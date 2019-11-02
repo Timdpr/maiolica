@@ -3,4 +3,4 @@ project(maiolica)
 
 set(CMAKE_CXX_STANDARD 14)
 
-add_executable(maiolica src/main.cpp)
+add_executable(maiolica src/main.cpp src/defs.h src/init.cpp src/bitboards.cpp src/hashkeys.cpp src/board.cpp src/data.cpp)
