@@ -98,11 +98,16 @@ struct Board {
 /// Takes 64-based square index and returns equivalent 120-based square index
 #define INDEX_64_TO_120(sq64) (sq64ToSq120[(sq64)])
 /// Finds first (least significant) bit in given bitboard, and returns index
-#define POP(b) popBit(b)
+#define POP(bitboard) popBit(bitboard)
 /// Returns number of bits in bitboard
-#define COUNT(b) countBits(b)
+#define COUNT(bitboard) countBits(bitboard)
 #define CLEAR_BIT(bitboard, sq) ((bitboard) &= clearMask[(sq)])
 #define SET_BIT(bitboard, sq) ((bitboard) |= setMask[(sq)])
+#define IS_KNIGHT(piece) (pieceKnight[(piece)])
+#define IS_BISHOP_OR_QUEEN(piece) (pieceBishopQueen[(piece)])
+#define IS_ROOK_OR_QUEEN(piece) (pieceRookQueen[(piece)])
+#define IS_KING(piece) (pieceKing[(piece)])
+
 extern U64 RAND_64;
 
 
@@ -130,6 +135,10 @@ extern int piecesColour[13]; // stores piece colour
 extern int filesBoard[BRD_SQ_NUM]; // holds the file index for a board position, 0 - 7 or 100 if offboard
 extern int ranksBoard[BRD_SQ_NUM]; // holds the rank index for a board position, 0 - 7 or 100 if offboard
 
+extern int pieceKnight[13]; // used to ask 'is piece a knight?'
+extern int pieceBishopQueen[13]; // used to ask 'is piece a bishop or queen?'
+extern int pieceRookQueen[13]; // used to ask 'is piece a rook or queen?'
+extern int pieceKing[13]; // used to ask 'is piece a king?'
 
 /* -- FUNCTIONS -- */
 // init.cpp
@@ -149,6 +158,9 @@ extern void updateMaterialLists(Board *board);
 extern int parseFen(char *fen, Board *board);
 extern void resetBoard(Board *board);
 extern void printBoard(const Board *board);
+
+// attack.cpp
+extern int isSquareAttacked(const int square, const int attackingSide, const Board *board);
 
 
 #endif //MAIOLICA_DEFS_H
