@@ -116,7 +116,7 @@ void updateMaterialLists(Board *board) {
 }
 
 /// Parses a Forsyth–Edwards Notation string and sets the given board with it
-int parseFen(char *fen, Board *board) {
+int parseFen(const char *fen, Board *board) {
     ASSERT(fen != NULL)
     ASSERT(board != NULL)
 

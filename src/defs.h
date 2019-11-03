@@ -52,6 +52,22 @@ enum { wK_CA = 1, wQ_CA = 2, bK_CA = 4, bQ_CA = 8 }; // Castling permissions
 
 
 /* -- STRUCTS -- */
+/** Uses an integer to store all necessary information, and another int for the score
+
+0000 0000 0000 0000 0000 0111 1111 -> 'From' square: 0x7F
+0000 0000 0000 0011 1111 1000 0000 -> 'To' square: >>7, 0x7F
+0000 0000 0011 1100 0000 0000 0000 -> Piece captured, if any: >>14, 0xF
+0000 0000 0100 0000 0000 0000 0000 -> En passant?: bit and, 0x40000
+0000 0000 1000 1100 0000 0000 0000 -> Pawn start move?: bit and, 0x80000
+0000 1111 0000 0000 0000 0000 0000 -> What piece was promoted, if any: >>20, 0xF
+0001 0000 0000 0000 0000 0000 0000 -> Was it a castling move?: bit and, 0x1000000
+
+We can also check '0x7C000' to see if a move was a capturing move, and 0xF00000 to see if it contains a promotion */
+struct Move {
+    int move; // stores lots of information
+    int score; // used for move ordering
+};
+
 /// Holds game state at a particular ply
 struct Undo {
     int move;
@@ -91,6 +107,7 @@ struct Board {
 
 
 /* -- MACROS -- */
+// - Square index macros:
 /// Takes 64-based file and rank index and returns 120-based square index
 #define FILE_RANK_TO_SQUARE_INDEX(file, rank) ( (21 + (file)) + ((rank) * 10) )
 /// Takes 120-based square index and returns equivalent 64-based square index
@@ -98,20 +115,47 @@ struct Board {
 /// Takes 64-based square index and returns equivalent 120-based square index
 #define INDEX_64_TO_120(sq64) (sq64ToSq120[(sq64)])
 /// Finds first (least significant) bit in given bitboard, and returns index
+
+// - Bitboard macros:
+///
 #define POP(bitboard) popBit(bitboard)
 /// Returns number of bits in bitboard
 #define COUNT(bitboard) countBits(bitboard)
+///
 #define CLEAR_BIT(bitboard, sq) ((bitboard) &= clearMask[(sq)])
+///
 #define SET_BIT(bitboard, sq) ((bitboard) |= setMask[(sq)])
+
+// - Piece checking macros:
 #define IS_KNIGHT(piece) (pieceKnight[(piece)])
 #define IS_BISHOP_OR_QUEEN(piece) (pieceBishopQueen[(piece)])
 #define IS_ROOK_OR_QUEEN(piece) (pieceRookQueen[(piece)])
 #define IS_KING(piece) (pieceKing[(piece)])
 
-extern U64 RAND_64;
-
+// - Operations on Move int macros:
+// For getting info out of Move integer:
+/// Get 'from' square from move int
+#define GET_FROM(move) ((move) & 0x7F)
+/// Get 'to' square from move int
+#define GET_TO(move) (((move)>>7) & 0x7F)
+/// Get captured piece from move int
+#define GET_CAPTURED(move) (((move)>>14) & 0xF)
+/// Get promoted piece from move int
+#define GET_PROMOTED(move) (((move)>>20) & 0xF)
+/// Get en passant flag from move
+#define GET_EN_PASSANT(move) 0x40000
+/// Get pawn start flag from move
+#define GET_PAWN_START(move) 0x80000
+/// Get castling flag from move
+#define GET_CASTLING(move) 0x1000000
+///
+#define WAS_CAPTURING(move) 0x7C000
+///
+#define WAS_PROMOTION(move) 0xF00000
 
 /* -- GLOBAL -- */  // TODO: Consider making these non-global...
+extern U64 RAND_64;
+
 extern int sq120ToSq64[BRD_SQ_NUM];
 extern int sq64ToSq120[64];
 
@@ -155,12 +199,15 @@ extern U64 generatePositionKey(const Board *board);
 // board.cpp
 extern int checkBoard(const Board *board);
 extern void updateMaterialLists(Board *board);
-extern int parseFen(char *fen, Board *board);
+extern int parseFen(const char *fen, Board *board);
 extern void resetBoard(Board *board);
 extern void printBoard(const Board *board);
 
 // attack.cpp
 extern int isSquareAttacked(const int square, const int attackingSide, const Board *board);
 
+// io.cpp
+extern char *printSquare(const int square);
+extern char *printMove(const int move);
 
 #endif //MAIOLICA_DEFS_H
