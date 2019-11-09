@@ -23,6 +23,7 @@ std::exit(0);}
 #define NAME "Maiolica 1.0"
 #define BRD_SQ_NUM 120
 #define MAX_GAME_MOVES 2048
+#define MAX_POSITION_MOVES 256
 #define START_FEN "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 
 typedef std::uint64_t U64;
@@ -66,6 +67,11 @@ We can also check '0x7C000' to see if a move was a capturing move, and 0xF00000 
 struct Move {
     int move; // stores lots of information
     int score; // used for move ordering
+};
+
+struct MoveList {
+    Move moves[MAX_POSITION_MOVES];
+    int count;
 };
 
 /// Holds game state at a particular ply
@@ -142,16 +148,16 @@ struct Board {
 #define GET_CAPTURED(move) (((move)>>14) & 0xF)
 /// Get promoted piece from move int
 #define GET_PROMOTED(move) (((move)>>20) & 0xF)
-/// Get en passant flag from move
-#define GET_EN_PASSANT(move) 0x40000
-/// Get pawn start flag from move
-#define GET_PAWN_START(move) 0x80000
-/// Get castling flag from move
-#define GET_CASTLING(move) 0x1000000
-///
-#define WAS_CAPTURING(move) 0x7C000
-///
-#define WAS_PROMOTION(move) 0xF00000
+/// Set en passant flag in move by ORing in this flag
+#define MFLAG_EN_PASSANT 0x40000
+/// Set pawn start flag in move by ORing in this flag
+#define MFLAG_PAWN_START 0x80000
+/// Set castling flag in move by ORing in this flag
+#define MFLAG_CASTLING 0x1000000
+/// Set capturing flag in move by ORing in this flag
+#define MFLAG_CAPTURING(move) 0x7C000
+/// Set promotion flag in move by ORing in this flag
+#define MFLAG_PROMOTION(move) 0xF00000
 
 /* -- GLOBAL -- */  // TODO: Consider making these non-global...
 extern U64 RAND_64;
@@ -165,24 +171,25 @@ extern U64 pieceKeys[13][120];
 extern U64 sideKey;
 extern U64 castleKeys[16];
 
-extern char pieceChars[];
-extern char sideChars[];
-extern char rankChars[];
-extern char fileChars[];
+extern const char pieceChars[];
+extern const char sideChars[];
+extern const char rankChars[];
+extern const char fileChars[];
 
-extern int piecesBig[13]; // stores whether piece is big
-extern int piecesMajor[13]; // stores whether piece is major
-extern int piecesMinor[13]; // stores whether piece is minor
-extern int piecesValue[13]; // stores piece value
-extern int piecesColour[13]; // stores piece colour
+extern const int piecesBig[13]; // stores whether piece is big
+extern const int piecesMajor[13]; // stores whether piece is major
+extern const int piecesMinor[13]; // stores whether piece is minor
+extern const int piecesValue[13]; // stores piece value
+extern const int piecesColour[13]; // stores piece colour
 
 extern int filesBoard[BRD_SQ_NUM]; // holds the file index for a board position, 0 - 7 or 100 if offboard
 extern int ranksBoard[BRD_SQ_NUM]; // holds the rank index for a board position, 0 - 7 or 100 if offboard
 
-extern int pieceKnight[13]; // used to ask 'is piece a knight?'
-extern int pieceBishopQueen[13]; // used to ask 'is piece a bishop or queen?'
-extern int pieceRookQueen[13]; // used to ask 'is piece a rook or queen?'
-extern int pieceKing[13]; // used to ask 'is piece a king?'
+extern const int pieceKnight[13]; // used to ask 'is piece a knight?'
+extern const int pieceBishopQueen[13]; // used to ask 'is piece a bishop or queen?'
+extern const int pieceRookQueen[13]; // used to ask 'is piece a rook or queen?'
+extern const int pieceKing[13]; // used to ask 'is piece a king?'
+extern const int pieceSlides[13]; // used to ask 'is piece a sliding piece?' (queen/rook/bishop)
 
 /* -- FUNCTIONS -- */
 // init.cpp
@@ -209,5 +216,16 @@ extern int isSquareAttacked(const int square, const int attackingSide, const Boa
 // io.cpp
 extern char *printSquare(const int square);
 extern char *printMove(const int move);
+extern void printMoveList(const MoveList *moveList);
+
+// validate.cpp
+extern bool squareOnBoard(const int sq);
+extern bool sideValid(const int side);
+extern bool fileOrRankValid(const int fileOrRank);
+extern bool pieceValid(const int piece);
+extern bool pieceValidOrEmpty(const int piece);
+
+// movegen.cpp
+extern void generateAllMoves(const Board *board, MoveList *list);
 
 #endif //MAIOLICA_DEFS_H
