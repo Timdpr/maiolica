@@ -40,3 +40,14 @@ char *printMove(const int move) {
     }
     return moveString;
 }
+
+void printMoveList(const MoveList *moveList) {
+    printf("MoveList: %d moves\n", moveList->count);
+
+    for (int i = 0; i < moveList->count; ++i) {
+        int move = moveList->moves[i].move;
+        int score = moveList->moves[i].score;
+
+        printf("Move: %d > %s (score: %d)\n", i+1, printMove(move), score);
+    }
+}
