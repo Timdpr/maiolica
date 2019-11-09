@@ -9,6 +9,10 @@ const int kingDirection[8]   = { -1, -10, 1, 10, -9, -11, 11, 9 };
 /// Call this to determine if the given square is being attacked *by the given side*
 int isSquareAttacked(const int square, const int attackingSide, const Board *board) {
 
+    ASSERT(squareOnBoard(square))
+    ASSERT(sideValid(attackingSide))
+    ASSERT(checkBoard(board))
+
     // Is it being attacked by a pawn?
     if (attackingSide == WHITE) {
         if (board->pieces[square - 11] == wP || board->pieces[square - 9] == wP) {
