@@ -26,8 +26,8 @@ int countBits(U64 bitboard) {
 void printBitBoard(U64 bitBoard) {
     auto shiftMe = U64(1);
 
-    int square = 0; // 120
-    int square64 = 0; // 64
+    int square; // 120
+    int square64; // 64
 
     std::printf("\n");
     for (int rank = RANK_8; rank >= RANK_1; --rank) {
