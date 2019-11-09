@@ -31,11 +31,9 @@ void initFilesRanksBoard() {
         filesBoard[i] = OFFBOARD;
         ranksBoard[i] = OFFBOARD;
     }
-
-    int square = A1;
     for (int rank = RANK_1; rank <= RANK_8; ++rank) {
         for (int file = FILE_A; file <= FILE_H; ++file) {
-            square = FILE_RANK_TO_SQUARE_INDEX(file, rank);
+            int square = FILE_RANK_TO_SQUARE_INDEX(file, rank);
             filesBoard[square] = file;
             ranksBoard[square] = rank;
         }
