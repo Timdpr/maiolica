@@ -3,13 +3,11 @@
 
 /// Lots of cross-checking of most elements of the board!
 int checkBoard(const Board *board) {
-    int piece, pieceNum, square64, square120, colour;
-
     // Check piece lists match
-    for (piece = wP; piece <= bK; ++piece) {
-        for (pieceNum = 0; pieceNum < board->pieceNums[piece]; ++pieceNum) {
-            square120 = board->pieceList[piece][pieceNum];
-            ASSERT(board->pieces[square120] == piece);
+    for (int piece = wP; piece <= bK; ++piece) {
+        for (int pieceNum = 0; pieceNum < board->pieceNums[piece]; ++pieceNum) {
+            int square120 = board->pieceList[piece][pieceNum];
+            ASSERT(board->pieces[square120] == piece)
         }
     }
 
@@ -21,10 +19,10 @@ int checkBoard(const Board *board) {
     int expectedMaterial[2] = { 0, 0 };
 
     for (int square64 = 0; square64 < 64; ++square64) {
-        square120 = INDEX_64_TO_120(square64);
-        piece = board->pieces[square120]; // go through board pieces array
+        int square120 = INDEX_64_TO_120(square64);
+        int piece = board->pieces[square120]; // go through board pieces array
         expectedPieceNums[piece]++; // increment number of this piece
-        colour = piecesColour[piece];
+        int colour = piecesColour[piece];
         // add to piece type counts
         if (piecesBig[piece] == TRUE) expectedBigPieces[colour]++;
         if (piecesMinor[piece] == TRUE) expectedMinorPieces[colour]++;
@@ -33,8 +31,8 @@ int checkBoard(const Board *board) {
         expectedMaterial[colour] += piecesValue[piece]; // add to side's material score
     }
     // Check piece number array
-    for (piece = wP; piece <= bK; ++piece) {
-        ASSERT(expectedPieceNums[piece] == board->pieceNums[piece]);
+    for (int piece = wP; piece <= bK; ++piece) {
+        ASSERT(expectedPieceNums[piece] == board->pieceNums[piece])
     }
 
     // Check pawn bitboard
@@ -44,52 +42,50 @@ int checkBoard(const Board *board) {
     expectedPawns[BOTH] = board->pawns[BOTH];
 
     int pawnCount = COUNT(expectedPawns[WHITE]);
-    ASSERT(pawnCount == board->pieceNums[wP]);
+    ASSERT(pawnCount == board->pieceNums[wP])
     pawnCount = COUNT(expectedPawns[BLACK]);
-    ASSERT(pawnCount == board->pieceNums[bP]);
+    ASSERT(pawnCount == board->pieceNums[bP])
     pawnCount = COUNT(expectedPawns[BOTH]);
-    ASSERT(pawnCount == board->pieceNums[wP] + board->pieceNums[bP]);
+    ASSERT(pawnCount == board->pieceNums[wP] + board->pieceNums[bP])
 
     // Check bitboard squares
     while (expectedPawns[WHITE]) {
-        square64 = POP(&expectedPawns[WHITE]);
-        ASSERT(board->pieces[INDEX_64_TO_120(square64)] == wP);
+        int square64 = POP(&expectedPawns[WHITE]);
+        ASSERT(board->pieces[INDEX_64_TO_120(square64)] == wP)
     }
     while (expectedPawns[BLACK]) {
-        square64 = POP(&expectedPawns[BLACK]);
-        ASSERT(board->pieces[INDEX_64_TO_120(square64)] == bP);
+        int square64 = POP(&expectedPawns[BLACK]);
+        ASSERT(board->pieces[INDEX_64_TO_120(square64)] == bP)
     }
     while (expectedPawns[BOTH]) {
-        square64 = POP(&expectedPawns[BOTH]);
-        ASSERT( (board->pieces[INDEX_64_TO_120(square64)] == bP) || (board->pieces[INDEX_64_TO_120(square64)] == wP) );
+        int square64 = POP(&expectedPawns[BOTH]);
+        ASSERT( (board->pieces[INDEX_64_TO_120(square64)] == bP) || (board->pieces[INDEX_64_TO_120(square64)] == wP) )
     }
 
     // Check various counts, etc.
-    ASSERT(expectedMaterial[WHITE] == board->material[WHITE] && expectedMaterial[BLACK] == board->material[BLACK]);
-    ASSERT(expectedMinorPieces[WHITE] == board->minorPieces[WHITE] && expectedMinorPieces[BLACK] == board->minorPieces[BLACK]);
-    ASSERT(expectedMajorPieces[WHITE] == board->majorPieces[WHITE] && expectedMajorPieces[BLACK] == board->majorPieces[BLACK]);
-    ASSERT(expectedBigPieces[WHITE] == board->bigPieces[WHITE] && expectedBigPieces[BLACK] == board->bigPieces[BLACK]);
+    ASSERT(expectedMaterial[WHITE] == board->material[WHITE] && expectedMaterial[BLACK] == board->material[BLACK])
+    ASSERT(expectedMinorPieces[WHITE] == board->minorPieces[WHITE] && expectedMinorPieces[BLACK] == board->minorPieces[BLACK])
+    ASSERT(expectedMajorPieces[WHITE] == board->majorPieces[WHITE] && expectedMajorPieces[BLACK] == board->majorPieces[BLACK])
+    ASSERT(expectedBigPieces[WHITE] == board->bigPieces[WHITE] && expectedBigPieces[BLACK] == board->bigPieces[BLACK])
 
-    ASSERT(board->side == WHITE || board->side == BLACK);
-    ASSERT(generatePositionKey(board) == board->positionKey);
+    ASSERT(board->side == WHITE || board->side == BLACK)
+    ASSERT(generatePositionKey(board) == board->positionKey)
 
     ASSERT(board->enPasSq==NO_SQ || ( ranksBoard[board->enPasSq] == RANK_6 && board->side == WHITE)
-           || ( ranksBoard[board->enPasSq] == RANK_3 && board->side == BLACK)); // en passant specifics!
+           || ( ranksBoard[board->enPasSq] == RANK_3 && board->side == BLACK)) // en passant specifics!
 
-    ASSERT(board->pieces[board->kingSq[WHITE]] == wK);
-    ASSERT(board->pieces[board->kingSq[BLACK]] == bK);
+    ASSERT(board->pieces[board->kingSq[WHITE]] == wK)
+    ASSERT(board->pieces[board->kingSq[BLACK]] == bK)
 
     return TRUE;
 }
 
 /// Loops through all pieces and populates various lists of 'material'
 void updateMaterialLists(Board *board) {
-    int piece, square120, colour;
-    for (int i = 0; i < BRD_SQ_NUM; ++i) { // Loop through pieces
-        square120 = i;
-        piece = board->pieces[i];
+    for (int square120 = 0; square120 < BRD_SQ_NUM; ++square120) { // Loop through pieces
+        int piece = board->pieces[square120];
         if (piece != OFFBOARD && piece != EMPTY) {
-            colour = piecesColour[piece];
+            int colour = piecesColour[piece];
             // Piece type counts
             if (piecesBig[piece] == TRUE) board->bigPieces[colour]++;
             if (piecesMinor[piece] == TRUE) board->minorPieces[colour]++;
@@ -123,12 +119,11 @@ int parseFen(const char *fen, Board *board) {
     int rank = RANK_8;
     int file = FILE_A;
     int piece = 0;
-    int count = 0;
 
     resetBoard(board);
 
     while ((rank >= RANK_1) && *fen) {
-        count = 1;
+        int count = 1;
         switch (*fen) {
             // is it a piece? Set piece var to enum value.
             case 'p': piece = bP; break;
@@ -170,20 +165,16 @@ int parseFen(const char *fen, Board *board) {
 
         // empty piece 'count' is set to 1 OR the number of squares to skip,
         // so this will set piece OR skip the required amount of times!
-        int sq64 = 0;
-        int sq120 = 0;
         for (int i = 0; i < count; i++) {
-            sq64 = rank * 8 + file;         // TODO: Can these 2 lines be moved
-            sq120 = INDEX_64_TO_120(sq64);  //  to 'not empty' loop below?
             if (piece != EMPTY) {
-                board->pieces[sq120] = piece;
+                board->pieces[INDEX_64_TO_120(rank * 8 + file)] = piece;
             }
             file++;
         }
         fen++;
     }
     // At this point, our fen pointer should be at the 'side to move' position
-    ASSERT(*fen == 'w' || *fen == 'b');
+    ASSERT(*fen == 'w' || *fen == 'b')
     board->side = (*fen == 'w') ? WHITE : BLACK;
     fen += 2;
 
@@ -202,15 +193,15 @@ int parseFen(const char *fen, Board *board) {
         fen++;
     }
     fen++;
-    ASSERT(board->castlingPerms >= 0 && board->castlingPerms <= 15);
+    ASSERT(board->castlingPerms >= 0 && board->castlingPerms <= 15)
 
     // En passant square:
     if (*fen != '-') { // if we have an en passant square...
         file = fen[0] - 'a'; // set file and rank ints with ASCII trick
         rank = fen[1] - '1';
 
-        ASSERT(file >= FILE_A && file <= FILE_H);
-        ASSERT(rank >= RANK_1 && rank <= RANK_8);
+        ASSERT(file >= FILE_A && file <= FILE_H)
+        ASSERT(rank >= RANK_1 && rank <= RANK_8)
 
         board->enPasSq = FILE_RANK_TO_SQUARE_INDEX(file, rank); // set square
     }
@@ -237,6 +228,7 @@ void resetBoard(Board *board) {
         board->bigPieces[i] = 0;
         board->majorPieces[i] = 0;
         board->minorPieces[i] = 0;
+        board->material[i] = 0;
     }
 
     for (int i = 0; i < 3; i++) {
@@ -264,30 +256,29 @@ void resetBoard(Board *board) {
 }
 
 void printBoard(const Board *board) {
-    std::printf("\nBoard:\n");
+    std::printf("\n Board:\n");
 
     for(int rank = RANK_8; rank >= RANK_1; rank--) {
-        std::printf("%d  ", rank+1);
         for(int file = FILE_A; file <= FILE_H; file++) {
             int sq = FILE_RANK_TO_SQUARE_INDEX(file, rank);
             int piece = board->pieces[sq];
             std::printf("%3c", pieceChars[piece]);
         }
-        std::printf("\n");
+        std::printf("   %d\n", rank+1);
     }
 
-    std::printf("\n   ");
+    std::printf("\n");
     for(int file = FILE_A; file <= FILE_H; file++) {
-        std::printf("%3c", 'a'+file);
+        std::printf("%3c", 'A'+file);
     }
     std::printf("\n\n");
     std::printf("side character: %c\n", sideChars[board->side]);
     std::printf("en passant square: %d\n", board->enPasSq);
     std::printf("castling permissions: %c%c%c%c\n",
-           board->castlingPerms & wK_CA ? 'K' : '-',
-           board->castlingPerms & wQ_CA ? 'Q' : '-',
-           board->castlingPerms & bK_CA ? 'k' : '-',
-           board->castlingPerms & bQ_CA ? 'q' : '-'
+            (board->castlingPerms & wK_CA) ? 'K' : '-',
+            (board->castlingPerms & wQ_CA) ? 'Q' : '-',
+            (board->castlingPerms & bK_CA) ? 'k' : '-',
+            (board->castlingPerms & bQ_CA) ? 'q' : '-'
     );
     std::printf("position key: %llX\n", board->positionKey);
 }
