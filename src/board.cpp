@@ -5,7 +5,7 @@
 int checkBoard(const Board *board) {
     // Check piece lists match
     for (int piece = wP; piece <= bK; ++piece) {
-        for (int pieceNum = 0; pieceNum < board->pieceNums[piece]; ++pieceNum) {
+        for (int pieceNum = 0; pieceNum < board->pieceCounts[piece]; ++pieceNum) {
             int square120 = board->pieceList[piece][pieceNum];
             ASSERT(board->pieces[square120] == piece)
         }
@@ -22,17 +22,17 @@ int checkBoard(const Board *board) {
         int square120 = INDEX_64_TO_120(square64);
         int piece = board->pieces[square120]; // go through board pieces array
         expectedPieceNums[piece]++; // increment number of this piece
-        int colour = piecesColour[piece];
+        int colour = pieceColours[piece];
         // add to piece type counts
-        if (piecesBig[piece] == TRUE) expectedBigPieces[colour]++;
-        if (piecesMinor[piece] == TRUE) expectedMinorPieces[colour]++;
-        if (piecesMajor[piece] == TRUE) expectedMajorPieces[colour]++;
+        if (bigPieces[piece] == TRUE) expectedBigPieces[colour]++;
+        if (minorPieces[piece] == TRUE) expectedMinorPieces[colour]++;
+        if (majorPieces[piece] == TRUE) expectedMajorPieces[colour]++;
 
-        expectedMaterial[colour] += piecesValue[piece]; // add to side's material score
+        expectedMaterial[colour] += pieceValues[piece]; // add to side's material score
     }
     // Check piece number array
     for (int piece = wP; piece <= bK; ++piece) {
-        ASSERT(expectedPieceNums[piece] == board->pieceNums[piece])
+        ASSERT(expectedPieceNums[piece] == board->pieceCounts[piece])
     }
 
     // Check pawn bitboard
@@ -42,11 +42,11 @@ int checkBoard(const Board *board) {
     expectedPawns[BOTH] = board->pawns[BOTH];
 
     int pawnCount = COUNT(expectedPawns[WHITE]);
-    ASSERT(pawnCount == board->pieceNums[wP])
+    ASSERT(pawnCount == board->pieceCounts[wP])
     pawnCount = COUNT(expectedPawns[BLACK]);
-    ASSERT(pawnCount == board->pieceNums[bP])
+    ASSERT(pawnCount == board->pieceCounts[bP])
     pawnCount = COUNT(expectedPawns[BOTH]);
-    ASSERT(pawnCount == board->pieceNums[wP] + board->pieceNums[bP])
+    ASSERT(pawnCount == board->pieceCounts[wP] + board->pieceCounts[bP])
 
     // Check bitboard squares
     while (expectedPawns[WHITE]) {
@@ -85,17 +85,17 @@ void updateMaterialLists(Board *board) {
     for (int square120 = 0; square120 < BRD_SQ_NUM; ++square120) { // Loop through pieces
         int piece = board->pieces[square120];
         if (piece != OFFBOARD && piece != EMPTY) {
-            int colour = piecesColour[piece];
+            int colour = pieceColours[piece];
             // Piece type counts
-            if (piecesBig[piece] == TRUE) board->bigPieces[colour]++;
-            if (piecesMinor[piece] == TRUE) board->minorPieces[colour]++;
-            if (piecesMajor[piece] == TRUE) board->majorPieces[colour]++;
+            if (bigPieces[piece] == TRUE) board->bigPieces[colour]++;
+            if (minorPieces[piece] == TRUE) board->minorPieces[colour]++;
+            if (majorPieces[piece] == TRUE) board->majorPieces[colour]++;
             // Overall material score
-            board->material[colour] += piecesValue[piece];
+            board->material[colour] += pieceValues[piece];
             // Square index of each piece
-            board->pieceList[piece][board->pieceNums[piece]] = square120;
+            board->pieceList[piece][board->pieceCounts[piece]] = square120;
             // How many of each type of piece
-            board->pieceNums[piece]++;
+            board->pieceCounts[piece]++;
             // King locations
             if (piece == wK) board->kingSq[WHITE] = square120;
             if (piece == bK) board->kingSq[BLACK] = square120;
@@ -236,7 +236,7 @@ void resetBoard(Board *board) {
     }
 
     for (int i = 0; i < 13; ++i) {
-        board->pieceNums[i] = 0;
+        board->pieceCounts[i] = 0;
     }
 
     board->kingSq[WHITE] = board->kingSq[BLACK] = NO_SQ;
@@ -246,7 +246,7 @@ void resetBoard(Board *board) {
     board->fiftyMove = 0;
 
     board->ply = 0;
-    board->plyHist = 0;
+    board->historyPly = 0;
 
     board->castlingPerms = 0;
 

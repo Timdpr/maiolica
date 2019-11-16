@@ -1,4 +1,3 @@
-
 #include "defs.h"
 
 const int knightDirection[8] = { -8, -19, -21, -12, 8, 19, 21, 12 };
@@ -25,7 +24,7 @@ int isSquareAttacked(const int square, const int attackingSide, const Board *boa
     // How about a knight?
     for (int i = 0; i < 8; ++i) { // go through 'knightDirection'
         int piece = board->pieces[square + knightDirection[i]];
-        if (IS_KNIGHT(piece) && piecesColour[piece] == attackingSide) {
+        if (piece != OFFBOARD && IS_KNIGHT(piece) && pieceColours[piece] == attackingSide) {
             return TRUE;
         }
     }
@@ -37,7 +36,7 @@ int isSquareAttacked(const int square, const int attackingSide, const Board *boa
         int piece = board->pieces[tempSquare];
         while (piece != OFFBOARD) {
             if (piece != EMPTY) {
-                if (IS_ROOK_OR_QUEEN(piece) && piecesColour[piece] == attackingSide) {
+                if (IS_ROOK_OR_QUEEN(piece) && pieceColours[piece] == attackingSide) {
                     return TRUE;
                 }
                 break; // we have hit a piece, any piece, so break out of loop
@@ -54,7 +53,7 @@ int isSquareAttacked(const int square, const int attackingSide, const Board *boa
         int piece = board->pieces[tempSquare];
         while (piece != OFFBOARD) {
             if (piece != EMPTY) {
-                if (IS_BISHOP_OR_QUEEN(piece) && piecesColour[piece] == attackingSide) {
+                if (IS_BISHOP_OR_QUEEN(piece) && pieceColours[piece] == attackingSide) {
                     return TRUE;
                 }
                 break; // we have hit a piece, any piece, so break out of loop
@@ -67,7 +66,7 @@ int isSquareAttacked(const int square, const int attackingSide, const Board *boa
     // And finally, how about the kings?
     for (int i = 0; i < 8; ++i) { // go through 'knightDirection'
         int piece = board->pieces[square + kingDirection[i]];
-        if (IS_KING(piece) && piecesColour[piece] == attackingSide) {
+        if (piece != OFFBOARD && IS_KING(piece) && pieceColours[piece] == attackingSide) {
             return TRUE;
         }
     }
