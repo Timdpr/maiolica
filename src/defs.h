@@ -5,14 +5,14 @@
 #include <cstdio>
 #include <cstdlib>
 
-#define DEBUG
+//#define DEBUG
 
 #ifndef DEBUG
 #define ASSERT(n)
 #else
 #define ASSERT(n) \
 if(!(n)) { \
-std::printf("*** ASSERTION ERROR ***\n%s : FAILED ",#n); \
+std::printf("\n*** ASSERTION ERROR ***\n%s : FAILED ",#n); \
 std::printf("on %s ",__DATE__); \
 std::printf("at %s \n",__TIME__); \
 std::printf("At line %d ",__LINE__); \
@@ -21,7 +21,7 @@ std::exit(0);}
 #endif //DEBUG
 
 #define NAME "Maiolica 1.0"
-#define BRD_SQ_NUM 120
+#define BRD_SQ_NUM 120 // number of squares on the main, 'mailbox representation' board
 #define MAX_GAME_MOVES 2048
 #define MAX_POSITION_MOVES 256
 #define START_FEN "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
@@ -55,12 +55,12 @@ enum { wK_CA = 1, wQ_CA = 2, bK_CA = 4, bQ_CA = 8 }; // Castling permissions
 /* -- STRUCTS -- */
 /** Uses an integer to store all necessary information, and another int for the score
 
-0000 0000 0000 0000 0000 0111 1111 -> 'From' square: 0x7F
-0000 0000 0000 0011 1111 1000 0000 -> 'To' square: >>7, 0x7F
-0000 0000 0011 1100 0000 0000 0000 -> Piece captured, if any: >>14, 0xF
-0000 0000 0100 0000 0000 0000 0000 -> En passant?: bit and, 0x40000
-0000 0000 1000 1100 0000 0000 0000 -> Pawn start move?: bit and, 0x80000
-0000 1111 0000 0000 0000 0000 0000 -> What piece was promoted, if any: >>20, 0xF
+0000 0000 0000 0000 0000 0111 1111 -> 'From' square: 0x7F                         <br>
+0000 0000 0000 0011 1111 1000 0000 -> 'To' square: >>7, 0x7F                      <br>
+0000 0000 0011 1100 0000 0000 0000 -> Piece captured, if any: >>14, 0xF           <br>
+0000 0000 0100 0000 0000 0000 0000 -> En passant?: bit and, 0x40000               <br>
+0000 0000 1000 1100 0000 0000 0000 -> Pawn start move?: bit and, 0x80000          <br>
+0000 1111 0000 0000 0000 0000 0000 -> What piece was promoted, if any: >>20, 0xF  <br>
 0001 0000 0000 0000 0000 0000 0000 -> Was it a castling move?: bit and, 0x1000000
 
 We can also check '0x7C000' to see if a move was a capturing move, and 0xF00000 to see if it contains a promotion */
@@ -77,30 +77,30 @@ struct MoveList {
 /// Holds game state at a particular ply
 struct Undo {
     int move;
-    int castlePermission;
-    int enPas;
+    int castlingPerms;
+    int enPasSq;
     int fiftyMove;
-    U64 posKey;
+    U64 positionKey;
 };
 
+/// Representation of a board position
 struct Board {
-    int pieces[BRD_SQ_NUM];
+    int pieces[BRD_SQ_NUM]; // array of pieces indexed by 120-based square index
     U64 pawns[3]; // bitboard
+    int kingSq[2]; // square that the king is on, indexed by side
 
-    int kingSq[2];
-
-    int side;
+    int side; // the side to play, WHITE or BLACK
     int enPasSq; // en passant square, if set
-    int fiftyMove;
+    int fiftyMove; // 'fifty move rule' counter
 
     int ply;
-    int plyHist;
+    int historyPly;
 
-    int castlingPerms;
+    int castlingPerms; // castling permissions, from white kingside to black queenside, held in 4 bits (e.g. 15 == 1111 == all true)
 
     U64 positionKey; // hashkey
 
-    int pieceNums[13]; // holds numbers of types pieces currently on the board (index corresponds to piece type enum)
+    int pieceCounts[13]; // holds numbers of types pieces currently on the board (index corresponds to piece type enum)
     int bigPieces[2]; // # of non-pawn pieces by colour
     int majorPieces[2]; // # of rooks & queens by colour
     int minorPieces[2]; // # of bishops & knights by colour
@@ -176,11 +176,12 @@ extern const char sideChars[];
 extern const char rankChars[];
 extern const char fileChars[];
 
-extern const int piecesBig[13]; // stores whether piece is big
-extern const int piecesMajor[13]; // stores whether piece is major
-extern const int piecesMinor[13]; // stores whether piece is minor
-extern const int piecesValue[13]; // stores piece value
-extern const int piecesColour[13]; // stores piece colour
+extern const int bigPieces[13]; // stores whether piece is big
+extern const int majorPieces[13]; // stores whether piece is major
+extern const int minorPieces[13]; // stores whether piece is minor
+extern const int piecePawn[13]; // stores whether piece is a pawn
+extern const int pieceValues[13]; // stores piece value
+extern const int pieceColours[13]; // stores piece colour
 
 extern int filesBoard[BRD_SQ_NUM]; // holds the file index for a board position, 0 - 7 or 100 if offboard
 extern int ranksBoard[BRD_SQ_NUM]; // holds the rank index for a board position, 0 - 7 or 100 if offboard
@@ -227,5 +228,12 @@ extern bool pieceValidOrEmpty(const int piece);
 
 // movegen.cpp
 extern void generateAllMoves(const Board *board, MoveList *list);
+
+// makemove.cpp
+extern int makeMove(Board *board, int move);
+extern void takeMove(Board *board);
+
+// perft.cpp
+extern void perftTest(int depth, Board *board);
 
 #endif //MAIOLICA_DEFS_H
