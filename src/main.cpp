@@ -1,32 +1,26 @@
 #include <cstdio>
+#include <iostream>
 #include "defs.h"
 
 int main() {
 
+    const char *PAWNMOVESW = "rnbqkb1r/pp1p1pPp/8/2p1pP2/1P1P4/3P3P/P1P1P3/RNBQKBNR w KQkq e6 0 1";
+    const char *PAWNMOVESB = "rnbqkbnr/p1p1p3/3p3p/1p1p4/2P1Pp2/8/PP1P1PpP/RNBQKB1R b KQkq e3 0 1";
+    const char *KNIGHTSKINGS = "5k2/1n6/4n3/6N1/8/3N4/8/5K2 w - - 0 1";
+    const char *ROOKS = "6k1/8/5r2/8/1nR5/5N2/8/6K1 b - - 0 1";
+    const char *QUEENS = "6k1/8/4nq2/8/1nQ5/5N2/1N6/6K1 b - - 0 1 ";
+    const char *BISHOPS = "6k1/1b6/4n3/8/1n4B1/1B3N2/1N6/2b3K1 b - - 0 1 ";
+    const char *CASTLE1 = "r3k2r/8/8/8/8/8/8/R3K2R w KQkq - 0 1";
+    const char *CASTLE2 = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1";
+    const char *TRICKYFEN = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1";
+
     initAll();
 
     Board board[1];
+    MoveList moveList[1];
 
-    const char* FEN4 = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1";
-
-    parseFen(FEN4, board);
-    printBoard(board);
-    ASSERT(checkBoard(board));
-
-    int move = 0;
-    int from = A2;
-    int to = H7;
-    int cap = wR;
-    int prom = bB;
-
-    move = ( from ) | (to << 7) | ( cap << 14) | (prom << 20 );
-
-    printf("from: %d, to: %d, cap: %d, prom: %d\n",
-            GET_FROM(move), GET_TO(move), GET_CAPTURED(move), GET_PROMOTED(move));
-
-    printf("Algebraic from: %s\n", printSquare(from));
-    printf("Algebraic to: %s\n", printSquare(to));
-    printf("Algebraic move: %s\n", printMove(move));
+    parseFen(TRICKYFEN, board);
+    perftTest(5, board);
 
     return 0;
 }
