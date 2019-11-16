@@ -8,7 +8,7 @@ U64 generatePositionKey(const Board *board) { // returns rather than sets key
     // Loop through squares on board
     for (int square = 0; square < BRD_SQ_NUM; ++square) {
         int piece = board->pieces[square]; // set piece to whatever is in board's pieces array at this square
-        if (piece != NO_SQ && piece != OFFBOARD && piece != EMPTY) { // if piece is not a border square AND not empty...
+        if (piece != NO_SQ && piece != EMPTY && piece != OFFBOARD) { // if piece is not a border square AND not empty...
             ASSERT(piece >= wP && piece <= bK) // ...then it must be a real piece (white pawn up to black king)
             finalKey ^= pieceKeys[piece][square]; // hash in whatever number is stored at piece keys array here
         }
