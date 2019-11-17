@@ -51,3 +51,43 @@ void printMoveList(const MoveList *moveList) {
         printf("Move: %d > %s (score: %d)\n", i+1, printMove(move), score);
     }
 }
+
+/// Takes algebraic notation for move, and returns move int
+int parseMove(char *ptrChar, Board *board) {
+    // Make sure that rank/file is within correct bounds
+    if (ptrChar[1] > '8' || ptrChar[1] < '1') return FALSE;
+    if (ptrChar[3] > '8' || ptrChar[3] < '1') return FALSE;
+    if (ptrChar[0] > 'h' || ptrChar[0] < 'a') return FALSE;
+    if (ptrChar[2] > 'h' || ptrChar[2] < 'a') return FALSE;
+    // Get from/to square
+    int from = FILE_RANK_TO_SQUARE_INDEX(ptrChar[0] - 'a', ptrChar[1] - '1');
+    int to = FILE_RANK_TO_SQUARE_INDEX(ptrChar[2] - 'a', ptrChar[3] - '1');
+
+    printf("Char pointer: %s, from: %d, to: %d\n", ptrChar, from, to);
+    ASSERT(squareOnBoard(from) && squareOnBoard(to))
+
+    // Generate all moves for this board position, then try to find one that matches the input
+    MoveList moveList[1];
+    generateAllMoves(board, moveList);
+
+    for (int moveNum = 0; moveNum < moveList->count; ++moveNum) { // loop through moves to find matching move
+        int move = moveList->moves[moveNum].move;
+        if (GET_FROM(move) == from && GET_TO(move) == to) { // the from & to squares match, so this is the same move...
+            int promotedPiece = GET_PROMOTED(move); // ...if the promoted piece matches too:
+            if (promotedPiece != EMPTY) {
+                if (IS_ROOK_OR_QUEEN(promotedPiece) && !IS_BISHOP_OR_QUEEN(promotedPiece) && ptrChar[4] == 'r') {
+                    return move;
+                } else if (!IS_ROOK_OR_QUEEN(promotedPiece) && IS_BISHOP_OR_QUEEN(promotedPiece) && ptrChar[4] == 'b') {
+                    return move;
+                } else if (IS_ROOK_OR_QUEEN(promotedPiece) && IS_BISHOP_OR_QUEEN(promotedPiece) && ptrChar[4] == 'q') {
+                    return move;
+                } else if (IS_KNIGHT(promotedPiece) && ptrChar[4] == 'n') {
+                    return move;
+                }
+                continue;
+            }
+            return move;
+        }
+    }
+    return NO_MOVE;
+}

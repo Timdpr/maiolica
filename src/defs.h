@@ -159,6 +159,8 @@ struct Board {
 /// Set promotion flag in move by ORing in this flag
 #define MFLAG_PROMOTION(move) 0xF00000
 
+#define NO_MOVE 0
+
 /* -- GLOBAL -- */  // TODO: Consider making these non-global...
 extern U64 RAND_64;
 
@@ -218,6 +220,7 @@ extern int isSquareAttacked(const int square, const int attackingSide, const Boa
 extern char *printSquare(const int square);
 extern char *printMove(const int move);
 extern void printMoveList(const MoveList *moveList);
+extern int parseMove(char *ptrChar, Board *board);
 
 // validate.cpp
 extern bool squareOnBoard(const int sq);
