@@ -20,13 +20,14 @@ int main() {
     Board board[1];
     MoveList moveList[1];
 
-    parseFen(TRICKYFEN2, board);
-//    perftTest(5, board);
+    parseFen(START_FEN, board);
 
     char input[6];
+    int pvNum = 0;
+    int max = 0;
     printBoard(board);
     while (true) {
-        printf("\nPlease enter a move, 't' to undo last move, or 'q' to quit: ");
+        printf("\nPlease enter a move, 't' to undo last move, 'p' to run perft test, or 'q' to quit: ");
         fgets(input, 7, stdin);
         if (input[4] == '\n') input[4] = '\0';
         if (input[5] == '\n') input[5] = '\0';
@@ -36,13 +37,27 @@ int main() {
         } else if (input[0] == 't') {
             takeMove(board);
             printBoard(board);
+        } else if (input[0] == 'p') {
+            perftTest(4, board);
+        } else if (input[0] == 'r') {
+            max = getPVLine(4, board);
+            printf("pvLine of %d Moves: ", max);
+            for (pvNum = 0; pvNum < max; ++pvNum) {
+                int move = board->pvArray[pvNum];
+                printf(" %s", printMove(move));
+            }
+            printf("\n");
         } else {
             int move = parseMove(input, board);
             if (move != NO_MOVE) {
+                storePVMove(board, move);
                 makeMove(board, move);
+                if (isRepetition(board)) {
+                    printf("REPETITION!!\n");
+                }
                 printBoard(board);
             } else {
-                printf("- Move not recognised! -\n");
+                printf("- Move not parsed: %s\n", input);
             }
         }
 
