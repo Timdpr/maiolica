@@ -131,7 +131,7 @@ static void movePiece(const int from, const int to, Board *board) {
 
 // returns false if the side making the move is in check after the move
 // TODO: Can't we get hash from history?
-int makeMove(Board *board, int move) { // todo: return bool?
+int makeMove(Board *board, int move) {
     ASSERT(checkBoard(board))
 
     int from = GET_FROM(move);
