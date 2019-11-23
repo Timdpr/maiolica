@@ -5,7 +5,7 @@
 #include <cstdio>
 #include <cstdlib>
 
-//#define DEBUG
+#define DEBUG
 
 #ifndef DEBUG
 #define ASSERT(n)
@@ -24,6 +24,7 @@ std::exit(0);}
 #define BRD_SQ_NUM 120 // number of squares on the main, 'mailbox representation' board
 #define MAX_GAME_MOVES 2048
 #define MAX_POSITION_MOVES 256
+#define MAX_DEPTH 64
 #define START_FEN "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 
 typedef std::uint64_t U64;
@@ -74,6 +75,18 @@ struct MoveList {
     int count;
 };
 
+/// Principal variation entry
+struct PVEntry {
+    U64 positionKey;
+    int move;
+};
+
+/// Principal variation table
+struct PVTable {
+    PVEntry *pTable; // pointer to element
+    int numEntries;
+};
+
 /// Holds game state at a particular ply
 struct Undo {
     int move;
@@ -109,6 +122,9 @@ struct Board {
     Undo history[MAX_GAME_MOVES]; // holds game state (via 'Undo' struct) at each ply
 
     int pieceList[13][10]; // 13 types of pieces, and at most 10 of each // TODO: May need to convert this to 1D for speed
+
+    PVTable pvTable[1]; // initialise principal variation table to size 1 array, but this will be dynamically allocated
+    int pvArray[MAX_DEPTH];
 };
 
 
@@ -223,14 +239,15 @@ extern void printMoveList(const MoveList *moveList);
 extern int parseMove(char *ptrChar, Board *board);
 
 // validate.cpp
-extern bool squareOnBoard(const int sq);
-extern bool sideValid(const int side);
-extern bool fileOrRankValid(const int fileOrRank);
-extern bool pieceValid(const int piece);
-extern bool pieceValidOrEmpty(const int piece);
+extern int squareOnBoard(const int sq);
+extern int sideValid(const int side);
+extern int fileOrRankValid(const int fileOrRank);
+extern int pieceValid(const int piece);
+extern int pieceValidOrEmpty(const int piece);
 
 // movegen.cpp
 extern void generateAllMoves(const Board *board, MoveList *list);
+extern int moveExists(Board *board, const int move);
 
 // makemove.cpp
 extern int makeMove(Board *board, int move);
@@ -238,5 +255,17 @@ extern void takeMove(Board *board);
 
 // perft.cpp
 extern void perftTest(int depth, Board *board);
+
+// misc.cpp
+extern int getTimeMS();
+
+// search.cpp
+extern int isRepetition(const Board *board);
+
+// pvtable.cpp
+extern int getPVLine(const int depth, Board *board);
+extern void initPVTable(PVTable *pvTable);
+extern void storePVMove(const Board *board, const int move);
+extern int probePVTable(const Board *board);
 
 #endif //MAIOLICA_DEFS_H
