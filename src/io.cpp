@@ -63,7 +63,6 @@ int parseMove(char *ptrChar, Board *board) {
     int from = FILE_RANK_TO_SQUARE_INDEX(ptrChar[0] - 'a', ptrChar[1] - '1');
     int to = FILE_RANK_TO_SQUARE_INDEX(ptrChar[2] - 'a', ptrChar[3] - '1');
 
-    printf("Char pointer: %s, from: %d, to: %d\n", ptrChar, from, to);
     ASSERT(squareOnBoard(from) && squareOnBoard(to))
 
     // Generate all moves for this board position, then try to find one that matches the input
