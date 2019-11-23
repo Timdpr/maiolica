@@ -111,7 +111,9 @@ void updateMaterialLists(Board *board) {
     }
 }
 
-/// Parses a Forsyth–Edwards Notation string and sets the given board with it
+/** Parses a Forsyth–Edwards Notation string and sets the given board with it
+ *  TODO: Missing half move clock!!!
+ */
 int parseFen(const char *fen, Board *board) {
     ASSERT(fen != NULL)
     ASSERT(board != NULL)
@@ -251,6 +253,8 @@ void resetBoard(Board *board) {
     board->castlingPerms = 0;
 
     board->positionKey = U64(0);
+
+    initPVTable(board->pvTable);
 
     // TODO: Missing resetting material?
 }
