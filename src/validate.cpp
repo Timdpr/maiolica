@@ -1,21 +1,23 @@
 #include "defs.h"
 
-bool squareOnBoard(const int sq) {
-    return !(filesBoard[sq] == OFFBOARD);
+/// Not using bools here, as compiler adds 'not 0 or 1' checking, and ints should be determined to be 8 bit here anyway
+
+int squareOnBoard(const int sq) {
+    return filesBoard[sq] == OFFBOARD ? 0 : 1;
 }
 
-bool sideValid(const int side) {
-    return side == WHITE || side == BLACK;
+int sideValid(const int side) {
+    return (side == WHITE || side == BLACK) ? 1 : 0;
 }
 
-bool fileOrRankValid(const int fileOrRank) {
-    return fileOrRank >= 0 && fileOrRank <= 7;
+int fileOrRankValid(const int fileOrRank) {
+    return (fileOrRank >= 0 && fileOrRank <= 7) ? 1 : 0;
 }
 
-bool pieceValid(const int piece) {
-    return piece >= wP && piece <= bK;
+int pieceValid(const int piece) {
+    return (piece >= wP && piece <= bK) ? 1 : 0;
 }
 
-bool pieceValidOrEmpty(const int piece) {
-    return piece >= EMPTY && piece <= bK;
+int pieceValidOrEmpty(const int piece) {
+    return (piece >= EMPTY && piece <= bK) ? 1 : 0;
 }
