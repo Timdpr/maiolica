@@ -285,3 +285,20 @@ void generateAllMoves(const Board *board, MoveList *moveList) {
         piece = nonSlidePiecesArray[pieceIndex++];
     }
 }
+
+/// Check that a move is legal given the board state
+int moveExists(Board *board, const int move) {
+    MoveList moveList[1];
+    generateAllMoves(board, moveList);
+
+    for (int moveNum = 0; moveNum < moveList->count; ++moveNum) {
+        if (!makeMove(board, moveList->moves[moveNum].move)) {
+            continue;
+        }
+        takeMove(board);
+        if (moveList->moves[moveNum].move == move) {
+            return TRUE;
+        }
+    }
+    return FALSE;
+}
