@@ -142,8 +142,14 @@ static int alphaBeta(int alpha, int beta, int depth, Board *board, SearchInfo *i
     if (isRepetition(board) || board->fiftyMove >= 100) {
         return 0;
     }
-    if (board->ply > MAX_DEPTH-1) { // at max depth allowed!
+    if (board->ply > MAX_DEPTH - 1) { // at max depth allowed!
         return evalPosition(board);
+    }
+
+    // increase depth if we are in check!
+    int inCheck = isSquareAttacked(board->kingSq[board->side], board->side^1, board); // are we in check?
+    if (inCheck == TRUE) {
+        depth++;
     }
 
     MoveList moveList[1];
@@ -205,7 +211,7 @@ static int alphaBeta(int alpha, int beta, int depth, Board *board, SearchInfo *i
     }
     if (legal == 0) { // if we don't have any legal moves...
         // ...and the king square of our side is attacked by the opposite side, we are checkmated
-        if (isSquareAttacked(board->kingSq[board->side], board->side^1, board)) {
+        if (inCheck) {
             return -MATE + board->ply; // return mate score PLUS PLYS TO GO UNTIL MATE
         } else {
             return 0;
