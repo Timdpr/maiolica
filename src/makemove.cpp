@@ -164,7 +164,7 @@ int makeMove(Board *board, int move) {
                 movePiece(H1, F1, board); break;
             case G8:
                 movePiece(H8, F8, board); break;
-            default: ASSERT(FALSE); break;
+            default: ASSERT(FALSE) break;
         }
     }
     // hash en passant square if it was available:
@@ -229,7 +229,7 @@ int makeMove(Board *board, int move) {
     board->side ^= 1;
     HASH_SIDE;
 
-    ASSERT(checkBoard(board));
+    ASSERT(checkBoard(board))
 
     // If the king is attacked by the new side to move, take back the move and return false
     if (isSquareAttacked(board->kingSq[side], board->side, board)) {

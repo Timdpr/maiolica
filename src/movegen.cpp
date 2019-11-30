@@ -3,6 +3,18 @@
 #define MOVE(from, to, captured, promoted, flag) ( (from) | ((to) << 7) | ((captured) << 14) | ((promoted) << 20 ) | (flag) )
 #define SQUARE_OFFBOARD(square) (filesBoard[(square)] == OFFBOARD)
 
+const int victimScore[13] = {0, 100, 200, 300, 400, 500, 600, 100, 200, 300, 400, 500, 600};
+static int mVVLVAScores[13][13];
+
+/*
+ * Move ordering:
+ * Search for...
+ * - PV Move
+ * - Captures -> MvvLVA (most valuable victim, least valuable attacker) (so P takes Q descending to Q takes P)
+ * - Killers (non-capturing)
+ * - HistoryScore (non-capturing)
+ */
+
 /// Use this array to loop through slide pieces for a side. Start at index given by slideLoopStartIndex[SIDE], and stop at '0'.
 const int slidePiecesArray[8]       = { wB, wR, wQ, 0, bB, bR, bQ, 0 };
 const int slideLoopStartIndex[2]    = { 0,          4 };
@@ -30,31 +42,38 @@ const int pieceDirectionNumbers[13] = { 0, 0, 8, 4, 4, 8, 8, 0, 8, 4, 4, 8, 8 };
 
 /// Adds a 'quiet' (non-capture) Move to the MoveList using the given 'move' integer
 static void addQuietMove(const Board *board, int move, MoveList *moveList) {
-    ASSERT(squareOnBoard(GET_FROM(move)));
-    ASSERT(squareOnBoard(GET_TO(move)));
+    ASSERT(squareOnBoard(GET_FROM(move)))
+    ASSERT(squareOnBoard(GET_TO(move)))
     // MoveList's 'count' variable is essentially 'current index + 1'
     // So at the 'count' index in MoveList's Move array, set the Move's 'move' int to the given move
     moveList->moves[moveList->count].move = move;
-    moveList->moves[moveList->count].score = 0; // Then set that Move's score
+    // Then set that Move's score. If move is in killer moves list, score accordingly, else score by searchHistory array!
+    if (board->searchKillers[0][board->ply] == move) {
+        moveList->moves[moveList->count].score = 900000;
+    } else if (board->searchKillers[1][board->ply] == move) {
+        moveList->moves[moveList->count].score = 800000;
+    } else {
+        moveList->moves[moveList->count].score = board->searchHistory[board->pieces[GET_FROM(move)]][GET_TO(move)];
+    }
     moveList->count++; // Then update the counter
 }
 
 /// Adds a capturing Move to the MoveList using the given 'move' integer
 static void addCaptureMove(const Board *board, int move, MoveList *moveList) {
-    ASSERT(squareOnBoard(GET_FROM(move)));
-    ASSERT(squareOnBoard(GET_TO(move)));
-    ASSERT(pieceValid(GET_CAPTURED(move)));
+    ASSERT(squareOnBoard(GET_FROM(move)))
+    ASSERT(squareOnBoard(GET_TO(move)))
+    ASSERT(pieceValid(GET_CAPTURED(move)))
     moveList->moves[moveList->count].move = move;
-    moveList->moves[moveList->count].score = 0;
+    moveList->moves[moveList->count].score = mVVLVAScores[GET_CAPTURED(move)][board->pieces[GET_FROM(move)]] + 1000000; // +1m makes sure these are searched first
     moveList->count++;
 }
 
 /// Adds an en passant Move to the MoveList using the given 'move' integer
 static void addEnPassantMove(const Board *board, int move, MoveList *moveList) {
-    ASSERT(squareOnBoard(GET_FROM(move)));
-    ASSERT(squareOnBoard(GET_TO(move)));
+    ASSERT(squareOnBoard(GET_FROM(move)))
+    ASSERT(squareOnBoard(GET_TO(move)))
     moveList->moves[moveList->count].move = move;
-    moveList->moves[moveList->count].score = 0;
+    moveList->moves[moveList->count].score = 105 + 1000000; // effectively pawn takes pawn. +1m makes sure these are searched first
     moveList->count++;
 }
 
@@ -132,7 +151,7 @@ void generateAllMoves(const Board *board, MoveList *moveList) {
         // Loop through each white pawn in the piece list, getting its square number...
         for (int pieceNum = 0; pieceNum < board->pieceCounts[wP]; ++pieceNum) {
             int square = board->pieceList[wP][pieceNum];
-            ASSERT(squareOnBoard(square));
+            ASSERT(squareOnBoard(square))
             // ...then generating NON-CAPTURE moves for it
             if (board->pieces[square+10] == EMPTY) { // +10 = move white forward 1 square
                 addWhitePawnMove(board, square, square+10, moveList);
@@ -142,7 +161,6 @@ void generateAllMoves(const Board *board, MoveList *moveList) {
             }
             // ...then generating CAPTURE moves for it
             // (if square ahead and to the right/left is not offboard and has a black piece, add capture move):
-
             if (!SQUARE_OFFBOARD(square+9) && pieceColours[board->pieces[square + 9]] == BLACK) {
                 addWhitePawnCaptureMove(board, square, square+9, board->pieces[square+9], moveList);
             }
@@ -182,7 +200,7 @@ void generateAllMoves(const Board *board, MoveList *moveList) {
     } else { // if side is BLACK (repeat of logic above)
         for (int pieceNum = 0; pieceNum < board->pieceCounts[bP]; ++pieceNum) { // loop through black pawns
             int square = board->pieceList[bP][pieceNum];
-            ASSERT(squareOnBoard(square));
+            ASSERT(squareOnBoard(square))
             // NON-CAPTURE moves:
             if (board->pieces[square-10] == EMPTY) { // -10 = move black forward 1 square
                 addBlackPawnMove(board, square, square-10, moveList);
@@ -283,6 +301,128 @@ void generateAllMoves(const Board *board, MoveList *moveList) {
             }
         }
         piece = nonSlidePiecesArray[pieceIndex++];
+    }
+}
+
+void generateAllCaptureMoves(const Board *board, MoveList *moveList) {
+    ASSERT(checkBoard(board))
+
+    moveList->count = 0;
+    int side = board->side;
+
+    // PAWNS and CASTLING:
+    // TODO: Consider collapsing this into a function call
+    if (side == WHITE) {
+        // Loop through each white pawn in the piece list, getting its square number...
+        for (int pieceNum = 0; pieceNum < board->pieceCounts[wP]; ++pieceNum) {
+            int square = board->pieceList[wP][pieceNum];
+            ASSERT(squareOnBoard(square))
+            // generate CAPTURE moves for it
+            // (if square ahead and to the right/left is not offboard and has a black piece, add capture move):
+            if (!SQUARE_OFFBOARD(square+9) && pieceColours[board->pieces[square + 9]] == BLACK) {
+                addWhitePawnCaptureMove(board, square, square+9, board->pieces[square+9], moveList);
+            }
+            if (!SQUARE_OFFBOARD(square+11) && pieceColours[board->pieces[square + 11]] == BLACK) {
+                addWhitePawnCaptureMove(board, square, square+11, board->pieces[square+11], moveList);
+            }
+            // ...then generating EN PASSANT moves for it
+            if (board->enPasSq != NO_SQ) {
+                if (square+9 == board->enPasSq) { // offboard check not needed, just check board's en passant square field!
+                    addEnPassantMove(board, MOVE(square, square+9, EMPTY, EMPTY, MFLAG_EN_PASSANT), moveList);
+                }
+                if (square+11 == board->enPasSq) {
+                    addEnPassantMove(board, MOVE(square, square+11, EMPTY, EMPTY, MFLAG_EN_PASSANT), moveList);
+                }
+            }
+        }
+    } else { // if side is BLACK (repeat of logic above)
+        for (int pieceNum = 0; pieceNum < board->pieceCounts[bP]; ++pieceNum) { // loop through black pawns
+            int square = board->pieceList[bP][pieceNum];
+            ASSERT(squareOnBoard(square))
+            // CAPTURE moves:
+            if (!SQUARE_OFFBOARD(square-9) && pieceColours[board->pieces[square - 9]] == WHITE) {
+                addBlackPawnCaptureMove(board, square, square-9, board->pieces[square-9], moveList);
+            }
+            if (!SQUARE_OFFBOARD(square-11) && pieceColours[board->pieces[square - 11]] == WHITE) {
+                addBlackPawnCaptureMove(board, square, square-11, board->pieces[square-11], moveList);
+            }
+            if (board->enPasSq != NO_SQ) {
+                // EN PASSANT moves:
+                if (square - 9 == board->enPasSq) { // offboard check not needed, just check board's en passant square field!
+                    addEnPassantMove(board, MOVE(square, square - 9, EMPTY, EMPTY, MFLAG_EN_PASSANT), moveList);
+                }
+                if (square - 11 == board->enPasSq) {
+                    addEnPassantMove(board, MOVE(square, square - 11, EMPTY, EMPTY, MFLAG_EN_PASSANT), moveList);
+                }
+            }
+        }
+    }
+
+    // SLIDING moves:
+    int pieceIndex = slideLoopStartIndex[side]; // todo: is doing this with an array really better than '(side==WHITE) ? 0 : 4'?
+    int piece = slidePiecesArray[pieceIndex++];
+    while (piece != 0) { // for each type of sliding piece of the side's colour todo: loop optimisation here?
+        ASSERT(pieceValid(piece))
+
+        for (int pieceNum = 0; pieceNum < board->pieceCounts[piece]; ++pieceNum) { // for each instance of this piece on the board
+            int square = board->pieceList[piece][pieceNum]; // get the piece's 120-based square index
+            ASSERT(squareOnBoard(square))
+
+            for (int i = 0; i < pieceDirectionNumbers[piece]; ++i) { // for each direction this SLIDING piece can move in
+                int direction = pieceDirection[piece][i];
+                int targetSquare = square + direction; // calculate the 'target' square
+
+                while (!SQUARE_OFFBOARD(targetSquare)) { // while the square is not offboard
+                    // Determine if the target square contains a piece of the opposite colour:
+                    if (board->pieces[targetSquare] != EMPTY) {
+                        if (pieceColours[board->pieces[targetSquare]] == (side ^ 1)) { // exclusive ORing the side int with 1 gives the opposite side!
+                            addCaptureMove(board, MOVE(square, targetSquare, board->pieces[targetSquare], EMPTY, 0), moveList);
+                        }
+                        break; // else, break out of moving in this direction because the square wasn't empty or capturable
+                    } // but can move if square was empty:
+                    targetSquare += direction; // keep moving in this direction
+                }
+            }
+        }
+        piece = slidePiecesArray[pieceIndex++];
+    }
+
+    // NON-SLIDING moves:
+    pieceIndex = nonSlideLoopStartIndex[side];
+    piece = nonSlidePiecesArray[pieceIndex++];
+    while (piece != 0) { // for each type of non-sliding piece of the side's colour
+        ASSERT(pieceValid(piece))
+
+        for (int pieceNum = 0; pieceNum < board->pieceCounts[piece]; ++pieceNum) { // for each instance of this piece on the board
+            int square = board->pieceList[piece][pieceNum]; // get the piece's 120-based square index
+            ASSERT(squareOnBoard(square))
+
+            for (int i = 0; i < pieceDirectionNumbers[piece]; ++i) { // for each direction this NON-SLIDING piece can move in
+                int direction = pieceDirection[piece][i];
+                int targetSquare = square + direction; // calculate the 'target' square
+
+                if (SQUARE_OFFBOARD(targetSquare)) {
+                    continue; // check if the target is off the board: move on to the next direction if so
+                }
+                // Determine if the target square contains a piece of the opposite colour:
+                if (board->pieces[targetSquare] != EMPTY) {
+                    if (pieceColours[board->pieces[targetSquare]] == (side ^ 1)) { // exclusive ORing the side with 1 gives the opposite side!
+                        addCaptureMove(board, MOVE(square, targetSquare, board->pieces[targetSquare], EMPTY, 0), moveList);
+                    }
+                    continue; // else, move to next piece because the square wasn't empty or capturable
+                } // but can move if square was empty:
+            }
+        }
+        piece = nonSlidePiecesArray[pieceIndex++];
+    }
+}
+
+void initMVVLVA() {
+    for (int attacker = wP; attacker <= bK; ++attacker) {
+        for (int victim = wP; victim <= bK; ++victim) {
+            mVVLVAScores[victim][attacker] = (victimScore[victim] + 6) - (victimScore[attacker] / 100);
+            // e.g. (queen + 6 - pawn)  ==  (500 + 6 - (100/100))  ==  (506 - 1)  ==  (505)
+        }
     }
 }
 
