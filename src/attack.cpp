@@ -22,17 +22,16 @@ int isSquareAttacked(const int square, const int attackingSide, const Board *boa
     }
 
     // How about a knight?
-    for (int i = 0; i < 8; ++i) { // go through 'knightDirection'
-        int piece = board->pieces[square + knightDirection[i]];
+    for (int nDirection : knightDirection) { // go through 'knightDirection'
+        int piece = board->pieces[square + nDirection];
         if (piece != OFFBOARD && IS_KNIGHT(piece) && pieceColours[piece] == attackingSide) {
             return TRUE;
         }
     }
 
     // What about rooks and queens moving in cardinal directions?
-    for (int i = 0; i < 4; ++i) { // for each direction
-        int direction = rookDirection[i];
-        int tempSquare = square + direction;
+    for (int rDirection : rookDirection) { // for each direction
+        int tempSquare = square + rDirection;
         int piece = board->pieces[tempSquare];
         while (piece != OFFBOARD) {
             if (piece != EMPTY) {
@@ -41,15 +40,14 @@ int isSquareAttacked(const int square, const int attackingSide, const Board *boa
                 }
                 break; // we have hit a piece, any piece, so break out of loop
             } // if no piece found, continue 'sliding' in the current direction:
-            tempSquare += direction;
+            tempSquare += rDirection;
             piece = board->pieces[tempSquare];
         }
     }
 
     // What about bishops and queens moving diagonally?
-    for (int i = 0; i < 4; ++i) { // for each direction
-        int direction = bishopDirection[i];
-        int tempSquare = square + direction;
+    for (int bDirection : bishopDirection) { // for each direction
+        int tempSquare = square + bDirection;
         int piece = board->pieces[tempSquare];
         while (piece != OFFBOARD) {
             if (piece != EMPTY) {
@@ -58,14 +56,14 @@ int isSquareAttacked(const int square, const int attackingSide, const Board *boa
                 }
                 break; // we have hit a piece, any piece, so break out of loop
             } // if no piece found, continue 'sliding' in the current direction:
-            tempSquare += direction;
+            tempSquare += bDirection;
             piece = board->pieces[tempSquare];
         }
     }
 
     // And finally, how about the kings?
-    for (int i = 0; i < 8; ++i) { // go through 'knightDirection'
-        int piece = board->pieces[square + kingDirection[i]];
+    for (int kDirection : kingDirection) { // go through 'knightDirection'
+        int piece = board->pieces[square + kDirection];
         if (piece != OFFBOARD && IS_KING(piece) && pieceColours[piece] == attackingSide) {
             return TRUE;
         }
