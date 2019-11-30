@@ -1,10 +1,11 @@
 #include <chrono>
 #include <cstdio>
-#include <io.h>
 #include "defs.h"
 
-#if defined(WIN32) || defined(WIN64)
+#ifdef WIN32
 #include "windows.h"
+#elseif MINGW
+#include <io.h>
 #else
 #include "sys/select.h"
 #include "unistd.h"
