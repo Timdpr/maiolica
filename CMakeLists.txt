@@ -8,10 +8,10 @@ set(CMAKE_CXX_STANDARD 14)
 # -mdyn... = https://bugzilla.mozilla.org/show_bug.cgi?id=165851,
 # -flto = link time optimisation https://gcc.gnu.org/wiki/LinkTimeOptimization
 
-if (CYGWIN OR MINGW)
-    set(CMAKE_CXX_FLAGS "-O3 -flto") # fallback/default
-    set(CMAKE_CXX_FLAGS_DEBUG "-O3 -flto")
-    set(CMAKE_CXX_FLAGS_RELEASE "-O3 -flto")
+if(MINGW)
+    set(CMAKE_CXX_FLAGS "-O3 -static-libstdc++ -static-libgcc  -flto") # fallback/default
+    set(CMAKE_CXX_FLAGS_DEBUG "-O3 -static-libstdc++ -static-libgcc -flto")
+    set(CMAKE_CXX_FLAGS_RELEASE "-O3 -static-libstdc++ -static-libgcc -flto")
 else()
     set(CMAKE_CXX_FLAGS "-O3 -mdynamic-no-pic -flto") # fallback/default
     set(CMAKE_CXX_FLAGS_DEBUG "-O3 -mdynamic-no-pic -flto")

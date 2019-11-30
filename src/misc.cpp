@@ -1,5 +1,6 @@
 #include <chrono>
 #include <cstdio>
+#include <io.h>
 #include "defs.h"
 
 #if defined(WIN32) || defined(WIN64)
