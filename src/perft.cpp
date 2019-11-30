@@ -22,8 +22,7 @@ void perft(int depth, Board *board) {
         perft(depth - 1, board);
         takeMove(board);
     }
-    return;
-}
+    }
 
 void perftTest(int depth, Board *board) {
     ASSERT(checkBoard(board))
@@ -32,7 +31,7 @@ void perftTest(int depth, Board *board) {
     printf("\nStarting test to depth: %d\n", depth);
 
     leafNodes = 0;
-    int start = getTimeMS();
+    TimeMS start = getTimeMS();
 
     MoveList moveList[1];
     generateAllMoves(board, moveList);
@@ -52,5 +51,5 @@ void perftTest(int depth, Board *board) {
         printf("Move %d : %s : %ld\n", moveNum+1, printMove(move), oldNodes);
     }
 
-    printf("Test complete: %ld leaf nodes visited in %dms\n", leafNodes, getTimeMS() - start);
+    printf("Test complete: %ld leaf nodes visited in %lld ms\n", leafNodes, getTimeMS() - start);
 }
