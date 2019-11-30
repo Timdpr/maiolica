@@ -43,7 +43,9 @@ void clearPVTable(PVTable *pvTable) {
 void initPVTable(PVTable *pvTable) {
     pvTable->numEntries = pvSize / sizeof(PVEntry); // how many entries can we fit inside 2mb?
     pvTable->numEntries -= 2; // make sure we don't go over!
-    free(pvTable->pTable); // free table pointer's memory  // todo: this will crash for now, but gets changed later!
+    if (pvTable->pTable != nullptr) {
+        free(pvTable->pTable); // free table pointer's memory
+    }
     pvTable->pTable = (PVEntry *) malloc(pvTable->numEntries * sizeof(PVEntry)); // allocate memory with similar logic to how it was freed!
     clearPVTable(pvTable);
     printf("pvTable init complete with %d entries\n", pvTable->numEntries);
