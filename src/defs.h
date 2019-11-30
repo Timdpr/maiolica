@@ -4,8 +4,9 @@
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
+#include <chrono>
 
-#define DEBUG
+//#define DEBUG
 
 #ifndef DEBUG
 #define ASSERT(n)
@@ -28,6 +29,7 @@ std::exit(0);}
 #define START_FEN "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 
 typedef std::uint64_t U64;
+typedef std::chrono::milliseconds::rep TimeMS;
 
 
 /* -- ENUMS -- */
@@ -125,6 +127,28 @@ struct Board {
 
     PVTable pvTable[1]; // initialise principal variation table to size 1 array, but this will be dynamically allocated
     int pvArray[MAX_DEPTH];
+
+    int searchHistory[13][BRD_SQ_NUM]; // indexed by piece type and board square
+    int searchKillers[2][MAX_DEPTH]; // indexed by 2 killer moves, by depth
+};
+
+///
+struct SearchInfo {
+    TimeMS startTime;
+    TimeMS stopTime;
+    int depth;
+    int depthSet; // only search to this depth
+    int timeSet; // total time set for all moves
+    int movesToGo;
+    int infinite; // if true, don't stop search unless external command given
+
+    long nodes; // count of all positions the engine visits in the search tree
+
+    int quit; // quit entirely if set to true
+    int stopped;
+
+    float failHigh; // divide fhf by fh to get an idea of how good move ordering is
+    float failHighFirst; // try to make it >90%
 };
 
 
@@ -171,9 +195,9 @@ struct Board {
 /// Set castling flag in move by ORing in this flag
 #define MFLAG_CASTLING 0x1000000
 /// Set capturing flag in move by ORing in this flag
-#define MFLAG_CAPTURING(move) 0x7C000
+#define MFLAG_CAPTURING 0x7C000
 /// Set promotion flag in move by ORing in this flag
-#define MFLAG_PROMOTION(move) 0xF00000
+#define MFLAG_PROMOTION 0xF00000
 
 #define NO_MOVE 0
 
@@ -228,6 +252,7 @@ extern void updateMaterialLists(Board *board);
 extern int parseFen(const char *fen, Board *board);
 extern void resetBoard(Board *board);
 extern void printBoard(const Board *board);
+extern Board *genBoard();
 
 // attack.cpp
 extern int isSquareAttacked(const int square, const int attackingSide, const Board *board);
@@ -236,7 +261,7 @@ extern int isSquareAttacked(const int square, const int attackingSide, const Boa
 extern char *printSquare(const int square);
 extern char *printMove(const int move);
 extern void printMoveList(const MoveList *moveList);
-extern int parseMove(char *ptrChar, Board *board);
+extern int parseMove(const char *ptrChar, Board *board);
 
 // validate.cpp
 extern int squareOnBoard(const int sq);
@@ -247,7 +272,9 @@ extern int pieceValidOrEmpty(const int piece);
 
 // movegen.cpp
 extern void generateAllMoves(const Board *board, MoveList *list);
+extern void generateAllCaptureMoves(const Board *board, MoveList *moveList);
 extern int moveExists(Board *board, const int move);
+extern void initMVVLVA();
 
 // makemove.cpp
 extern int makeMove(Board *board, int move);
@@ -257,15 +284,23 @@ extern void takeMove(Board *board);
 extern void perftTest(int depth, Board *board);
 
 // misc.cpp
-extern int getTimeMS();
+extern TimeMS getTimeMS();
+extern void ReadInput(SearchInfo *info);
 
 // search.cpp
-extern int isRepetition(const Board *board);
+extern void searchPosition(Board *board, SearchInfo *info);
 
 // pvtable.cpp
+extern void clearPVTable(PVTable *pvTable);
 extern int getPVLine(const int depth, Board *board);
 extern void initPVTable(PVTable *pvTable);
 extern void storePVMove(const Board *board, const int move);
 extern int probePVTable(const Board *board);
+
+// board.cpp
+extern int evalPosition(const Board *board);
+
+// uci.cpp
+extern void uciLoop(Board *board, SearchInfo *info);
 
 #endif //MAIOLICA_DEFS_H
