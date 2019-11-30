@@ -53,7 +53,7 @@ void printMoveList(const MoveList *moveList) {
 }
 
 /// Takes algebraic notation for move, and returns move int
-int parseMove(char *ptrChar, Board *board) {
+int parseMove(const char *ptrChar, Board *board) {
     // Make sure that rank/file is within correct bounds
     if (ptrChar[1] > '8' || ptrChar[1] < '1') return FALSE;
     if (ptrChar[3] > '8' || ptrChar[3] < '1') return FALSE;
