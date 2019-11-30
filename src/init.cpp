@@ -1,11 +1,10 @@
-#include "defs.h"
-#include <cstdlib>
 #include <random>
+#include "defs.h"
 
-// TODO: Investigate using c++11 random function that generates a full 64bit random number.
-// TODO: I added brackets here for operator precedence reasons, tutorial says it was fine!
-#define RAND_64_WIN ( (U64)rand() | (U64)rand() << 15 | (U64)rand() << 30 | (U64)rand() << 45 | ((U64)rand() & 0xf << 60) )
-#define RAND_64 ( ((U64)rand() << 32) + rand() )
+std::random_device rd;
+std::mt19937_64 gen(rd());
+std::uniform_int_distribution<U64> dist(0, INT64_MAX);
+#define RAND_64 dist(gen)
 
 int sq120ToSq64[BRD_SQ_NUM];
 int sq64ToSq120[64];
@@ -88,4 +87,5 @@ void initAll() {
     initSquare120To64();
     initBitMasks();
     initHashKeys();
+    initMVVLVA();
 }
