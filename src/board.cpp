@@ -254,8 +254,6 @@ void resetBoard(Board *board) {
 
     board->positionKey = U64(0);
 
-    initPVTable(board->pvTable);
-
     // TODO: Missing resetting material?
 }
 
@@ -285,4 +283,10 @@ void printBoard(const Board *board) {
             (board->castlingPerms & bQ_CA) ? 'q' : '-'
     );
     std::printf("position key: %llX\n", board->positionKey);
+}
+
+Board *genBoard() {
+    Board *board = (Board*)malloc(sizeof(Board));
+    board->pvTable->pTable = nullptr;
+    return board;
 }
