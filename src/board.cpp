@@ -115,8 +115,8 @@ void updateMaterialLists(Board *board) {
  *  TODO: Missing half move clock!!!
  */
 int parseFen(const char *fen, Board *board) {
-    ASSERT(fen != NULL)
-    ASSERT(board != NULL)
+    ASSERT(fen != nullptr)
+    ASSERT(board != nullptr)
 
     int rank = RANK_8;
     int file = FILE_A;
@@ -283,6 +283,46 @@ void printBoard(const Board *board) {
             (board->castlingPerms & bQ_CA) ? 'q' : '-'
     );
     std::printf("position key: %llX\n", board->positionKey);
+}
+
+void mirrorBoard(Board *board) {
+    int tempPiecesArray[64];
+    int tempSide = board->side^1;
+    int swapPiece[13] = { EMPTY, bP, bN, bB, bR, bQ, bK, wP, wN, wB, wR, wQ, wK }; // swapped pieces enum...
+    int tempCastlingPerms = 0;
+    int tempEnPasSq = NO_SQ;
+
+    // Swap castling permissions
+    if (board->castlingPerms & wK_CA) tempCastlingPerms |= bK_CA;
+    if (board->castlingPerms & wQ_CA) tempCastlingPerms |= bQ_CA;
+    if (board->castlingPerms & bK_CA) tempCastlingPerms |= wK_CA;
+    if (board->castlingPerms & bQ_CA) tempCastlingPerms |= wQ_CA;
+
+    // Swap en passant squares (tricky with indexing...)
+    if (board->enPasSq != NO_SQ) {
+        tempEnPasSq = INDEX_64_TO_120(mirror64[INDEX_120_TO_64(board->enPasSq)]);
+    }
+    // Make temp pieces array for future swapping (tricky with indexing...)
+    for (int square = 0; square < 64; square++) {
+        tempPiecesArray[square] = board->pieces[INDEX_64_TO_120(mirror64[square])];
+    }
+
+    resetBoard(board);
+
+    // Now swap pieces using temp array and swapped pieces array/enum
+    for (int square = 0; square < 64; square++) {
+        board->pieces[INDEX_64_TO_120(square)] = swapPiece[tempPiecesArray[square]];
+    }
+
+    //
+    board->side = tempSide;
+    board->castlingPerms = tempCastlingPerms;
+    board->enPasSq = tempEnPasSq;
+    board->positionKey = generatePositionKey(board);
+
+    updateMaterialLists(board);
+
+    ASSERT(checkBoard(board))
 }
 
 Board *genBoard() {

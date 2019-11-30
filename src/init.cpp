@@ -22,6 +22,80 @@ U64 castleKeys[16];
 int filesBoard[BRD_SQ_NUM]; // holds the file index for a board position, 0 - 7 or 100 if offboard
 int ranksBoard[BRD_SQ_NUM]; // holds the rank index for a board position, 0 - 7 or 100 if offboard
 
+U64 fileBitMask[8]; // all '1's for the indexed file
+U64 rankBitMask[8]; // all '1's for the indexed rank
+
+U64 whitePassedMask[64]; // does the indexed white pawn have a 'clear run' to promotion?
+U64 blackPassedMask[64]; // does the indexed black pawn have a 'clear run' to promotion?
+U64 isolatedPawnMask[64]; // is the indexed pawn 'isolated'?
+
+void initEvalMasks() {
+    for (int square = 0; square < 8; ++square) {
+        fileBitMask[square] = U64(0);
+        rankBitMask[square] = U64(0);
+    }
+    // loop through 64-based bitboards, setting '1' for the file/rank
+    for (int rank = RANK_8; rank >= RANK_1; rank--) {
+        for (int file = FILE_A; file <= FILE_H; file++) {
+            int square = rank * 8 + file;
+            fileBitMask[file] |= (U64(1) << square);
+            rankBitMask[rank] |= (U64(1) << square);
+        }
+    }
+    for (int square = 0; square < 64; ++square) {
+        isolatedPawnMask[square] = U64(0);
+        whitePassedMask[square] = U64(0);
+        blackPassedMask[square] = U64(0);
+    }
+    //
+    for (int square = 0; square < 64; ++square) {
+        int tsq = square + 8;
+
+        while (tsq < 64) {
+            whitePassedMask[square] |= (U64(1) << tsq);
+            tsq += 8;
+        }
+
+        tsq = square - 8;
+        while (tsq >= 0) {
+            blackPassedMask[square] |= (U64(1) << tsq);
+            tsq -= 8;
+        }
+
+        if (filesBoard[INDEX_64_TO_120(square)] > FILE_A) {
+            isolatedPawnMask[square] |= fileBitMask[filesBoard[INDEX_64_TO_120(square)] - 1];
+
+            tsq = square + 7;
+            while (tsq < 64) {
+                whitePassedMask[square] |= (U64(1) << tsq);
+                tsq += 8;
+            }
+
+            tsq = square - 9;
+            while (tsq >= 0) {
+                blackPassedMask[square] |= (U64(1) << tsq);
+                tsq -= 8;
+            }
+        }
+
+        if (filesBoard[INDEX_64_TO_120(square)] < FILE_H) {
+            isolatedPawnMask[square] |= fileBitMask[filesBoard[INDEX_64_TO_120(square)] + 1];
+
+            tsq = square + 9;
+            while (tsq < 64) {
+                whitePassedMask[square] |= (U64(1) << tsq);
+                tsq += 8;
+            }
+
+            tsq = square - 7;
+            while (tsq >= 0) {
+                blackPassedMask[square] |= (U64(1) << tsq);
+                tsq -= 8;
+            }
+        }
+    }
+}
+
 /// Initialise arrays of rank and file indexes
 void initFilesRanksBoard() {
     for (int i = 0; i < BRD_SQ_NUM; ++i) {
@@ -83,9 +157,10 @@ void initSquare120To64() {
 
 /// Initialise everything!
 void initAll() {
-    initFilesRanksBoard();
     initSquare120To64();
     initBitMasks();
     initHashKeys();
+    initFilesRanksBoard();
+    initEvalMasks();
     initMVVLVA();
 }

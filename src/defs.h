@@ -33,6 +33,7 @@ typedef std::chrono::milliseconds::rep TimeMS;
 
 
 /* -- ENUMS -- */
+
 enum { EMPTY, wP, wN, wB, wR, wQ, wK, bP, bN, bB, bR, bQ, bK };
 enum { FILE_A, FILE_B, FILE_C, FILE_D, FILE_E, FILE_F, FILE_G, FILE_H, FILE_NONE };
 enum { RANK_1, RANK_2, RANK_3, RANK_4, RANK_5, RANK_6, RANK_7, RANK_8, RANK_NONE };
@@ -56,6 +57,7 @@ enum { wK_CA = 1, wQ_CA = 2, bK_CA = 4, bQ_CA = 8 }; // Castling permissions
 
 
 /* -- STRUCTS -- */
+
 /** Uses an integer to store all necessary information, and another int for the score
 
 0000 0000 0000 0000 0000 0111 1111 -> 'From' square: 0x7F                         <br>
@@ -153,6 +155,7 @@ struct SearchInfo {
 
 
 /* -- MACROS -- */
+
 // - Square index macros:
 /// Takes 64-based file and rank index and returns 120-based square index
 #define FILE_RANK_TO_SQUARE_INDEX(file, rank) ( (21 + (file)) + ((rank) * 10) )
@@ -178,6 +181,9 @@ struct SearchInfo {
 #define IS_ROOK_OR_QUEEN(piece) (pieceRookQueen[(piece)])
 #define IS_KING(piece) (pieceKing[(piece)])
 
+/// Get square index for black from white, as eval tables are designed for white
+#define MIRROR_64(square) (mirror64[(square)])
+
 // - Operations on Move int macros:
 // For getting info out of Move integer:
 /// Get 'from' square from move int
@@ -202,6 +208,7 @@ struct SearchInfo {
 #define NO_MOVE 0
 
 /* -- GLOBAL -- */  // TODO: Consider making these non-global...
+
 extern U64 RAND_64;
 
 extern int sq120ToSq64[BRD_SQ_NUM];
@@ -234,7 +241,18 @@ extern const int pieceRookQueen[13]; // used to ask 'is piece a rook or queen?'
 extern const int pieceKing[13]; // used to ask 'is piece a king?'
 extern const int pieceSlides[13]; // used to ask 'is piece a sliding piece?' (queen/rook/bishop)
 
+extern int mirror64[64];
+
+extern U64 fileBitMask[8]; // all '1's for the indexed file
+extern U64 rankBitMask[8]; // all '1's for the indexed rank
+
+extern U64 whitePassedMask[64]; // does the indexed white pawn have a 'clear run' to promotion?
+extern U64 blackPassedMask[64]; // does the indexed black pawn have a 'clear run' to promotion?
+extern U64 isolatedPawnMask[64]; // is the indexed pawn 'isolated'?
+
+
 /* -- FUNCTIONS -- */
+
 // init.cpp
 extern void initAll();
 
@@ -299,6 +317,7 @@ extern int probePVTable(const Board *board);
 
 // board.cpp
 extern int evalPosition(const Board *board);
+extern void mirrorBoard(Board *board);
 
 // uci.cpp
 extern void uciLoop(Board *board, SearchInfo *info);

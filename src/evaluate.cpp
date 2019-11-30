@@ -44,21 +44,6 @@ const int rookTable[64] = {
         0	,	0	,	5	,	10	,	10	,	5	,	0	,	0
 };
 
-/// Use to get square index for black, as above tables are designed for white
-const int mirror64[64] = {
-        56	,	57	,	58	,	59	,	60	,	61	,	62	,	63	,
-        48	,	49	,	50	,	51	,	52	,	53	,	54	,	55	,
-        40	,	41	,	42	,	43	,	44	,	45	,	46	,	47	,
-        32	,	33	,	34	,	35	,	36	,	37	,	38	,	39	,
-        24	,	25	,	26	,	27	,	28	,	29	,	30	,	31	,
-        16	,	17	,	18	,	19	,	20	,	21	,	22	,	23	,
-        8	,	9	,	10	,	11	,	12	,	13	,	14	,	15	,
-        0	,	1	,	2	,	3	,	4	,	5	,	6	,	7
-};
-
-/// Get square index for black from white, as eval tables are designed for white
-#define MIRROR_64(square) (mirror64[(square)])
-
 /// Evaluate a board position! @return a score (in 100ths of a pawn)
 int evalPosition(const Board *board) {
     int score = board->material[WHITE] - board->material[BLACK]; // compare material score (remember white is +vs, black -ve!)
