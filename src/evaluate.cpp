@@ -6,6 +6,7 @@ const int rookOpenFile = 10;
 const int rookSemiOpenFile = 5;
 const int queenOpenFile = 5;
 const int queenSemiOpenFile = 3;
+const int bishopPair = 30;
 
 const int pawnTable[64] = {
         0	,	0	,	0	,	0	,	0	,	0	,	0	,	0	,
@@ -53,21 +54,21 @@ const int rookTable[64] = {
 
 /// Heavy penalties for corners! Encourages king to be central
 const int kingEndgame[64] = {
-        -50	,	-20	,	0	,	0	,	0	,	0	,	-20	,	-50	,
-        -20,	0	,	20	,	20	,	20	,	20	,	0	,	-20	,
-        0	,	20	,	40	,	40	,	40	,	40	,	20	,	0	,
-        0	,	20	,	40	,	50	,	50	,	40	,	20	,	0	,
-        0	,	20	,	40	,	50	,	50	,	40	,	20	,	0	,
-        0	,	20	,	40	,	40	,	40	,	40	,	20	,	0	,
-        -20	,	0	,	20	,	20	,	20	,	20	,	0	,	-20	,
-        -50	,	-20	,	0	,	0	,	0	,	0	,	-20	,	-50
+        -50	,	-10	,	0	,	0	,	0	,	0	,	-10	,	-50	,
+        -10,	0	,	10	,	10	,	10	,	10	,	0	,	-10	,
+        0	,	10	,	15	,	15	,	15	,	15	,	10	,	0	,
+        0	,	10	,	15	,	20	,	20	,	15	,	10	,	0	,
+        0	,	10	,	15	,	20	,	20	,	15	,	10	,	0	,
+        0	,	10	,	15	,	15	,	15	,	15	,	10	,	0	,
+        -10,	0	,	10	,	10	,	10	,	10	,	0	,	-10	,
+        -50	,	-10	,	0	,	0	,	0	,	0	,	-10	,	-50
 };
 
 /// Encouraged to castle kingside, penalised for walking forwards
 const int kingOpening[64] = {
         0	,	5	,	5	,	-10	,	-10	,	0	,	10	,	5	,
-        -10	,	-10	,	-10	,	-10	,	-10	,	-10	,	-10	,	-10	,
         -30	,	-30	,	-30	,	-30	,	-30	,	-30	,	-30	,	-30	,
+        -50	,	-50	,	-50	,	-50	,	-50	,	-50	,	-50	,	-50	,
         -70	,	-70	,	-70	,	-70	,	-70	,	-70	,	-70	,	-70	,
         -70	,	-70	,	-70	,	-70	,	-70	,	-70	,	-70	,	-70	,
         -70	,	-70	,	-70	,	-70	,	-70	,	-70	,	-70	,	-70	,
@@ -76,7 +77,7 @@ const int kingOpening[64] = {
 };
 
 /// Material score threshold to determine when we have moved into the endgame
-#define ENDGAME_MATERIAL (2 * pieceValues[wR] + 4 * pieceValues[wN])
+#define ENDGAME_MATERIAL (1 * pieceValues[wR] + 2 * pieceValues[wN] + 2 * pieceValues[wP])
 
 /// based on sjeng
 int materialDraw(const Board *board) {
@@ -102,7 +103,7 @@ int materialDraw(const Board *board) {
 
 /// Evaluate a board position! @return a score (in 100ths of a pawn)
 int evalPosition(const Board *board) {
-    if (materialDraw(board) == TRUE) {
+    if (board->pieceCounts[wP] && !board->pieceCounts[bP] && materialDraw(board) == TRUE) {
         return 0;
     }
 
@@ -218,18 +219,21 @@ int evalPosition(const Board *board) {
     }
 
     piece = wK;
-    if (board->pieceCounts[bQ] == 0 || (board->material[BLACK] <= ENDGAME_MATERIAL)) {
+    if (board->material[BLACK] <= ENDGAME_MATERIAL) {
         score += kingEndgame[INDEX_120_TO_64(board->pieceList[piece][0])];
     } else {
         score += kingOpening[INDEX_120_TO_64(board->pieceList[piece][0])];
     }
 
     piece = bK;
-    if (board->pieceCounts[wQ] == 0 || (board->material[WHITE] <= ENDGAME_MATERIAL)) {
-        score -= kingEndgame[INDEX_120_TO_64(board->pieceList[piece][0])];
+    if (board->material[WHITE] <= ENDGAME_MATERIAL) {
+        score -= kingEndgame[MIRROR_64(INDEX_120_TO_64(board->pieceList[piece][0]))];
     } else {
-        score -= kingOpening[INDEX_120_TO_64(board->pieceList[piece][0])];
+        score -= kingOpening[MIRROR_64(INDEX_120_TO_64(board->pieceList[piece][0]))];
     }
+
+    if (board->pieceCounts[wB] >= 2) score += bishopPair;
+    if (board->pieceCounts[bB] >= 2) score -= bishopPair;
 
     return board->side == WHITE ? score : -score; // flip score if side is black
 }
