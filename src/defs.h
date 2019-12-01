@@ -287,6 +287,7 @@ extern int sideValid(const int side);
 extern int fileOrRankValid(const int fileOrRank);
 extern int pieceValid(const int piece);
 extern int pieceValidOrEmpty(const int piece);
+extern void mirrorEvalTest(Board *board);
 
 // movegen.cpp
 extern void generateAllMoves(const Board *board, MoveList *list);
