@@ -190,9 +190,6 @@ static int alphaBeta(int alpha, int beta, int depth, Board *board, SearchInfo *i
         }
     }
 
-    // Using principal variation search
-    int foundPV = FALSE;
-
     // for each move generated
     for (int moveNum = 0; moveNum < moveList->count; ++moveNum) {
         // order the moves
@@ -202,16 +199,8 @@ static int alphaBeta(int alpha, int beta, int depth, Board *board, SearchInfo *i
             continue;
         }
         legal++;
-        // negamax, so flip it all. Also using principal variation search!
-        // TODO: PVS may be detrimental...
-        if (foundPV == TRUE) {
-            score = -alphaBeta(-alpha - 1, -alpha, depth-1, board, info, TRUE);
-            if (score > alpha && score < beta) {
-                score = -alphaBeta(-beta, -alpha, depth-1, board, info, TRUE);
-            }
-        } else {
-            score = -alphaBeta(-beta, -alpha, depth-1, board, info, TRUE);
-        }
+        // negamax, so flip it all. Not using principal variation search!
+        score = -alphaBeta(-beta, -alpha, depth-1, board, info, TRUE);
         takeMove(board);
 
         if (info->stopped == TRUE) { // if we have been told to stop, stop, but AFTER TAKEMOVE!!
@@ -237,7 +226,6 @@ static int alphaBeta(int alpha, int beta, int depth, Board *board, SearchInfo *i
                     storeHashEntry(board, bestMove, beta, HF_BETA, depth);
                     return beta;
                 }
-                foundPV = TRUE;
                 alpha = score;       // otherwise, update score and bestMove
                 bestMove = moveList->moves[moveNum].move;
                 // Update search history
