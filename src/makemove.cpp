@@ -307,3 +307,50 @@ void takeMove(Board *board) {
 
     ASSERT(checkBoard(board))
 }
+
+/// Update and switch side as usual, but no move is made
+void makeNullMove(Board *board) {
+    ASSERT(checkBoard(board))
+    ASSERT(!isSquareAttacked(board->kingSq[board->side], board->side^1, board))
+
+    board->ply++;
+    board->history[board->historyPly].positionKey = board->positionKey;
+
+    if (board->enPasSq != NO_SQ) {
+        HASH_EN_PASSANT;
+    }
+    board->history[board->historyPly].move = NO_MOVE;
+    board->history[board->historyPly].fiftyMove = board->fiftyMove; // todo: should this be incremented here (then taken back)? Probably!
+    board->history[board->historyPly].enPasSq = board->enPasSq;
+    board->history[board->historyPly].castlingPerms = board->castlingPerms;
+    board->enPasSq = NO_SQ;
+
+    board->side ^= 1;
+    board->historyPly++;
+    HASH_SIDE;
+
+    ASSERT(checkBoard(board))
+}
+
+/// Take back a null move!
+void takeNullMove(Board *board) {
+    ASSERT(checkBoard(board))
+
+    board->historyPly--;
+    board->ply--;
+
+    if (board->enPasSq != NO_SQ) {
+        HASH_EN_PASSANT;
+    }
+    board->castlingPerms = board->history[board->historyPly].castlingPerms;
+    board->fiftyMove = board->history[board->historyPly].fiftyMove;
+    board->enPasSq = board->history[board->historyPly].enPasSq;
+
+    if (board->enPasSq != NO_SQ) {
+        HASH_EN_PASSANT;
+    }
+    board->side ^= 1;
+    HASH_SIDE;
+
+    ASSERT(checkBoard(board))
+}
