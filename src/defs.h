@@ -28,11 +28,16 @@ std::exit(0);}
 #define MAX_DEPTH 64
 #define START_FEN "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 
+#define INFINITE 30000
+#define IS_MATE (INFINITE - MAX_DEPTH)
+
 typedef std::uint64_t U64;
 typedef std::chrono::milliseconds::rep TimeMS;
 
 
 /* -- ENUMS -- */
+
+enum { UCI_MODE, XBOARD_MODE, CONSOLE_MODE };
 
 enum { EMPTY, wP, wN, wB, wR, wQ, wK, bP, bN, bB, bR, bQ, bK };
 enum { FILE_A, FILE_B, FILE_C, FILE_D, FILE_E, FILE_F, FILE_G, FILE_H, FILE_NONE };
@@ -54,6 +59,8 @@ enum {
 enum { FALSE, TRUE };
 
 enum { wK_CA = 1, wQ_CA = 2, bK_CA = 4, bQ_CA = 8 }; // Castling permissions
+
+enum { HF_NONE, HF_ALPHA, HF_BETA, HF_EXACT };
 
 
 /* -- STRUCTS -- */
@@ -80,15 +87,22 @@ struct MoveList {
 };
 
 /// Principal variation entry
-struct PVEntry {
+struct HashEntry {
     U64 positionKey;
     int move;
+    int score;
+    int depth;
+    int flags;
 };
 
 /// Principal variation table
-struct PVTable {
-    PVEntry *pTable; // pointer to element
+struct HashTable {
+    HashEntry *hTable; // pointer to element
     int numEntries;
+    int newWrite;
+    int overWrite;
+    int hit;
+    int cut;
 };
 
 /// Holds game state at a particular ply
@@ -127,7 +141,7 @@ struct Board {
 
     int pieceList[13][10]; // 13 types of pieces, and at most 10 of each // TODO: May need to convert this to 1D for speed
 
-    PVTable pvTable[1]; // initialise principal variation table to size 1 array, but this will be dynamically allocated
+    HashTable hashTable[1]; // initialise hash table to size 1 array, but this will be dynamically allocated
     int pvArray[MAX_DEPTH];
 
     int searchHistory[13][BRD_SQ_NUM]; // indexed by piece type and board square
@@ -151,6 +165,10 @@ struct SearchInfo {
 
     float failHigh; // divide fhf by fh to get an idea of how good move ordering is
     float failHighFirst; // try to make it >90%
+    int nullCut;
+
+    int gameMode;
+    int postThinking;
 };
 
 
@@ -282,11 +300,15 @@ extern void printMoveList(const MoveList *moveList);
 extern int parseMove(const char *ptrChar, Board *board);
 
 // validate.cpp
+extern int moveListValid(const MoveList *list, const Board *board);
+extern int squareIs120(const int sq);
 extern int squareOnBoard(const int sq);
 extern int sideValid(const int side);
 extern int fileOrRankValid(const int fileOrRank);
 extern int pieceValid(const int piece);
-extern int pieceValidOrEmpty(const int piece);
+extern int pieceValidEmpty(const int piece);
+extern int pieceValidEmptyOffboard(const int pce);
+extern void debugAnalysisTest(Board *board, SearchInfo *info);
 extern void mirrorEvalTest(Board *board);
 
 // movegen.cpp
@@ -298,6 +320,8 @@ extern void initMVVLVA();
 // makemove.cpp
 extern int makeMove(Board *board, int move);
 extern void takeMove(Board *board);
+extern void makeNullMove(Board *board);
+extern void takeNullMove(Board *board);
 
 // perft.cpp
 extern void perftTest(int depth, Board *board);
@@ -310,10 +334,11 @@ extern void ReadInput(SearchInfo *info);
 extern void searchPosition(Board *board, SearchInfo *info);
 
 // pvtable.cpp
-extern void clearPVTable(PVTable *pvTable);
+extern void clearHashTable(HashTable *hashTable);
 extern int getPVLine(const int depth, Board *board);
-extern void initPVTable(PVTable *pvTable);
-extern void storePVMove(const Board *board, const int move);
+extern void initHashTable(HashTable *hashTable, const int MB);
+extern void storeHashEntry(Board *board, const int move, int score, const int flags, const int depth);
+extern int probeHashEntry(Board *board, int *move, int *score, int alpha, int beta, int depth);
 extern int probePVTable(const Board *board);
 
 // board.cpp
@@ -322,5 +347,9 @@ extern void mirrorBoard(Board *board);
 
 // uci.cpp
 extern void uciLoop(Board *board, SearchInfo *info);
+
+// xboard.cpp
+extern void xBoardLoop(Board *board, SearchInfo *info);
+extern void consoleLoop(Board *board, SearchInfo *info);
 
 #endif //MAIOLICA_DEFS_H
