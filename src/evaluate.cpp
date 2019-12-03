@@ -117,12 +117,10 @@ int evalPosition(const Board *board) {
         score += pawnTable[INDEX_120_TO_64(square)];
         // Check for isolated pawn: AND the pawn mask for the square with the pawn bitboard
         if ((isolatedPawnMask[INDEX_120_TO_64(square)] & board->pawns[WHITE]) == 0) {
-//            printf("wP Isolated: %s\n", printSquare(square));
             score += pawnIsolated;
         }
         // Check for passed pawn
         if ((whitePassedMask[INDEX_120_TO_64(square)] & board->pawns[BLACK]) == 0) {
-//            printf("wP Passed: %s\n", printSquare(square));
             score += pawnPassed[ranksBoard[square]];
         }
     }
@@ -133,11 +131,9 @@ int evalPosition(const Board *board) {
         ASSERT(squareOnBoard(square))
         score -= pawnTable[MIRROR_64(INDEX_120_TO_64(square))];
         if ((isolatedPawnMask[INDEX_120_TO_64(square)] & board->pawns[BLACK]) == 0) {
-//            printf("bP Isolated: %s\n", printSquare(square));
             score -= pawnIsolated;
         }
         if ((blackPassedMask[INDEX_120_TO_64(square)] & board->pawns[WHITE]) == 0) {
-//            printf("bP Passed: %s\n", printSquare(square));
             score -= pawnPassed[7 - ranksBoard[square]]; // note '7 - the rank' because black pawns go down the board!
         }
     }
