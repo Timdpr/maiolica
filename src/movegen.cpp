@@ -79,7 +79,7 @@ static void addEnPassantMove(const Board *board, int move, MoveList *moveList) {
 
 /// Add a capturing move by a white pawn to the Move list. Set 'captured' to EMPTY if it is not a capturing move
 static void addWhitePawnCaptureMove(const Board *board, const int from, const int to, const int captured, MoveList *list) {
-    ASSERT(pieceValidOrEmpty(captured))
+    ASSERT(pieceValidEmpty(captured))
     ASSERT(squareOnBoard(from))
     ASSERT(squareOnBoard(to))
     // if pawn starts on rank 7, then it will finish on rank 8, where it has to promote
@@ -110,7 +110,7 @@ static void addWhitePawnMove(const Board *board, const int from, const int to, M
 
 /// Add a move by a black pawn to the Move list. Set 'captured' to EMPTY if it is not a capturing move
 static void addBlackPawnCaptureMove(const Board *board, const int from, const int to, const int captured, MoveList *list) {
-    ASSERT(pieceValidOrEmpty(captured))
+    ASSERT(pieceValidEmpty(captured))
     ASSERT(squareOnBoard(from))
     ASSERT(squareOnBoard(to))
     // if pawn starts on rank 2, then it will finish on rank 1, where it has to promote
