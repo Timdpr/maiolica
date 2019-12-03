@@ -327,6 +327,6 @@ void mirrorBoard(Board *board) {
 
 Board *genBoard() {
     Board *board = (Board*)malloc(sizeof(Board));
-    board->pvTable->pTable = nullptr;
+    board->hashTable->hTable = nullptr;
     return board;
 }
