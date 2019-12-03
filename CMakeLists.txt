@@ -18,4 +18,4 @@ else()
     set(CMAKE_CXX_FLAGS_RELEASE "-O3 -mdynamic-no-pic -flto")
 endif()
 
-add_executable(maiolica src/main.cpp src/defs.h src/init.cpp src/bitboards.cpp src/hashkeys.cpp src/board.cpp src/data.cpp src/attack.cpp src/io.cpp src/movegen.cpp src/validate.cpp src/makemove.cpp src/perft.cpp src/misc.cpp src/search.cpp src/pvtable.cpp src/evaluate.cpp src/uci.cpp)
+add_executable(maiolica src/main.cpp src/defs.h src/init.cpp src/bitboards.cpp src/hashkeys.cpp src/board.cpp src/data.cpp src/attack.cpp src/io.cpp src/movegen.cpp src/validate.cpp src/makemove.cpp src/perft.cpp src/misc.cpp src/search.cpp src/pvtable.cpp src/evaluate.cpp src/uci.cpp src/xboard.cpp)
