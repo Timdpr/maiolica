@@ -37,7 +37,7 @@ const int pieceDirection [13][8] = {
     { -1,-10,  1, 10, -9,-11, 11,  9 },
     { -1,-10,  1, 10, -9,-11, 11,  9 }
 };
-/// Tells you how many directions there are in the rows of the pieceDirection array (indexed by piece).
+/// Tells you how many directions there are in the rows of the pieceDirection array (indexed by piece)
 const int pieceDirectionNumbers[13] = { 0, 0, 8, 4, 4, 8, 8, 0, 8, 4, 4, 8, 8 };
 
 /// Adds a 'quiet' (non-capture) Move to the MoveList using the given 'move' integer
@@ -153,27 +153,27 @@ void generateAllMoves(const Board *board, MoveList *moveList) {
             int square = board->pieceList[wP][pieceNum];
             ASSERT(squareOnBoard(square))
             // ...then generating NON-CAPTURE moves for it
-            if (board->pieces[square+10] == EMPTY) { // +10 = move white forward 1 square
-                addWhitePawnMove(board, square, square+10, moveList);
-                if (ranksBoard[square] == RANK_2 && board->pieces[square+20] == EMPTY) { // +20 = move forward 2 squares = pawn start!
-                    addQuietMove(board, MOVE(square, (square+20), EMPTY, EMPTY, MFLAG_PAWN_START), moveList);
+            if (board->pieces[square + 10] == EMPTY) { // +10 = move white forward 1 square
+                addWhitePawnMove(board, square, square + 10, moveList);
+                if (ranksBoard[square] == RANK_2 && board->pieces[square + 20] == EMPTY) { // +20 = move forward 2 squares = pawn start!
+                    addQuietMove(board, MOVE(square, (square + 20), EMPTY, EMPTY, MFLAG_PAWN_START), moveList);
                 }
             }
             // ...then generating CAPTURE moves for it
             // (if square ahead and to the right/left is not offboard and has a black piece, add capture move):
-            if (!SQUARE_OFFBOARD(square+9) && pieceColours[board->pieces[square + 9]] == BLACK) {
-                addWhitePawnCaptureMove(board, square, square+9, board->pieces[square+9], moveList);
+            if (!SQUARE_OFFBOARD(square + 9) && pieceColours[board->pieces[square + 9]] == BLACK) {
+                addWhitePawnCaptureMove(board, square, square + 9, board->pieces[square + 9], moveList);
             }
-            if (!SQUARE_OFFBOARD(square+11) && pieceColours[board->pieces[square + 11]] == BLACK) {
-                addWhitePawnCaptureMove(board, square, square+11, board->pieces[square+11], moveList);
+            if (!SQUARE_OFFBOARD(square + 11) && pieceColours[board->pieces[square + 11]] == BLACK) {
+                addWhitePawnCaptureMove(board, square, square + 11, board->pieces[square + 11], moveList);
             }
             // ...then generating EN PASSANT moves for it
             if (board->enPasSq != NO_SQ) {
-                if (square+9 == board->enPasSq) { // offboard check not needed, just check board's en passant square field!
-                    addEnPassantMove(board, MOVE(square, square+9, EMPTY, EMPTY, MFLAG_EN_PASSANT), moveList);
+                if (square + 9 == board->enPasSq) { // offboard check not needed, just check board's en passant square field!
+                    addEnPassantMove(board, MOVE(square, square + 9, EMPTY, EMPTY, MFLAG_EN_PASSANT), moveList);
                 }
-                if (square+11 == board->enPasSq) {
-                    addEnPassantMove(board, MOVE(square, square+11, EMPTY, EMPTY, MFLAG_EN_PASSANT), moveList);
+                if (square + 11 == board->enPasSq) {
+                    addEnPassantMove(board, MOVE(square, square + 11, EMPTY, EMPTY, MFLAG_EN_PASSANT), moveList);
                 }
             }
         }
@@ -202,18 +202,18 @@ void generateAllMoves(const Board *board, MoveList *moveList) {
             int square = board->pieceList[bP][pieceNum];
             ASSERT(squareOnBoard(square))
             // NON-CAPTURE moves:
-            if (board->pieces[square-10] == EMPTY) { // -10 = move black forward 1 square
-                addBlackPawnMove(board, square, square-10, moveList);
-                if (ranksBoard[square] == RANK_7 && board->pieces[square-20] == EMPTY) { // -20 = move forward 2 squares = pawn start!
-                    addQuietMove(board, MOVE(square, (square-20), EMPTY, EMPTY, MFLAG_PAWN_START), moveList);
+            if (board->pieces[square - 10] == EMPTY) { // -10 = move black forward 1 square
+                addBlackPawnMove(board, square, square - 10, moveList);
+                if (ranksBoard[square] == RANK_7 && board->pieces[square - 20] == EMPTY) { // -20 = move forward 2 squares = pawn start!
+                    addQuietMove(board, MOVE(square, (square - 20), EMPTY, EMPTY, MFLAG_PAWN_START), moveList);
                 }
             }
             // CAPTURE moves:
-            if (!SQUARE_OFFBOARD(square-9) && pieceColours[board->pieces[square - 9]] == WHITE) {
-                addBlackPawnCaptureMove(board, square, square-9, board->pieces[square-9], moveList);
+            if (!SQUARE_OFFBOARD(square - 9) && pieceColours[board->pieces[square - 9]] == WHITE) {
+                addBlackPawnCaptureMove(board, square, square - 9, board->pieces[square - 9], moveList);
             }
-            if (!SQUARE_OFFBOARD(square-11) && pieceColours[board->pieces[square - 11]] == WHITE) {
-                addBlackPawnCaptureMove(board, square, square-11, board->pieces[square-11], moveList);
+            if (!SQUARE_OFFBOARD(square - 11) && pieceColours[board->pieces[square - 11]] == WHITE) {
+                addBlackPawnCaptureMove(board, square, square - 11, board->pieces[square - 11], moveList);
             }
             if (board->enPasSq != NO_SQ) {
                 // EN PASSANT moves:
@@ -319,19 +319,19 @@ void generateAllCaptureMoves(const Board *board, MoveList *moveList) {
             ASSERT(squareOnBoard(square))
             // generate CAPTURE moves for it
             // (if square ahead and to the right/left is not offboard and has a black piece, add capture move):
-            if (!SQUARE_OFFBOARD(square+9) && pieceColours[board->pieces[square + 9]] == BLACK) {
-                addWhitePawnCaptureMove(board, square, square+9, board->pieces[square+9], moveList);
+            if (!SQUARE_OFFBOARD(square + 9) && pieceColours[board->pieces[square + 9]] == BLACK) {
+                addWhitePawnCaptureMove(board, square, square + 9, board->pieces[square + 9], moveList);
             }
-            if (!SQUARE_OFFBOARD(square+11) && pieceColours[board->pieces[square + 11]] == BLACK) {
-                addWhitePawnCaptureMove(board, square, square+11, board->pieces[square+11], moveList);
+            if (!SQUARE_OFFBOARD(square + 11) && pieceColours[board->pieces[square + 11]] == BLACK) {
+                addWhitePawnCaptureMove(board, square, square + 11, board->pieces[square + 11], moveList);
             }
             // ...then generating EN PASSANT moves for it
             if (board->enPasSq != NO_SQ) {
-                if (square+9 == board->enPasSq) { // offboard check not needed, just check board's en passant square field!
-                    addEnPassantMove(board, MOVE(square, square+9, EMPTY, EMPTY, MFLAG_EN_PASSANT), moveList);
+                if (square + 9 == board->enPasSq) { // offboard check not needed, just check board's en passant square field!
+                    addEnPassantMove(board, MOVE(square, square + 9, EMPTY, EMPTY, MFLAG_EN_PASSANT), moveList);
                 }
-                if (square+11 == board->enPasSq) {
-                    addEnPassantMove(board, MOVE(square, square+11, EMPTY, EMPTY, MFLAG_EN_PASSANT), moveList);
+                if (square + 11 == board->enPasSq) {
+                    addEnPassantMove(board, MOVE(square, square + 11, EMPTY, EMPTY, MFLAG_EN_PASSANT), moveList);
                 }
             }
         }
@@ -340,11 +340,11 @@ void generateAllCaptureMoves(const Board *board, MoveList *moveList) {
             int square = board->pieceList[bP][pieceNum];
             ASSERT(squareOnBoard(square))
             // CAPTURE moves:
-            if (!SQUARE_OFFBOARD(square-9) && pieceColours[board->pieces[square - 9]] == WHITE) {
-                addBlackPawnCaptureMove(board, square, square-9, board->pieces[square-9], moveList);
+            if (!SQUARE_OFFBOARD(square - 9) && pieceColours[board->pieces[square - 9]] == WHITE) {
+                addBlackPawnCaptureMove(board, square, square - 9, board->pieces[square - 9], moveList);
             }
-            if (!SQUARE_OFFBOARD(square-11) && pieceColours[board->pieces[square - 11]] == WHITE) {
-                addBlackPawnCaptureMove(board, square, square-11, board->pieces[square-11], moveList);
+            if (!SQUARE_OFFBOARD(square - 11) && pieceColours[board->pieces[square - 11]] == WHITE) {
+                addBlackPawnCaptureMove(board, square, square - 11, board->pieces[square - 11], moveList);
             }
             if (board->enPasSq != NO_SQ) {
                 // EN PASSANT moves:
@@ -430,7 +430,6 @@ void initMVVLVA() {
 int moveExists(Board *board, const int move) {
     MoveList moveList[1];
     generateAllMoves(board, moveList);
-
     for (int moveNum = 0; moveNum < moveList->count; ++moveNum) {
         if (!makeMove(board, moveList->moves[moveNum].move)) {
             continue;
