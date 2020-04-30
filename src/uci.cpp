@@ -110,7 +110,7 @@ void parsePosition(const char* lineIn, Board *board) {
             ptrChar++; // then move it past the space to the next move/command/end
         }
     }
-    printBoard(board);
+    printBoard(board, false);
 }
 
 void uciLoop(Board *board, SearchInfo *info) {

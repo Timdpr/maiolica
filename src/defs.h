@@ -239,6 +239,7 @@ extern U64 sideKey;
 extern U64 castleKeys[16];
 
 extern const char pieceChars[];
+extern const char *pieceCharsUTF8[13];
 extern const char sideChars[];
 extern const char rankChars[];
 extern const char fileChars[];
@@ -287,34 +288,34 @@ extern int checkBoard(const Board *board);
 extern void updateMaterialLists(Board *board);
 extern int parseFen(const char *fen, Board *board);
 extern void resetBoard(Board *board);
-extern void printBoard(const Board *board);
+extern void printBoard(const Board *board, bool unicode);
 extern Board *genBoard();
 
 // attack.cpp
-extern int isSquareAttacked(const int square, const int attackingSide, const Board *board);
+extern int isSquareAttacked(int square, int attackingSide, const Board *board);
 
 // io.cpp
-extern char *printSquare(const int square);
-extern char *printMove(const int move);
+extern char *printSquare(int square);
+extern char *printMove(int move);
 extern void printMoveList(const MoveList *moveList);
 extern int parseMove(const char *ptrChar, Board *board);
 
 // validate.cpp
 extern int moveListValid(const MoveList *list, const Board *board);
-extern int squareIs120(const int sq);
-extern int squareOnBoard(const int sq);
-extern int sideValid(const int side);
-extern int fileOrRankValid(const int fileOrRank);
-extern int pieceValid(const int piece);
-extern int pieceValidEmpty(const int piece);
-extern int pieceValidEmptyOffboard(const int pce);
+extern int squareIs120(int sq);
+extern int squareOnBoard(int sq);
+extern int sideValid(int side);
+extern int fileOrRankValid(int fileOrRank);
+extern int pieceValid(int piece);
+extern int pieceValidEmpty(int piece);
+extern int pieceValidEmptyOffboard(int pce);
 extern void debugAnalysisTest(Board *board, SearchInfo *info);
 extern void mirrorEvalTest(Board *board);
 
 // movegen.cpp
 extern void generateAllMoves(const Board *board, MoveList *list);
 extern void generateAllCaptureMoves(const Board *board, MoveList *moveList);
-extern int moveExists(Board *board, const int move);
+extern int moveExists(Board *board, int move);
 extern void initMVVLVA();
 
 // makemove.cpp
@@ -335,9 +336,9 @@ extern void searchPosition(Board *board, SearchInfo *info);
 
 // pvtable.cpp
 extern void clearHashTable(HashTable *hashTable);
-extern int getPVLine(const int depth, Board *board);
-extern void initHashTable(HashTable *hashTable, const int MB);
-extern void storeHashEntry(Board *board, const int move, int score, const int flags, const int depth);
+extern int getPVLine(int depth, Board *board);
+extern void initHashTable(HashTable *hashTable, int MB);
+extern void storeHashEntry(Board *board, int move, int score, int flags, int depth);
 extern int probeHashEntry(Board *board, int *move, int *score, int alpha, int beta, int depth);
 extern int probePVTable(const Board *board);
 

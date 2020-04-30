@@ -16,7 +16,7 @@ int moveListValid(const MoveList *list, const Board *board) {
             return FALSE;
         }
         if (!pieceValid(board->pieces[from])) {
-            printBoard(board);
+            printBoard(board, false);
             return FALSE;
         }
     }
@@ -99,9 +99,9 @@ void mirrorEvalTest(Board *board) {
             if (ev1 != ev2) {
                 printf("\n\n\n");
                 parseFen(lineIn, board);
-                printBoard(board);
+                printBoard(board, false);
                 mirrorBoard(board);
-                printBoard(board);
+                printBoard(board, false);
                 printf("\n\nMirror Fail:\n%s\n",lineIn);
                 getchar();
                 return;

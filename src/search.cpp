@@ -307,6 +307,5 @@ void searchPosition(Board *board, SearchInfo *info) {
     } else {
         printf("\n*** Maiolica makes move %s ***\n", printMove(bestMove));
         makeMove(board, bestMove);
-        printBoard(board);
     }
 }

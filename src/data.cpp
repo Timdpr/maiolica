@@ -1,6 +1,9 @@
 #include "defs.h"
 
 const char pieceChars[] = ".PNBRQKpnbrqk";
+const char *pieceCharsUTF8[13] = { u8"  \u00B7",
+                                   u8"  \u265F", u8"  \u265E", u8"  \u265D", u8"  \u265C", u8"  \u265B", u8"  \u265A",
+                                   u8"  \u2659", u8"  \u2658", u8"  \u2657", u8"  \u2656", u8"  \u2655", u8"  \u2654"};
 const char sideChars[]  = "wb-";
 const char rankChars[]  = "12345678";
 const char fileChars[]  = "ABCDEFGH";

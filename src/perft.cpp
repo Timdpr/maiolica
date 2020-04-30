@@ -27,7 +27,7 @@ void perft(int depth, Board *board) {
 void perftTest(int depth, Board *board) {
     ASSERT(checkBoard(board))
 
-    printBoard(board);
+    printBoard(board, false);
     printf("\nStarting test to depth: %d\n", depth);
 
     leafNodes = 0;

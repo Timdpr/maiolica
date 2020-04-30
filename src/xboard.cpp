@@ -227,6 +227,7 @@ void consoleLoop(Board *board, SearchInfo *info) {
 
     int depth = MAX_DEPTH, movetime = 3000;
     char inBuf[80], command[80];
+    bool unicode = false;
 
     int engineSide = BLACK;
     parseFen(START_FEN, board);
@@ -245,6 +246,7 @@ void consoleLoop(Board *board, SearchInfo *info) {
             }
 
             searchPosition(board, info);
+            printBoard(board, unicode);
         }
 
         printf("\nMaiolica > ");
@@ -263,6 +265,7 @@ void consoleLoop(Board *board, SearchInfo *info) {
             printf("quit - quit game\n");
             printf("force - computer will not think\n");
             printf("print - show board\n");
+            printf("unicode - use (colour-inverted) Unicode chess piece characters when printing\n");
             printf("post - show thinking\n");
             printf("nopost - do not show thinking\n");
             printf("new - start new game\n");
@@ -286,7 +289,12 @@ void consoleLoop(Board *board, SearchInfo *info) {
         }
 
         if (!strcmp(command, "print")) {
-            printBoard(board);
+            printBoard(board, unicode);
+            continue;
+        }
+
+        if (!strcmp(command, "unicode")) {
+            unicode = true;
             continue;
         }
 
@@ -325,6 +333,7 @@ void consoleLoop(Board *board, SearchInfo *info) {
         if (!strcmp(command, "new")) {
             engineSide = BLACK;
             parseFen(START_FEN, board);
+            printBoard(board, unicode);
             continue;
         }
 

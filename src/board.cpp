@@ -257,14 +257,18 @@ void resetBoard(Board *board) {
     // TODO: Missing resetting material?
 }
 
-void printBoard(const Board *board) {
+void printBoard(const Board *board, const bool unicode) {
     std::printf("\n Board:\n");
 
     for(int rank = RANK_8; rank >= RANK_1; rank--) {
         for(int file = FILE_A; file <= FILE_H; file++) {
             int sq = FILE_RANK_TO_SQUARE_INDEX(file, rank);
             int piece = board->pieces[sq];
-            std::printf("%3c", pieceChars[piece]);
+            if (unicode) {
+                std::printf("%3s", pieceCharsUTF8[piece]);
+            } else {
+                std::printf("%3c", pieceChars[piece]);
+            }
         }
         std::printf("   %d\n", rank+1);
     }
