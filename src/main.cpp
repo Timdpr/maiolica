@@ -6,10 +6,10 @@ int main() {
     // TODO: Not doing polyglot books for now
     initAll();
 
-    Board *board = genBoard();
+    Board board = genBoard();
     SearchInfo info[1];
     info->quit = false;
-    initHashTable(board->hashTable, 64);
+    initHashTable(board.hashTable, 64);
 
     setbuf(stdin, nullptr);
     setbuf(stdout, nullptr);
@@ -32,22 +32,12 @@ int main() {
             if (info->quit == true) break;
             continue;
 
-        } else if (!strncmp(line, "xboard", 6))	{
-            xBoardLoop(board, info);
-            if (info->quit == true) break;
-            continue;
-
-        } else if (!strncmp(line, "console", 4))	{
-            consoleLoop(board, info);
-            if (info->quit == true) break;
-            continue;
-
         } else if (!strncmp(line, "quit", 4))	{
             break;
         }
     }
 
-    free(board->hashTable->hTable);
+    free(board.hashTable->hTable);
 
     return 0;
 }

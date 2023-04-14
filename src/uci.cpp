@@ -12,7 +12,7 @@ int fastAtoi(const char* str) {
     return val;
 }
 
-void parseGo(const char* line, SearchInfo *info, Board *board) {
+void parseGo(const char* line, SearchInfo *info, Board& board) {
     // e.g. go depth 6 wtime 180000 btime 100000 binc 1000 winc 1000 movetime 1000 movestogo 40
     int depth = -1;
     int movesToGo = 30; // defaulting to sudden death time control
@@ -27,19 +27,19 @@ void parseGo(const char* line, SearchInfo *info, Board *board) {
 
     }
 
-    if ((ptr = strstr(line,"binc")) && board->side == BLACK) {
+    if ((ptr = strstr(line,"binc")) && board.side == BLACK) {
         increment = fastAtoi(ptr + 5); // atoi converts string to integer
     }
 
-    if ((ptr = strstr(line,"winc")) && board->side == WHITE) {
+    if ((ptr = strstr(line,"winc")) && board.side == WHITE) {
         increment = fastAtoi(ptr + 5);
     }
 
-    if ((ptr = strstr(line,"wtime")) && board->side == WHITE) {
+    if ((ptr = strstr(line,"wtime")) && board.side == WHITE) {
         time = fastAtoi(ptr + 6);
     }
 
-    if ((ptr = strstr(line,"btime")) && board->side == BLACK) {
+    if ((ptr = strstr(line,"btime")) && board.side == BLACK) {
         time = fastAtoi(ptr + 6);
     }
 
@@ -82,7 +82,7 @@ void parseGo(const char* line, SearchInfo *info, Board *board) {
 }
 
 /// reads a fen or 'startpos', possibly followed by moves
-void parsePosition(const char* lineIn, Board *board) {
+void parsePosition(const char* lineIn, Board& board) {
     lineIn += 9; // move pointer forward 9 chars
     const char *ptrChar = lineIn;
 
@@ -110,7 +110,7 @@ void parsePosition(const char* lineIn, Board *board) {
                 break;
             }
             makeMove(board, move); // make the move
-            board->ply = 0; // set ply back to 0, since it gets incremented to 1 in makeMove
+            board.ply = 0; // set ply back to 0, since it gets incremented to 1 in makeMove
             while (*ptrChar && *ptrChar != ' ') { // while we are pointing to something AND haven't found a space
                 ptrChar++; // move pointer through the move
             }
@@ -120,8 +120,7 @@ void parsePosition(const char* lineIn, Board *board) {
     printBoard(board);
 }
 
-void uciLoop(Board *board, SearchInfo *info) {
-    info->gameMode = UCI_MODE;
+void uciLoop(Board& board, SearchInfo *info) {
     // turn off any kind of buffering - stop bad commands etc.
     setbuf(stdin, nullptr);
     setbuf(stdout, nullptr);
@@ -160,7 +159,12 @@ void uciLoop(Board *board, SearchInfo *info) {
 
         // if 'go' then parse go!
         } else if (!strncmp(line, "go", 2)) {
-            parseGo(line, info, board);
+             parseGo(line, info, board);
+
+        // extra convenience function: start infinite analysis
+        } else if (!strncmp(line, "run", 3)) {
+            parseFen(START_FEN, board);
+            parseGo("go infinite", info, board);
 
         // if 'quit' then set quit to true
         } else if (!strncmp(line, "quit", 4)) {
@@ -182,7 +186,7 @@ void uciLoop(Board *board, SearchInfo *info) {
             if (MB < 4) MB = 4;
             if (MB > 2048) MB = 2048;
             printf("Set Hash to %d MB\n", MB);
-            initHashTable(board->hashTable, MB);
+            initHashTable(board.hashTable, MB);
         }
 
         // if quit was set, then quit!

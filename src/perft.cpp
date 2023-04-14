@@ -3,7 +3,7 @@
 
 long leafNodes;
 
-void perft(int depth, Board *board) {
+void perft(int depth, Board& board) {
     ASSERT(checkBoard(board))
 
     if (depth == 0) {
@@ -23,7 +23,7 @@ void perft(int depth, Board *board) {
     }
 }
 
-void perftTest(int depth, Board *board) {
+void perftTest(int depth, Board& board) {
     ASSERT(checkBoard(board))
 
     printBoard(board);
