@@ -83,27 +83,27 @@ const int kingOpening[64] = {
 int materialDraw(const Board *board) {
     if (!board->pieceCounts[wR] && !board->pieceCounts[bR] && !board->pieceCounts[wQ] && !board->pieceCounts[bQ]) {
         if (!board->pieceCounts[bB] && !board->pieceCounts[wB]) {
-            if (board->pieceCounts[wN] < 3 && board->pieceCounts[bN] < 3) {  return TRUE; }
+            if (board->pieceCounts[wN] < 3 && board->pieceCounts[bN] < 3) {  return true; }
         } else if (!board->pieceCounts[wN] && !board->pieceCounts[bN]) {
-            if (abs(board->pieceCounts[wB] - board->pieceCounts[bB]) < 2) { return TRUE; }
+            if (abs(board->pieceCounts[wB] - board->pieceCounts[bB]) < 2) { return true; }
         } else if ((board->pieceCounts[wN] < 3 && !board->pieceCounts[wB]) || (board->pieceCounts[wB] == 1 && !board->pieceCounts[wN])) {
-            if ((board->pieceCounts[bN] < 3 && !board->pieceCounts[bB]) || (board->pieceCounts[bB] == 1 && !board->pieceCounts[bN]))  { return TRUE; }
+            if ((board->pieceCounts[bN] < 3 && !board->pieceCounts[bB]) || (board->pieceCounts[bB] == 1 && !board->pieceCounts[bN]))  { return true; }
         }
     } else if (!board->pieceCounts[wQ] && !board->pieceCounts[bQ]) {
         if (board->pieceCounts[wR] == 1 && board->pieceCounts[bR] == 1) {
-            if ((board->pieceCounts[wN] + board->pieceCounts[wB]) < 2 && (board->pieceCounts[bN] + board->pieceCounts[bB]) < 2)	{ return TRUE; }
+            if ((board->pieceCounts[wN] + board->pieceCounts[wB]) < 2 && (board->pieceCounts[bN] + board->pieceCounts[bB]) < 2)	{ return true; }
         } else if (board->pieceCounts[wR] == 1 && !board->pieceCounts[bR]) {
-            if ((board->pieceCounts[wN] + board->pieceCounts[wB] == 0) && (((board->pieceCounts[bN] + board->pieceCounts[bB]) == 1) || ((board->pieceCounts[bN] + board->pieceCounts[bB]) == 2))) { return TRUE; }
+            if ((board->pieceCounts[wN] + board->pieceCounts[wB] == 0) && (((board->pieceCounts[bN] + board->pieceCounts[bB]) == 1) || ((board->pieceCounts[bN] + board->pieceCounts[bB]) == 2))) { return true; }
         } else if (board->pieceCounts[bR] == 1 && !board->pieceCounts[wR]) {
-            if ((board->pieceCounts[bN] + board->pieceCounts[bB] == 0) && (((board->pieceCounts[wN] + board->pieceCounts[wB]) == 1) || ((board->pieceCounts[wN] + board->pieceCounts[wB]) == 2))) { return TRUE; }
+            if ((board->pieceCounts[bN] + board->pieceCounts[bB] == 0) && (((board->pieceCounts[wN] + board->pieceCounts[wB]) == 1) || ((board->pieceCounts[wN] + board->pieceCounts[wB]) == 2))) { return true; }
         }
     }
-    return FALSE;
+    return false;
 }
 
 /// Evaluate a board position! @return a score (in 100ths of a pawn)
 int evalPosition(const Board *board) {
-    if (board->pieceCounts[wP] && !board->pieceCounts[bP] && materialDraw(board) == TRUE) {
+    if (board->pieceCounts[wP] && !board->pieceCounts[bP] && materialDraw(board) == true) {
         return 0;
     }
 

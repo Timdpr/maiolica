@@ -15,24 +15,24 @@ int threefoldRepetition(const Board *board) {
 
 // If any of the conditions here are met, then a mate can happen
 int drawMaterial(const Board *board) {
-    if (board->pieceCounts[wP] || board->pieceCounts[bP]) { return FALSE; }
-    if (board->pieceCounts[wQ] || board->pieceCounts[bQ] || board->pieceCounts[wR] || board->pieceCounts[bR]) { return FALSE; }
-    if (board->pieceCounts[wB] > 1 || board->pieceCounts[bB] > 1) { return FALSE; }
-    if (board->pieceCounts[wN] > 1 || board->pieceCounts[bN] > 1) { return FALSE; }
-    if (board->pieceCounts[wN] && board->pieceCounts[wB]) { return FALSE; }
-    if (board->pieceCounts[bN] && board->pieceCounts[bB]) { return FALSE; }
-    return TRUE;
+    if (board->pieceCounts[wP] || board->pieceCounts[bP]) { return false; }
+    if (board->pieceCounts[wQ] || board->pieceCounts[bQ] || board->pieceCounts[wR] || board->pieceCounts[bR]) { return false; }
+    if (board->pieceCounts[wB] > 1 || board->pieceCounts[bB] > 1) { return false; }
+    if (board->pieceCounts[wN] > 1 || board->pieceCounts[bN] > 1) { return false; }
+    if (board->pieceCounts[wN] && board->pieceCounts[wB]) { return false; }
+    if (board->pieceCounts[bN] && board->pieceCounts[bB]) { return false; }
+    return true;
 }
 
 int checkResult(Board *board) {
     if (board->fiftyMove > 100) { // todo: not accounting for side, potentially inaccurate
-        printf("1/2-1/2 {50 move rule (claimed by Maiolica)}\n"); return TRUE;
+        printf("1/2-1/2 {50 move rule (claimed by Maiolica)}\n"); return true;
     }
     if (threefoldRepetition(board) >= 2) {
-        printf("1/2-1/2 {Threefold repetition (claimed by Maiolica)}\n"); return TRUE;
+        printf("1/2-1/2 {Threefold repetition (claimed by Maiolica)}\n"); return true;
     }
-    if (drawMaterial(board) == TRUE) {
-        printf("1/2-1/2 {Insufficient material (claimed by Maiolica)}\n"); return TRUE;
+    if (drawMaterial(board) == true) {
+        printf("1/2-1/2 {Insufficient material (claimed by Maiolica)}\n"); return true;
     }
 
     MoveList moveList[1];
@@ -48,21 +48,21 @@ int checkResult(Board *board) {
         break;
     }
     if (found != 0) {
-        return FALSE;
+        return false;
     }
 
     int inCheck = isSquareAttacked(board->kingSq[board->side], board->side^1, board);
-    if (inCheck == TRUE) {
+    if (inCheck == true) {
         if (board->side == WHITE) {
             printf("0-1 {Black mates (claimed by Maiolica)}\n");
-            return TRUE;
+            return true;
         } else {
             printf("0-1 {White mates (claimed by Maiolica)}\n");
-            return TRUE;
+            return true;
         }
     } else {
         printf("\n1/2-1/2 {Stalemate (claimed by Maiolica)}\n");
-        return TRUE;
+        return true;
     }
 }
 
@@ -73,7 +73,7 @@ void printOptions() {
 
 void xBoardLoop(Board *board, SearchInfo *info) {
     info->gameMode = XBOARD_MODE;
-    info->postThinking = TRUE;
+    info->postThinking = true;
     setbuf(stdin, nullptr);
     setbuf(stdout, nullptr);
     printOptions();
@@ -91,16 +91,16 @@ void xBoardLoop(Board *board, SearchInfo *info) {
     int depth = -1;
     int time = -1;
 
-    while(TRUE) {
+    while(true) {
 
         fflush(stdout);
 
-        if (board->side == engineSide && checkResult(board) == FALSE) {
+        if (board->side == engineSide && checkResult(board) == false) {
             info->startTime = getTimeMS();
             info->depth = depth;
 
             if (time != -1) {
-                info->timeSet = TRUE;
+                info->timeSet = true;
                 time /= movesToGo[board->side];
                 time -= 50;
                 info->stopTime = info->startTime + time + inc;
@@ -135,7 +135,7 @@ void xBoardLoop(Board *board, SearchInfo *info) {
         printf("command seen:%s\n", inBuf);
 
         if (!strcmp(command, "quit")) {
-            info->quit = TRUE;
+            info->quit = true;
             break;
         }
 
@@ -221,7 +221,7 @@ void consoleLoop(Board *board, SearchInfo *info) {
     printf("Type 'help' for commands\n");
 
     info->gameMode = CONSOLE_MODE;
-    info->postThinking = TRUE;
+    info->postThinking = true;
     setbuf(stdin, nullptr);
     setbuf(stdout, nullptr);
 
@@ -231,16 +231,16 @@ void consoleLoop(Board *board, SearchInfo *info) {
     int engineSide = BLACK;
     parseFen(START_FEN, board);
 
-    while(TRUE) {
+    while(true) {
 
         fflush(stdout);
 
-        if(board->side == engineSide && checkResult(board) == FALSE) {
+        if(board->side == engineSide && checkResult(board) == false) {
             info->startTime = getTimeMS();
             info->depth = depth;
 
             if(movetime != 0) {
-                info->timeSet = TRUE;
+                info->timeSet = true;
                 info->stopTime = info->startTime + movetime;
             }
 
@@ -276,12 +276,12 @@ void consoleLoop(Board *board, SearchInfo *info) {
         }
 
         if (!strcmp(command, "quit")) {
-            info->quit = TRUE;
+            info->quit = true;
             break;
         }
 
         if (!strcmp(command, "post")) {
-            info->postThinking = TRUE;
+            info->postThinking = true;
             continue;
         }
 
@@ -291,7 +291,7 @@ void consoleLoop(Board *board, SearchInfo *info) {
         }
 
         if (!strcmp(command, "nopost")) {
-            info->postThinking = FALSE;
+            info->postThinking = false;
             continue;
         }
 

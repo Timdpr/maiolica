@@ -9,7 +9,7 @@ char *printSquare(const int square) {
     int file = filesBoard[square];
     int rank = ranksBoard[square];
 
-    std::sprintf(squareString, "%c%c", ('a' + file), ('1' + rank));
+    std::snprintf(squareString, sizeof(squareString), "%c%c", ('a' + file), ('1' + rank));
 
     return squareString;
 }
@@ -34,9 +34,9 @@ char *printMove(const int move) {
         } else if (!IS_ROOK_OR_QUEEN(promoted) && IS_BISHOP_OR_QUEEN(promoted)) { // check if it's a bishop
             promChar = 'b';
         }
-        sprintf(moveString, "%c%c%c%c%c", ('a' + fileFrom), ('1' + rankFrom), ('a' + fileTo), ('1' + rankTo), promChar);
+        snprintf(moveString, sizeof(moveString), "%c%c%c%c%c", ('a' + fileFrom), ('1' + rankFrom), ('a' + fileTo), ('1' + rankTo), promChar);
     } else {
-        sprintf(moveString, "%c%c%c%c", ('a' + fileFrom), ('1' + rankFrom), ('a' + fileTo), ('1' + rankTo));
+        snprintf(moveString, sizeof(moveString), "%c%c%c%c", ('a' + fileFrom), ('1' + rankFrom), ('a' + fileTo), ('1' + rankTo));
     }
     return moveString;
 }
@@ -55,10 +55,10 @@ void printMoveList(const MoveList *moveList) {
 /// Takes algebraic notation for move, and returns move int
 int parseMove(const char *ptrChar, Board *board) {
     // Make sure that rank/file is within correct bounds
-    if (ptrChar[1] > '8' || ptrChar[1] < '1') return FALSE;
-    if (ptrChar[3] > '8' || ptrChar[3] < '1') return FALSE;
-    if (ptrChar[0] > 'h' || ptrChar[0] < 'a') return FALSE;
-    if (ptrChar[2] > 'h' || ptrChar[2] < 'a') return FALSE;
+    if (ptrChar[1] > '8' || ptrChar[1] < '1') return false;
+    if (ptrChar[3] > '8' || ptrChar[3] < '1') return false;
+    if (ptrChar[0] > 'h' || ptrChar[0] < 'a') return false;
+    if (ptrChar[2] > 'h' || ptrChar[2] < 'a') return false;
     // Get from/to square
     int from = FILE_RANK_TO_SQUARE_INDEX(ptrChar[0] - 'a', ptrChar[1] - '1');
     int to = FILE_RANK_TO_SQUARE_INDEX(ptrChar[2] - 'a', ptrChar[3] - '1');

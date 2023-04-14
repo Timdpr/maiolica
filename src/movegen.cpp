@@ -437,8 +437,8 @@ int moveExists(Board *board, const int move) {
         }
         takeMove(board);
         if (moveList->moves[moveNum].move == move) {
-            return TRUE;
+            return true;
         }
     }
-    return FALSE;
+    return false;
 }

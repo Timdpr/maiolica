@@ -4,7 +4,7 @@
 
 #ifdef WIN32
 #include "windows.h"
-#elseif MINGW
+#elif MINGW
 #include <io.h>
 #else
 #include "sys/select.h"
@@ -23,11 +23,11 @@ int InputWaiting()
 {
 #if !defined(WIN32) && !defined(WIN64)
     fd_set readfds;
-    struct timeval tv;
+    struct timeval tv{};
     FD_ZERO (&readfds);
     FD_SET (fileno(stdin), &readfds);
     tv.tv_sec=0; tv.tv_usec=0;
-    select(16, &readfds, 0, 0, &tv);
+    select(16, &readfds, nullptr, nullptr, &tv);
 
     return (FD_ISSET(fileno(stdin), &readfds));
 #else
@@ -59,7 +59,7 @@ void ReadInput(SearchInfo *info) {
     char            input[256] = "", *endc;
 
     if (InputWaiting()) {
-        info->stopped = TRUE;
+        info->stopped = true;
         do {
             bytes=read(fileno(stdin),input,256);
         } while (bytes<0);
@@ -68,7 +68,7 @@ void ReadInput(SearchInfo *info) {
 
         if (strlen(input) > 0) {
             if (!strncmp(input, "quit", 4))    {
-                info->quit = TRUE;
+                info->quit = true;
             }
         }
         return;

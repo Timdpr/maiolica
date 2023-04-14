@@ -5,6 +5,13 @@
 /// This is what we expect the largest input to be:
 #define INPUT_BUFFER (400 * 6)
 
+int fastAtoi(const char* str) {
+    int val = 0;
+    uint8_t x;
+    while ((x = uint8_t(*str++ - '0')) <= 9) val = val * 10 + x;
+    return val;
+}
+
 void parseGo(const char* line, SearchInfo *info, Board *board) {
     // e.g. go depth 6 wtime 180000 btime 100000 binc 1000 winc 1000 movetime 1000 movestogo 40
     int depth = -1;
@@ -14,38 +21,38 @@ void parseGo(const char* line, SearchInfo *info, Board *board) {
     int increment = 0;
 
     const char *ptr = nullptr;
-    info->timeSet = FALSE;
+    info->timeSet = false;
 
     if ((ptr = strstr(line, "infinite"))) {
 
     }
 
     if ((ptr = strstr(line,"binc")) && board->side == BLACK) {
-        increment = atoi(ptr + 5); // atoi converts string to integer
+        increment = fastAtoi(ptr + 5); // atoi converts string to integer
     }
 
     if ((ptr = strstr(line,"winc")) && board->side == WHITE) {
-        increment = atoi(ptr + 5);
+        increment = fastAtoi(ptr + 5);
     }
 
     if ((ptr = strstr(line,"wtime")) && board->side == WHITE) {
-        time = atoi(ptr + 6);
+        time = fastAtoi(ptr + 6);
     }
 
     if ((ptr = strstr(line,"btime")) && board->side == BLACK) {
-        time = atoi(ptr + 6);
+        time = fastAtoi(ptr + 6);
     }
 
     if ((ptr = strstr(line,"movestogo"))) {
-        movesToGo = atoi(ptr + 10);
+        movesToGo = fastAtoi(ptr + 10);
     }
 
     if ((ptr = strstr(line,"movetime"))) {
-        moveTime = atoi(ptr + 9);
+        moveTime = fastAtoi(ptr + 9);
     }
 
     if ((ptr = strstr(line, "depth"))) {
-        depth = atoi(ptr + 6);
+        depth = fastAtoi(ptr + 6);
     }
 
 
@@ -58,7 +65,7 @@ void parseGo(const char* line, SearchInfo *info, Board *board) {
     info->depth = depth;
 
     if (time != -1) {
-        info->timeSet = TRUE;
+        info->timeSet = true;
         time /= movesToGo;
         time -= 50; // take 50ms off for safety!
         info->stopTime = info->startTime + time + increment;
@@ -68,7 +75,7 @@ void parseGo(const char* line, SearchInfo *info, Board *board) {
         info->depth = MAX_DEPTH;
     }
 
-    printf("time:%d start:%lld stop:%lld depth:%d timeset:%d\n",
+    std::printf("time:%d start:%lld stop:%lld depth:%d timeset:%d\n",
            time, info->startTime, info->stopTime, info->depth, info->timeSet);
 
     searchPosition(board, info); // print best move to the gui
@@ -126,7 +133,7 @@ void uciLoop(Board *board, SearchInfo *info) {
 
     int MB = 64;
 
-    while (TRUE) {
+    while (true) {
         memset(&line[0], 0, sizeof(line));
         fflush(stdout);
 
@@ -157,7 +164,7 @@ void uciLoop(Board *board, SearchInfo *info) {
 
         // if 'quit' then set quit to true
         } else if (!strncmp(line, "quit", 4)) {
-            info->quit = TRUE;
+            info->quit = true;
             break;
 
         // if 'uci' then print info and 'uciok'

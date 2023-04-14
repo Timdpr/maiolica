@@ -101,7 +101,7 @@ static void movePiece(const int from, const int to, Board *board) {
     int piece = board->pieces[from];
     int colour = pieceColours[piece];
 #ifdef DEBUG
-    int removedPieceNumber = FALSE; // Preprocesser: for checking that we find a piece, when in debug mode
+    int removedPieceNumber = false; // Preprocesser: for checking that we find a piece, when in debug mode
 #endif
 
     HASH_PIECE(piece, from);
@@ -121,7 +121,7 @@ static void movePiece(const int from, const int to, Board *board) {
         if (board->pieceList[piece][i] == from) { // ...and if a piece's square number matches our 'from' square...
             board->pieceList[piece][i] = to; // ...then set it to our 'to' square!
 #ifdef DEBUG
-            removedPieceNumber = TRUE; // set this so we can check if a piece was found when in debug mode
+            removedPieceNumber = true; // set this so we can check if a piece was found when in debug mode
 #endif
             break;
         }
@@ -164,7 +164,7 @@ int makeMove(Board *board, int move) {
                 movePiece(H1, F1, board); break;
             case G8:
                 movePiece(H8, F8, board); break;
-            default: ASSERT(FALSE) break;
+            default: ASSERT(false) break;
         }
     }
     // hash en passant square if it was available:
@@ -234,10 +234,10 @@ int makeMove(Board *board, int move) {
     // If the king is attacked by the new side to move, take back the move and return false
     if (isSquareAttacked(board->kingSq[side], board->side, board)) {
         takeMove(board);
-        return FALSE;
+        return false;
     }
 
-    return TRUE;
+    return true;
 }
 
 /// Undo a move
@@ -283,7 +283,7 @@ void takeMove(Board *board) {
             case C8: movePiece(D8, A8, board); break;
             case G1: movePiece(F1, H1, board); break;
             case G8: movePiece(F8, H8, board); break;
-            default: ASSERT(FALSE); break;
+            default: ASSERT(false); break;
         }
     }
 

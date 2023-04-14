@@ -8,7 +8,7 @@ int main() {
 
     Board *board = genBoard();
     SearchInfo info[1];
-    info->quit = FALSE;
+    info->quit = false;
     initHashTable(board->hashTable, 64);
 
     setbuf(stdin, nullptr);
@@ -17,7 +17,7 @@ int main() {
     printf("Welcome to Maiolica! Type 'console' for console mode...\n");
 
     char line[256];
-    while (TRUE) {
+    while (true) {
         memset(&line[0], 0, sizeof(line));
         fflush(stdout);
 
@@ -29,17 +29,17 @@ int main() {
 
         if (!strncmp(line, "uci", 3)) {
             uciLoop(board, info);
-            if (info->quit == TRUE) break;
+            if (info->quit == true) break;
             continue;
 
         } else if (!strncmp(line, "xboard", 6))	{
             xBoardLoop(board, info);
-            if (info->quit == TRUE) break;
+            if (info->quit == true) break;
             continue;
 
         } else if (!strncmp(line, "console", 4))	{
             consoleLoop(board, info);
-            if (info->quit == TRUE) break;
+            if (info->quit == true) break;
             continue;
 
         } else if (!strncmp(line, "quit", 4))	{

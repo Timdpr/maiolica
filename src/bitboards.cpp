@@ -11,7 +11,7 @@ const int bitTable[64] = { // https://www.chessprogramming.org/Looking_for_Magic
 /// Finds first (least significant) bit in bitboard, and returns index
 int popBit(U64 *bitboard) {
     U64 b = *bitboard ^ (*bitboard - 1);
-    unsigned int fold = (unsigned) ((b & 0xffffffff) ^ (b >> 32));
+    auto fold = (unsigned) ((b & 0xffffffff) ^ (b >> 32));
     *bitboard &= (*bitboard - 1);
     return bitTable[(fold * 0x783a9b23) >> 26];
 }

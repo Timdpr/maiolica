@@ -15,17 +15,17 @@ int isSquareAttacked(const int square, const int attackingSide, const Board *boa
     // Is it being attacked by a pawn?
     if (attackingSide == WHITE) {
         if (board->pieces[square - 11] == wP || board->pieces[square - 9] == wP) {
-            return TRUE;
+            return true;
         }
     } else if (board->pieces[square + 11] == bP || board->pieces[square + 9] == bP) {
-        return TRUE;
+        return true;
     }
 
     // How about a knight?
     for (int nDirection : knightDirection) { // go through 'knightDirection'
         int piece = board->pieces[square + nDirection];
         if (piece != OFFBOARD && IS_KNIGHT(piece) && pieceColours[piece] == attackingSide) {
-            return TRUE;
+            return true;
         }
     }
 
@@ -36,7 +36,7 @@ int isSquareAttacked(const int square, const int attackingSide, const Board *boa
         while (piece != OFFBOARD) {
             if (piece != EMPTY) {
                 if (IS_ROOK_OR_QUEEN(piece) && pieceColours[piece] == attackingSide) {
-                    return TRUE;
+                    return true;
                 }
                 break; // we have hit a piece, any piece, so break out of loop
             } // if no piece found, continue 'sliding' in the current direction:
@@ -52,7 +52,7 @@ int isSquareAttacked(const int square, const int attackingSide, const Board *boa
         while (piece != OFFBOARD) {
             if (piece != EMPTY) {
                 if (IS_BISHOP_OR_QUEEN(piece) && pieceColours[piece] == attackingSide) {
-                    return TRUE;
+                    return true;
                 }
                 break; // we have hit a piece, any piece, so break out of loop
             } // if no piece found, continue 'sliding' in the current direction:
@@ -65,9 +65,9 @@ int isSquareAttacked(const int square, const int attackingSide, const Board *boa
     for (int kDirection : kingDirection) { // go through 'knightDirection'
         int piece = board->pieces[square + kDirection];
         if (piece != OFFBOARD && IS_KING(piece) && pieceColours[piece] == attackingSide) {
-            return TRUE;
+            return true;
         }
     }
 
-    return FALSE; // If no attacking piece can be found, return false!
+    return false; // If no attacking piece can be found, return false!
 }

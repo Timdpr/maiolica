@@ -4,7 +4,6 @@
 long leafNodes;
 
 void perft(int depth, Board *board) {
-
     ASSERT(checkBoard(board))
 
     if (depth == 0) {
@@ -19,10 +18,10 @@ void perft(int depth, Board *board) {
         if (!makeMove(board, moveList->moves[moveNum].move)) {
             continue;
         }
-        perft(depth - 1, board);
+        perft(depth-1, board);
         takeMove(board);
     }
-    }
+}
 
 void perftTest(int depth, Board *board) {
     ASSERT(checkBoard(board))

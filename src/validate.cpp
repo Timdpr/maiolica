@@ -5,7 +5,7 @@
 
 int moveListValid(const MoveList *list, const Board *board) {
     if (list->count < 0 || list->count >= MAX_POSITION_MOVES) {
-        return FALSE;
+        return false;
     }
     int from = 0;
     int to = 0;
@@ -13,14 +13,14 @@ int moveListValid(const MoveList *list, const Board *board) {
         to = GET_TO(list->moves[moveNum].move);
         from = GET_FROM(list->moves[moveNum].move);
         if (!squareOnBoard(to) || !squareOnBoard(from)) {
-            return FALSE;
+            return false;
         }
         if (!pieceValid(board->pieces[from])) {
             printBoard(board);
-            return FALSE;
+            return false;
         }
     }
-    return TRUE;
+    return true;
 }
 
 int squareIs120(const int sq) {
@@ -58,7 +58,7 @@ void debugAnalysisTest(Board *board, SearchInfo *info) {
     char lineIn [1024];
 
     info->depth = MAX_DEPTH;
-    info->timeSet = TRUE;
+    info->timeSet = true;
     int time = 1140000;
 
     if (file == nullptr) {

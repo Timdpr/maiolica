@@ -24,9 +24,9 @@ int checkBoard(const Board *board) {
         expectedPieceNums[piece]++; // increment number of this piece
         int colour = pieceColours[piece];
         // add to piece type counts
-        if (bigPieces[piece] == TRUE) expectedBigPieces[colour]++;
-        if (minorPieces[piece] == TRUE) expectedMinorPieces[colour]++;
-        if (majorPieces[piece] == TRUE) expectedMajorPieces[colour]++;
+        if (bigPieces[piece] == true) expectedBigPieces[colour]++;
+        if (minorPieces[piece] == true) expectedMinorPieces[colour]++;
+        if (majorPieces[piece] == true) expectedMajorPieces[colour]++;
 
         expectedMaterial[colour] += pieceValues[piece]; // add to side's material score
     }
@@ -77,7 +77,7 @@ int checkBoard(const Board *board) {
     ASSERT(board->pieces[board->kingSq[WHITE]] == wK)
     ASSERT(board->pieces[board->kingSq[BLACK]] == bK)
 
-    return TRUE;
+    return true;
 }
 
 /// Loops through all pieces and populates various lists of 'material'
@@ -87,9 +87,9 @@ void updateMaterialLists(Board *board) {
         if (piece != OFFBOARD && piece != EMPTY) {
             int colour = pieceColours[piece];
             // Piece type counts
-            if (bigPieces[piece] == TRUE) board->bigPieces[colour]++;
-            if (minorPieces[piece] == TRUE) board->minorPieces[colour]++;
-            if (majorPieces[piece] == TRUE) board->majorPieces[colour]++;
+            if (bigPieces[piece] == true) board->bigPieces[colour]++;
+            if (minorPieces[piece] == true) board->minorPieces[colour]++;
+            if (majorPieces[piece] == true) board->majorPieces[colour]++;
             // Overall material score
             board->material[colour] += pieceValues[piece];
             // Square index of each piece
@@ -218,8 +218,8 @@ int parseFen(const char *fen, Board *board) {
 
 /// Resets all attributes of the Board!
 void resetBoard(Board *board) {
-    for (int i = 0; i < BRD_SQ_NUM; ++i) {
-        board->pieces[i] = OFFBOARD;
+    for (int & piece : board->pieces) {
+        piece = OFFBOARD;
     }
 
     for (int i = 0; i < 64; ++i) {
@@ -233,12 +233,12 @@ void resetBoard(Board *board) {
         board->material[i] = 0;
     }
 
-    for (int i = 0; i < 3; i++) {
-        board->pawns[i] = U64(0);
+    for (unsigned long long & pawn : board->pawns) {
+        pawn = U64(0);
     }
 
-    for (int i = 0; i < 13; ++i) {
-        board->pieceCounts[i] = 0;
+    for (int & pieceCount : board->pieceCounts) {
+        pieceCount = 0;
     }
 
     board->kingSq[WHITE] = board->kingSq[BLACK] = NO_SQ;

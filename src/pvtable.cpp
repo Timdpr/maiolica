@@ -97,19 +97,18 @@ int probeHashEntry(Board *board, int *move, int *score, int alpha, int beta, int
                 case HF_ALPHA:
                     if (*score <= alpha) {
                         *score = alpha;
-                        return TRUE;
+                        return true;
                     }
                     break;
                 case HF_BETA:
                     if (*score >= beta) {
                         *score = beta;
-                        return TRUE;
+                        return true;
                     }
                     break;
                 case HF_EXACT:
-                    return TRUE;
-                    break;
-                default: ASSERT(FALSE) break;
+                    return true;
+                default: ASSERT(false) break;
             }
         }
     }

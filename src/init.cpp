@@ -113,14 +113,14 @@ void initFilesRanksBoard() {
 
 /// Initialise hash keys with random numbers
 void initHashKeys() {
-    for (int i = 0; i < 13; ++i) {
-        for(int j = 0; j < 120; ++j) {
-            pieceKeys[i][j] = RAND_64;
+    for (auto & pieceKey : pieceKeys) {
+        for (auto & j : pieceKey) {
+            j = RAND_64;
         }
     }
     sideKey = RAND_64;
-    for (int i = 0; i < 16; ++i) {
-        castleKeys[i] = RAND_64;
+    for (auto & castleKey : castleKeys) {
+        castleKey = RAND_64;
     }
 }
 

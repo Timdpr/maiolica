@@ -2,8 +2,8 @@
 
 /// Check if time is up / interrupt from gui
 static void checkUp(SearchInfo *info) {
-    if (info->timeSet == TRUE && getTimeMS() > info->stopTime) {
-        info->stopped = TRUE;
+    if (info->timeSet == true && getTimeMS() > info->stopTime) {
+        info->stopped = true;
     }
     ReadInput(info);
 }
@@ -33,22 +33,22 @@ static int isRepetition(const Board *board) {
         ASSERT(i >= 0 && i < MAX_GAME_MOVES)
         // if current hash key matches, then this must be a repetition!
         if (board->positionKey == board->history[i].positionKey) {
-            return TRUE;
+            return true;
         }
     }
-    return FALSE;
+    return false;
 }
 
 /// Clear relevant arrays before starting to search and set up search info
 static void clearForSearch(Board *board, SearchInfo *info) {
-    for (int i = 0; i < 13; ++i) {
-        for (int j = 0; j < BRD_SQ_NUM; ++j) {
-            board->searchHistory[i][j] = 0;
+    for (auto& piece : board->searchHistory) {
+        for (int& square : piece) {
+            square = 0;
         }
     }
-    for (int i = 0; i < 2; ++i) {
-        for (int j = 0; j < MAX_DEPTH; ++j) {
-            board->searchKillers[i][j] = 0;
+    for (auto& killerMove : board->searchKillers) {
+        for (int& depth : killerMove) {
+            depth = 0;
         }
     }
     board->hashTable->overWrite = 0;
@@ -105,7 +105,7 @@ static int quiescence(int alpha, int beta, Board *board, SearchInfo *info) {
         score = -quiescence(-beta, -alpha, board, info);
         takeMove(board);
 
-        if (info->stopped == TRUE) { // if we have been told to stop, stop, but AFTER TAKEMOVE!!
+        if (info->stopped == true) { // if we have been told to stop, stop, but AFTER TAKEMOVE!!
             return 0;
         }
 
@@ -148,14 +148,14 @@ static int alphaBeta(int alpha, int beta, int depth, Board *board, SearchInfo *i
 
     // increase depth if we are in check!
     int inCheck = isSquareAttacked(board->kingSq[board->side], board->side^1, board); // are we in check?
-    if (inCheck == TRUE) {
+    if (inCheck == true) {
         depth++;
     }
 
     int score = -INFINITE;
     int pvMove = NO_MOVE;
 
-    if (probeHashEntry(board, &pvMove, &score, alpha, beta, depth) == TRUE) {
+    if (probeHashEntry(board, &pvMove, &score, alpha, beta, depth) == true) {
         board->hashTable->cut++;
         return score;
     }
@@ -164,9 +164,9 @@ static int alphaBeta(int alpha, int beta, int depth, Board *board, SearchInfo *i
     if (nullMoveAllowed && !inCheck && board->ply && (board->bigPieces[board->side] > 1) && depth >= 4) {
         // if so, we can make a null move
         makeNullMove(board);
-        score = -alphaBeta(-beta, -beta+1, depth-4, board, info, FALSE);
+        score = -alphaBeta(-beta, -beta+1, depth-4, board, info, false);
         takeNullMove(board);
-        if (info->stopped == TRUE) {
+        if (info->stopped == true) {
             return 0;
         }
         if (score >= beta && abs(score) < IS_MATE) {
@@ -191,7 +191,7 @@ static int alphaBeta(int alpha, int beta, int depth, Board *board, SearchInfo *i
     }
 
     // Using principal variation search
-    int foundPV = FALSE;
+    int foundPV = false;
 
     // for each move generated
     for (int moveNum = 0; moveNum < moveList->count; ++moveNum) {
@@ -204,17 +204,17 @@ static int alphaBeta(int alpha, int beta, int depth, Board *board, SearchInfo *i
         legal++;
         // negamax, so flip it all. Also using principal variation search!
         // TODO: PVS may be detrimental...
-        if (foundPV == TRUE) {
-            score = -alphaBeta(-alpha - 1, -alpha, depth-1, board, info, TRUE);
+        if (foundPV == true) {
+            score = -alphaBeta(-alpha - 1, -alpha, depth-1, board, info, true);
             if (score > alpha && score < beta) {
-                score = -alphaBeta(-beta, -alpha, depth-1, board, info, TRUE);
+                score = -alphaBeta(-beta, -alpha, depth-1, board, info, true);
             }
         } else {
-            score = -alphaBeta(-beta, -alpha, depth-1, board, info, TRUE);
+            score = -alphaBeta(-beta, -alpha, depth-1, board, info, true);
         }
         takeMove(board);
 
-        if (info->stopped == TRUE) { // if we have been told to stop, stop, but AFTER TAKEMOVE!!
+        if (info->stopped == true) { // if we have been told to stop, stop, but AFTER TAKEMOVE!!
             return 0;
         }
 
@@ -237,7 +237,7 @@ static int alphaBeta(int alpha, int beta, int depth, Board *board, SearchInfo *i
                     storeHashEntry(board, bestMove, beta, HF_BETA, depth);
                     return beta;
                 }
-                foundPV = TRUE;
+                foundPV = true;
                 alpha = score;       // otherwise, update score and bestMove
                 bestMove = moveList->moves[moveNum].move;
                 // Update search history
@@ -270,8 +270,8 @@ void searchPosition(Board *board, SearchInfo *info) {
     int bestMove = board->pvArray[0];
 
     for (int currentDepth = 1; currentDepth <= info->depth; ++currentDepth) {
-        int bestScore = alphaBeta(-INFINITE, INFINITE, currentDepth, board, info, TRUE);
-        if (info->stopped == TRUE) { // Because we may have stopped partway through alphaBeta, we break here so the previous results are returned
+        int bestScore = alphaBeta(-INFINITE, INFINITE, currentDepth, board, info, true);
+        if (info->stopped == true) { // Because we may have stopped partway through alphaBeta, we break here so the previous results are returned
             break;
         }
         int pvMoves = getPVLine(currentDepth, board);
@@ -280,15 +280,15 @@ void searchPosition(Board *board, SearchInfo *info) {
         if (info->gameMode == UCI_MODE) {
             printf("info score cp %d depth %d nodes %ld time %lld ",
                    bestScore, currentDepth, info->nodes, getTimeMS() - info->startTime);
-        } else if (info->gameMode == XBOARD_MODE && info->postThinking == TRUE) {
+        } else if (info->gameMode == XBOARD_MODE && info->postThinking == true) {
             printf("%d %d %lld %ld ",
                    currentDepth, bestScore, (getTimeMS() - info->startTime) / 10, info->nodes);
-        } else if (info->postThinking == TRUE) { // in console mode with posting turned on
+        } else if (info->postThinking == true) { // in console mode with posting turned on
             printf("score:%d depth:%d nodes:%ld time:%lldms ",
                    bestScore, currentDepth, info->nodes, getTimeMS() - info->startTime);
         }
 
-        if (info->gameMode == UCI_MODE || info->postThinking == TRUE) {
+        if (info->gameMode == UCI_MODE || info->postThinking == true) {
             pvMoves = getPVLine(currentDepth, board);
             printf("pv");
         }

@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.15)
 project(maiolica)
 
-set(CMAKE_CXX_STANDARD 14)
+set(CMAKE_CXX_STANDARD 20)
 
 # Compiler options:
 # -O3 = agressive optimisation https://gcc.gnu.org/onlinedocs/gcc/Optimize-Options.html,
@@ -18,4 +18,10 @@ else()
     set(CMAKE_CXX_FLAGS_RELEASE "-O3 -mdynamic-no-pic -flto")
 endif()
 
-add_executable(maiolica src/main.cpp src/defs.h src/init.cpp src/bitboards.cpp src/hashkeys.cpp src/board.cpp src/data.cpp src/attack.cpp src/io.cpp src/movegen.cpp src/validate.cpp src/makemove.cpp src/perft.cpp src/misc.cpp src/search.cpp src/pvtable.cpp src/evaluate.cpp src/uci.cpp src/xboard.cpp)
+add_executable(maiolica
+        src/main.cpp src/defs.h src/data.cpp src/init.cpp
+        src/io.cpp src/uci.cpp src/xboard.cpp
+        src/board.cpp src/bitboards.cpp src/hashkeys.cpp
+        src/attack.cpp src/movegen.cpp src/validate.cpp src/makemove.cpp src/misc.cpp src/search.cpp src/pvtable.cpp src/evaluate.cpp
+        src/perft.cpp
+        )
