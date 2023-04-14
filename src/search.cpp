@@ -22,7 +22,7 @@ static void pickNextMove(int moveNum, MoveList *moveList) {
     ASSERT(bestMoveNum >= 0 && bestMoveNum < moveList->count)
     ASSERT(bestMoveNum >= moveNum)
     // and swap it with move at 'moveNum'
-     Move tempMove = moveList->moves[moveNum];
+    Move tempMove = moveList->moves[moveNum];
     moveList->moves[moveNum] = moveList->moves[bestMoveNum];
     moveList->moves[bestMoveNum] = tempMove;
 }
@@ -274,12 +274,12 @@ void searchPosition(Board& board, SearchInfo *info) {
         if (info->stopped == true) { // Because we may have stopped partway through alphaBeta, we break here so the previous results are returned
             break;
         }
-         bestMove = board.pvArray[0];
+        int pvMoves = getPVLine(currentDepth, board);
+        bestMove = board.pvArray[0];
 
         printf("info score cp %d depth %d nodes %ld time %lld ",
                bestScore, currentDepth, info->nodes, getTimeMS() - info->startTime);
 
-        int pvMoves = getPVLine(currentDepth, board);
         for (int pvNum = 0; pvNum < pvMoves; ++pvNum) {
             printf(" %s", printMove(board.pvArray[pvNum]));
         }

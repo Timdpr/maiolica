@@ -329,9 +329,3 @@ Board& genBoard() {
     board.hashTable->hTable = nullptr;
     return board;
 }
-
-//Board *genBoard() {
-//    Board *board = (Board*)malloc(sizeof(Board));
-//    board->hashTable->hTable = nullptr;
-//    return board;
-//}
