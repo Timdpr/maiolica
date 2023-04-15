@@ -233,7 +233,7 @@ int makeMove(Board& board, int move) {
 
     // If the king is attacked by the new side to move, take back the move and return false
     if (isSquareAttacked(board.kingSq[side], board.side, board)) {
-        takeMove(board);
+        undoMove(board);
         return false;
     }
 
@@ -241,7 +241,7 @@ int makeMove(Board& board, int move) {
 }
 
 /// Undo a move
-void takeMove(Board& board) {
+void undoMove(Board& board) {
     ASSERT(checkBoard(board))
 
     board.historyPly--;
@@ -333,7 +333,7 @@ void makeNullMove(Board& board) {
 }
 
 /// Take back a null move!
-void takeNullMove(Board& board) {
+void undoNullMove(Board& board) {
     ASSERT(checkBoard(board))
 
     board.historyPly--;

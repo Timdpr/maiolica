@@ -435,7 +435,7 @@ int moveExists(Board& board, const int move) {
         if (!makeMove(board, moveList->moves[moveNum].move)) {
             continue;
         }
-        takeMove(board);
+        undoMove(board);
         if (moveList->moves[moveNum].move == move) {
             return true;
         }

@@ -40,7 +40,7 @@ static int isRepetition(const Board& board) {
 }
 
 /// Clear relevant arrays before starting to search and set up search info
-static void clearForSearch(Board& board, SearchInfo *info) {
+static void clearForSearch(Board& board, SearchInfo *info, HashTable *table) {
     for (auto& piece : board.searchHistory) {
         for (int& square : piece) {
             square = 0;
@@ -51,9 +51,9 @@ static void clearForSearch(Board& board, SearchInfo *info) {
             depth = 0;
         }
     }
-    board.hashTable->overWrite = 0;
-    board.hashTable->hit = 0;
-    board.hashTable->cut = 0;
+    table->hit = 0;
+    table->cut = 0;
+    table->currentAge++;
 
     board.ply = 0;
 
@@ -103,7 +103,7 @@ static int quiescence(int alpha, int beta, Board& board, SearchInfo *info) {
         legal++;
         // negamax, so flip it all...
         score = -quiescence(-beta, -alpha, board, info);
-        takeMove(board);
+        undoMove(board);
 
         if (info->stopped == true) { // if we have been told to stop, stop, but AFTER TAKEMOVE!!
             return 0;
@@ -126,7 +126,7 @@ static int quiescence(int alpha, int beta, Board& board, SearchInfo *info) {
 }
 
 /// Negamax alpha-beta search...
-static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo *info, int nullMoveAllowed) {
+static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo *info, HashTable *table, int nullMoveAllowed) {
     ASSERT(checkBoard(board))
 
     if (depth == 0) {
@@ -155,8 +155,8 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo *i
     int score = -INF_BOUND;
     int pvMove = NO_MOVE;
 
-    if (probeHashEntry(board, &pvMove, &score, alpha, beta, depth) == true) {
-        board.hashTable->cut++;
+    if (probeHashEntry(board, table, &pvMove, &score, alpha, beta, depth) == true) {
+        table->cut++;
         return score;
     }
 
@@ -164,8 +164,8 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo *i
     if (nullMoveAllowed && !inCheck && board.ply && (board.bigPieces[board.side] > 1) && depth >= 4) {
         // if so, we can make a null move
         makeNullMove(board);
-        score = -alphaBeta(-beta, -beta+1, depth-4, board, info, false);
-        takeNullMove(board);
+        score = -alphaBeta(-beta, -beta+1, depth-4, board, info, table, false);
+        undoNullMove(board);
         if (info->stopped == true) {
             return 0;
         }
@@ -205,14 +205,14 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo *i
         // negamax, so flip it all. Also using principal variation search!
         // TODO: PVS may be detrimental...
         if (foundPV == true) {
-            score = -alphaBeta(-alpha - 1, -alpha, depth-1, board, info, true);
+            score = -alphaBeta(-alpha - 1, -alpha, depth-1, board, info, table, true);
             if (score > alpha && score < beta) {
-                score = -alphaBeta(-beta, -alpha, depth-1, board, info, true);
+                score = -alphaBeta(-beta, -alpha, depth-1, board, info, table, true);
             }
         } else {
-            score = -alphaBeta(-beta, -alpha, depth-1, board, info, true);
+            score = -alphaBeta(-beta, -alpha, depth-1, board, info, table, true);
         }
-        takeMove(board);
+        undoMove(board);
 
         if (info->stopped == true) { // if we have been told to stop, stop, but AFTER TAKEMOVE!!
             return 0;
@@ -234,7 +234,7 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo *i
                         // ...and add current move
                         board.searchKillers[0][board.ply] = moveList->moves[moveNum].move;
                     }
-                    storeHashEntry(board, bestMove, beta, HF_BETA, depth);
+                    storeHashEntry(board, table,  bestMove, beta, HF_BETA, depth);
                     return beta;
                 }
                 foundPV = true;
@@ -258,26 +258,26 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo *i
         }
     }
     if (alpha != oldAlpha) { // if these don't match, then we must have updated alpha
-        storeHashEntry(board, bestMove, bestScore, HF_EXACT, depth); // so store it in the pv table
+        storeHashEntry(board, table,  bestMove, bestScore, HF_EXACT, depth); // so store it in the pv table
     } else {
-        storeHashEntry(board, bestMove, alpha, HF_ALPHA, depth);
+        storeHashEntry(board, table,  bestMove, alpha, HF_ALPHA, depth);
     }
     return alpha;
 }
 
-void searchPosition(Board& board, SearchInfo *info) {
-    clearForSearch(board, info);
+void searchPosition(Board& board, SearchInfo *info, HashTable *table) {
+    clearForSearch(board, info, table);
     int bestMove = board.pvArray[0];
 
     for (int currentDepth = 1; currentDepth <= info->depth; ++currentDepth) {
-        int bestScore = alphaBeta(-INF_BOUND, INF_BOUND, currentDepth, board, info, true);
+        int bestScore = alphaBeta(-INF_BOUND, INF_BOUND, currentDepth, board, info, table, true);
         if (info->stopped == true) { // Because we may have stopped partway through alphaBeta, we break here so the previous results are returned
             break;
         }
-        int pvMoves = getPVLine(currentDepth, board);
+        int pvMoves = getPVLine(currentDepth, board, table);
         bestMove = board.pvArray[0];
 
-        printf("info score cp %d depth %d nodes %ld time %lld ",
+        printf("info score cp %d depth %d nodes %ld time %lld pv",
                bestScore, currentDepth, info->nodes, getTimeMS() - info->startTime);
 
         for (int pvNum = 0; pvNum < pvMoves; ++pvNum) {

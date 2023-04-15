@@ -323,9 +323,3 @@ void mirrorBoard(Board& board) {
 
     ASSERT(checkBoard(board))
 }
-
-Board& genBoard() {
-    static Board board;
-    board.hashTable->hTable = nullptr;
-    return board;
-}

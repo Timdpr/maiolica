@@ -6,10 +6,10 @@ int main() {
     // TODO: Not doing polyglot books for now
     initAll();
 
-    Board board = genBoard();
+    Board board{};
     SearchInfo info[1];
     info->quit = false;
-    initHashTable(board.hashTable, 64);
+    initHashTable(hashTable, 64);
 
     setbuf(stdin, nullptr);
     setbuf(stdout, nullptr);
@@ -37,7 +37,7 @@ int main() {
         }
     }
 
-    free(board.hashTable->hTable);
+    free(hashTable->hTable);
 
     return 0;
 }

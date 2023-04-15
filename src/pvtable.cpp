@@ -1,10 +1,12 @@
 #include "defs.h"
 
+HashTable hashTable[1];
+
 /// Populate Board's pvArray
-int getPVLine(const int depth, Board& board) {
+int getPVLine(const int depth, Board& board, HashTable *table) {
     ASSERT(depth < MAX_DEPTH && depth >= 1)
 
-    int move = probePVTable(board);
+    int move = probePVTable(board, table);
     int count = 0;
 
     // 'loop through board's pvArray until given depth, as long as legal moves are being found'
@@ -16,56 +18,57 @@ int getPVLine(const int depth, Board& board) {
         } else {
             break;
         }
-        move = probePVTable(board);
+        move = probePVTable(board, table);
     }
 
     // Take the moves back!!!!11!!1!
     while (board.ply > 0) {
-        takeMove(board);
+        undoMove(board);
     }
 
     return count;
 }
 
 /// Loop through every entry in the table, setting each pos key and move to zero
-void clearHashTable(HashTable *hashTable) {
-    for (HashEntry *hashEntry = hashTable->hTable; hashEntry < hashTable->hTable + hashTable->numEntries; hashEntry++) {
+void clearHashTable(HashTable *table) {
+    for (HashEntry *hashEntry = table->hTable; hashEntry < table->hTable + table->numEntries; hashEntry++) {
         hashEntry->positionKey = U64(0);
         hashEntry->move = NO_MOVE;
         hashEntry->depth = 0;
         hashEntry->score = 0;
         hashEntry->flags = 0;
+        hashEntry->age = 0;
     }
-    hashTable->newWrite = 0;
+    table->currentAge = 0;
 }
 
 /**
  * 'Initialise hash table'
  * by dynamically declaring the memory for what is essentially an array
  */
-void initHashTable(HashTable *hashTable, const int MB) {
+void initHashTable(HashTable *table, const int MB) {
     int hashSize = 0x100000 * MB;
-    hashTable->numEntries = hashSize / sizeof(HashEntry); // how many entries can we fit inside?
-    hashTable->numEntries -= 2; // make sure we don't go over!
+    table->numEntries = hashSize / sizeof(HashEntry); // how many entries can we fit inside?
+    table->numEntries -= 2; // make sure we don't go over!
 
-    if (hashTable->hTable != nullptr) {
-        free(hashTable->hTable); // free table pointer's memory
+    if (table->hTable != nullptr) {
+        free(table->hTable); // free table pointer's memory
     }
     // Todo: May have to change this substantially for larger sizes...
-    hashTable->hTable = (HashEntry *) malloc(hashTable->numEntries * sizeof(HashEntry)); // allocate memory with similar logic to how it was freed!
-    if (hashTable->hTable == nullptr) {
+    table->hTable = (HashEntry *) malloc(table->numEntries * sizeof(HashEntry)); // allocate memory with similar logic to how it was freed!
+    if (table->hTable == nullptr) {
         printf("Hash table allocation failed, trying again with %dMB", MB/2);
-        initHashTable(hashTable, MB / 2);
+        initHashTable(table, MB / 2);
     } else {
-        clearHashTable(hashTable);
-        printf("HashTable init complete with %d entries\n", hashTable->numEntries);
+        clearHashTable(table);
+        printf("HashTable init complete with %d entries\n", table->numEntries);
     }
 }
 
 /// Get move indexed with this board's position key from principal variation table (if it exists)
-int probeHashEntry(Board& board, int *move, int *score, int alpha, int beta, int depth) {
+int probeHashEntry(Board& board, HashTable *table, int *move, int *score, int alpha, int beta, int depth) {
     // get index out of pos key modulo the number of entries!
-    int index = board.positionKey % board.hashTable->numEntries;
+    int index = board.positionKey % table->numEntries;
 
     ASSERT(index >= 0 && index <= board.hashTable->numEntries - 1)
     ASSERT(depth >=1 && depth < MAX_DEPTH)
@@ -75,16 +78,16 @@ int probeHashEntry(Board& board, int *move, int *score, int alpha, int beta, int
     ASSERT(board.ply >= 0 && board.ply < MAX_DEPTH)
 
     // if pos keys are equal...
-    if (board.hashTable->hTable[index].positionKey == board.positionKey) {
-        *move = board.hashTable->hTable[index].move; // get move
-        if (board.hashTable->hTable[index].depth >= depth) { // if depth >= search depth
-            board.hashTable->hit++; // we have a hit!
+    if (table->hTable[index].positionKey == board.positionKey) {
+        *move = table->hTable[index].move; // get move
+        if (table->hTable[index].depth >= depth) { // if depth >= search depth
+            table->hit++; // we have a hit!
 
             ASSERT(board.hashTable->hTable[index].depth >= 1 && board.hashTable->hTable[index].depth < MAX_DEPTH)
             ASSERT(board.hashTable->hTable[index].flags >= HF_ALPHA && board.hashTable->hTable[index].flags <= HF_EXACT)
 
             // get score & adjust according to ply if it is a mate score (we got rid of this when storing)
-            *score = board.hashTable->hTable[index].score;
+            *score = table->hTable[index].score;
             if (*score > IS_MATE) {
                 *score -= board.ply;
             } else if (*score < -IS_MATE) {
@@ -92,7 +95,7 @@ int probeHashEntry(Board& board, int *move, int *score, int alpha, int beta, int
             }
 
             // check for match depending on flags
-            switch (board.hashTable->hTable[index].flags) {
+            switch (table->hTable[index].flags) {
                 case HF_ALPHA:
                     if (*score <= alpha) {
                         *score = alpha;
@@ -115,9 +118,10 @@ int probeHashEntry(Board& board, int *move, int *score, int alpha, int beta, int
 }
 
 /// Store a move in the table
-void storeHashEntry(Board& board, const int move, int score, const int flags, const int depth) {
+/// TODO: Look up the more complex algorithms for how and when to store hash entries
+void storeHashEntry(Board& board, HashTable *table, const int move, int score, const int flags, const int depth) {
     // make index out of pos key modulo the number of entries!
-    int index = board.positionKey % board.hashTable->numEntries;
+    int index = board.positionKey % table->numEntries;
 
     ASSERT(index >= 0 && index <= board.hashTable->numEntries - 1)
     ASSERT(depth >= 1 && depth < MAX_DEPTH)
@@ -125,11 +129,16 @@ void storeHashEntry(Board& board, const int move, int score, const int flags, co
     ASSERT(score >= -INF_BOUND && score <= INF_BOUND)
     ASSERT(board.ply >= 0 && board.ply < MAX_DEPTH)
 
-    // keep count of new entries vs overwriting entries
-    if (board.hashTable->hTable[index].positionKey == 0) {
-        board.hashTable->newWrite++;
-    } else {
-        board.hashTable->overWrite++;
+    bool replace = false;
+    if (table->hTable[index].positionKey == 0) { // new entry
+        replace = true;
+    } else { // otherwise, if index that we're trying to replace is older than our current entry, or the depth is greater, then we replace
+        if (table->hTable[index].age < table->currentAge || table->hTable[index].depth <= depth) {
+            replace = true;
+        }
+    }
+    if (!replace) {
+        return; // return early without storing the worse entry!
     }
 
     // reset score back to 'infinite' (after it was adjusted by ply in the search)
@@ -140,21 +149,22 @@ void storeHashEntry(Board& board, const int move, int score, const int flags, co
     }
 
     // add move and pos key to table at index
-    board.hashTable->hTable[index].move = move;
-    board.hashTable->hTable[index].positionKey = board.positionKey;
-    board.hashTable->hTable[index].flags = flags;
-    board.hashTable->hTable[index].score = score;
-    board.hashTable->hTable[index].depth = depth;
+    table->hTable[index].move = move;
+    table->hTable[index].positionKey = board.positionKey;
+    table->hTable[index].flags = flags;
+    table->hTable[index].score = score;
+    table->hTable[index].depth = depth;
+    table->hTable[index].age = table->currentAge;
 }
 
-int probePVTable(const Board& board) {
+int probePVTable(const Board& board, HashTable *table) {
     // get index out of pos key modulo the number of entries!
-    int index = board.positionKey % board.hashTable->numEntries;
+    int index = board.positionKey % table->numEntries;
     ASSERT(index >= 0 && index <= board.hashTable->numEntries - 1)
 
     // if pos keys are equal, we can return move at the index
-    if (board.hashTable->hTable[index].positionKey == board.positionKey) {
-        return board.hashTable->hTable[index].move;
+    if (table->hTable[index].positionKey == board.positionKey) {
+        return table->hTable[index].move;
     }
     return NO_MOVE;
 }

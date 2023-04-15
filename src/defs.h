@@ -87,16 +87,16 @@ struct HashEntry {
     int score;
     int depth;
     int flags;
+    int age;
 };
 
 /// Principal variation table
 struct HashTable {
     HashEntry *hTable; // pointer to element
     int numEntries;
-    int newWrite;
-    int overWrite;
     int hit;
     int cut;
+    int currentAge;
 };
 
 /// Holds game state at a particular ply
@@ -135,7 +135,6 @@ struct Board {
 
     int pieceList[13][10]; // 13 types of pieces, and at most 10 of each // TODO: May need to convert this to 1D for speed
 
-    HashTable hashTable[1]; // initialise hash table to size 1 array, but this will be dynamically allocated
     int pvArray[MAX_DEPTH];
 
     int searchHistory[13][BRD_SQ_NUM]; // indexed by piece type and board square
@@ -147,10 +146,8 @@ struct SearchInfo {
     TimeMS startTime;
     TimeMS stopTime;
     int depth;
-    int depthSet; // only search to this depth
     int timeSet; // total time set for all moves
     int movesToGo;
-    int infinite; // if true, don't stop search unless external command given
 
     long nodes; // count of all positions the engine visits in the search tree
 
@@ -259,6 +256,7 @@ extern U64 whitePassedMask[64]; // does the indexed white pawn have a 'clear run
 extern U64 blackPassedMask[64]; // does the indexed black pawn have a 'clear run' to promotion?
 extern U64 isolatedPawnMask[64]; // is the indexed pawn 'isolated'?
 
+extern HashTable hashTable[1]; // initialise hash table to size 1 array, but this will be dynamically allocated
 
 /* -- FUNCTIONS -- */
 
@@ -279,7 +277,6 @@ extern void updateMaterialLists(Board& board);
 extern int parseFen(const char *fen, Board& board);
 extern void resetBoard(Board& board);
 extern void printBoard(const Board& board);
-extern Board& genBoard();
 
 // attack.cpp
 extern int isSquareAttacked(int square, int attackingSide, const Board& board);
@@ -299,7 +296,7 @@ extern int fileOrRankValid(int fileOrRank);
 extern int pieceValid(int piece);
 extern int pieceValidEmpty(int piece);
 extern int pieceValidEmptyOffboard(int pce);
-extern void debugAnalysisTest(Board& board, SearchInfo *info);
+extern void debugAnalysisTest(Board& board, SearchInfo *info, HashTable *table);
 extern void mirrorEvalTest(Board& board);
 
 // movegen.cpp
@@ -310,9 +307,9 @@ extern void initMVVLVA();
 
 // makemove.cpp
 extern int makeMove(Board& board, int move);
-extern void takeMove(Board& board);
+extern void undoMove(Board& board);
 extern void makeNullMove(Board& board);
-extern void takeNullMove(Board& board);
+extern void undoNullMove(Board& board);
 
 // perft.cpp
 extern void perftTest(int depth, Board& board);
@@ -322,15 +319,15 @@ extern TimeMS getTimeMS();
 extern void ReadInput(SearchInfo *info);
 
 // search.cpp
-extern void searchPosition(Board& board, SearchInfo *info);
+extern void searchPosition(Board& board, SearchInfo *info, HashTable *table );
 
 // pvtable.cpp
-extern void clearHashTable(HashTable *hashTable);
-extern int getPVLine(int depth, Board& board);
-extern void initHashTable(HashTable *hashTable, int MB);
-extern void storeHashEntry(Board& board, int move, int score, int flags, int depth);
-extern int probeHashEntry(Board& board, int *move, int *score, int alpha, int beta, int depth);
-extern int probePVTable(const Board& board);
+extern void clearHashTable(HashTable *table);
+extern int getPVLine(int depth, Board& board, HashTable *table);
+extern void initHashTable(HashTable *table, int MB);
+extern void storeHashEntry(Board& board, HashTable *table, int move, int score, int flags, int depth);
+extern int probeHashEntry(Board& board, HashTable *table, int *move, int *score, int alpha, int beta, int depth);
+extern int probePVTable(const Board& board, HashTable *table);
 
 // board.cpp
 extern int evalPosition(const Board& board);

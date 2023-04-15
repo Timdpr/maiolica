@@ -78,7 +78,7 @@ void parseGo(const char* line, SearchInfo *info, Board& board) {
     std::printf("time:%d start:%lld stop:%lld depth:%d timeset:%d\n",
            time, info->startTime, info->stopTime, info->depth, info->timeSet);
 
-    searchPosition(board, info); // print best move to the gui
+    searchPosition(board, info, hashTable); // print best move to the gui
 }
 
 /// reads a fen or 'startpos', possibly followed by moves
@@ -153,8 +153,9 @@ void uciLoop(Board& board, SearchInfo *info) {
         } else if (!strncmp(line, "position", 8)) {
             parsePosition(line, board);
 
-        // if 'ucinewgame' then parse the start position
+        // if 'ucinewgame' then clear hash table and parse the start position
         } else if (!strncmp(line, "ucinewgame", 10)) {
+            clearHashTable(hashTable);
             parsePosition("position startpos\n", board);
 
         // if 'go' then parse go!
@@ -178,7 +179,7 @@ void uciLoop(Board& board, SearchInfo *info) {
             printf("uciok\n");
 
         } else if (!strncmp(line, "debug", 4)) {
-            debugAnalysisTest(board, info);
+            debugAnalysisTest(board, info, hashTable);
             break;
 
         } else if (!strncmp(line, "setoption name Hash value ", 26)) {
@@ -186,7 +187,7 @@ void uciLoop(Board& board, SearchInfo *info) {
             if (MB < 4) MB = 4;
             if (MB > 2048) MB = 2048;
             printf("Set Hash to %d MB\n", MB);
-            initHashTable(board.hashTable, MB);
+            initHashTable(hashTable, MB);
         }
 
         // if quit was set, then quit!

@@ -19,7 +19,7 @@ void perft(int depth, Board& board) {
             continue;
         }
         perft(depth-1, board);
-        takeMove(board);
+        undoMove(board);
     }
 }
 
@@ -45,7 +45,7 @@ void perftTest(int depth, Board& board) {
         long cumNodes = leafNodes;
         perft(depth - 1, board);
 
-        takeMove(board);
+        undoMove(board);
         long oldNodes = leafNodes - cumNodes;
         printf("Move %d : %s : %ld\n", moveNum+1, printMove(move), oldNodes);
     }
