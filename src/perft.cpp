@@ -3,7 +3,7 @@
 
 long leafNodes;
 
-void perft(int depth, Board *board) {
+void perft(int depth, Board& board) {
     ASSERT(checkBoard(board))
 
     if (depth == 0) {
@@ -19,11 +19,11 @@ void perft(int depth, Board *board) {
             continue;
         }
         perft(depth-1, board);
-        takeMove(board);
+        undoMove(board);
     }
 }
 
-void perftTest(int depth, Board *board) {
+void perftTest(int depth, Board& board) {
     ASSERT(checkBoard(board))
 
     printBoard(board);
@@ -45,7 +45,7 @@ void perftTest(int depth, Board *board) {
         long cumNodes = leafNodes;
         perft(depth - 1, board);
 
-        takeMove(board);
+        undoMove(board);
         long oldNodes = leafNodes - cumNodes;
         printf("Move %d : %s : %ld\n", moveNum+1, printMove(move), oldNodes);
     }

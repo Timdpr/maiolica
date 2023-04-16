@@ -6,11 +6,7 @@
 #include <cstdlib>
 #include <chrono>
 
-//#define DEBUG
-
-#ifndef DEBUG
-#define ASSERT(n)
-#else
+#ifdef DEBUG
 #define ASSERT(n) \
 if(!(n)) { \
 std::printf("\n*** ASSERTION ERROR ***\n%s : FAILED ",#n); \
@@ -19,7 +15,9 @@ std::printf("at %s \n",__TIME__); \
 std::printf("At line %d ",__LINE__); \
 std::printf("in file %s \n",__FILE__); \
 std::exit(0);}
-#endif //DEBUG
+#else
+#define ASSERT(n)
+#endif
 
 #define NAME "Maiolica 1.0"
 #define BRD_SQ_NUM 120 // number of squares on the main, 'mailbox representation' board
@@ -28,16 +26,15 @@ std::exit(0);}
 #define MAX_DEPTH 64
 #define START_FEN "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 
-#define INFINITE 30000
-#define IS_MATE (INFINITE - MAX_DEPTH)
+#define INF_BOUND 32000
+#define ALPHABETA_BOUND 30000
+#define IS_MATE (ALPHABETA_BOUND - MAX_DEPTH)
 
 typedef std::uint64_t U64;
 typedef std::chrono::milliseconds::rep TimeMS;
 
 
 /* -- ENUMS -- */
-
-enum { UCI_MODE, XBOARD_MODE, CONSOLE_MODE };
 
 enum { EMPTY, wP, wN, wB, wR, wQ, wK, bP, bN, bB, bR, bQ, bK };
 enum { FILE_A, FILE_B, FILE_C, FILE_D, FILE_E, FILE_F, FILE_G, FILE_H, FILE_NONE };
@@ -91,16 +88,16 @@ struct HashEntry {
     int score;
     int depth;
     int flags;
+    int age;
 };
 
 /// Principal variation table
 struct HashTable {
     HashEntry *hTable; // pointer to element
     int numEntries;
-    int newWrite;
-    int overWrite;
     int hit;
     int cut;
+    int currentAge;
 };
 
 /// Holds game state at a particular ply
@@ -139,7 +136,6 @@ struct Board {
 
     int pieceList[13][10]; // 13 types of pieces, and at most 10 of each // TODO: May need to convert this to 1D for speed
 
-    HashTable hashTable[1]; // initialise hash table to size 1 array, but this will be dynamically allocated
     int pvArray[MAX_DEPTH];
 
     int searchHistory[13][BRD_SQ_NUM]; // indexed by piece type and board square
@@ -151,10 +147,8 @@ struct SearchInfo {
     TimeMS startTime;
     TimeMS stopTime;
     int depth;
-    int depthSet; // only search to this depth
     int timeSet; // total time set for all moves
     int movesToGo;
-    int infinite; // if true, don't stop search unless external command given
 
     long nodes; // count of all positions the engine visits in the search tree
 
@@ -164,9 +158,13 @@ struct SearchInfo {
     float failHigh; // divide fhf by fh to get an idea of how good move ordering is
     float failHighFirst; // try to make it >90%
     int nullCut;
+};
 
-    int gameMode;
-    int postThinking;
+/// Data to send to search thread
+struct SearchThreadData {
+    Board *originalPosition;
+    SearchInfo *info;
+    HashTable *ttable;
 };
 
 
@@ -266,6 +264,7 @@ extern U64 whitePassedMask[64]; // does the indexed white pawn have a 'clear run
 extern U64 blackPassedMask[64]; // does the indexed black pawn have a 'clear run' to promotion?
 extern U64 isolatedPawnMask[64]; // is the indexed pawn 'isolated'?
 
+extern HashTable hashTable[1]; // initialise hash table to size 1 array, but this will be dynamically allocated
 
 /* -- FUNCTIONS -- */
 
@@ -278,27 +277,26 @@ extern int popBit(U64 *bitboard);
 extern int countBits(U64 bitboard);
 
 // hashkeys.cpp
-extern U64 generatePositionKey(const Board *board);
+extern U64 generatePositionKey(const Board& board);
 
 // board.cpp
-extern int checkBoard(const Board *board);
-extern void updateMaterialLists(Board *board);
-extern int parseFen(const char *fen, Board *board);
-extern void resetBoard(Board *board);
-extern void printBoard(const Board *board);
-extern Board *genBoard();
+extern int checkBoard(const Board& board);
+extern void updateMaterialLists(Board& board);
+extern int parseFen(const char *fen, Board& board);
+extern void resetBoard(Board& board);
+extern void printBoard(const Board& board);
 
 // attack.cpp
-extern int isSquareAttacked(int square, int attackingSide, const Board *board);
+extern int isSquareAttacked(int square, int attackingSide, const Board& board);
 
 // io.cpp
 extern char *printSquare(int square);
 extern char *printMove(int move);
 extern void printMoveList(const MoveList *moveList);
-extern int parseMove(const char *ptrChar, Board *board);
+extern int parseMove(const char *ptrChar, Board& board);
 
 // validate.cpp
-extern int moveListValid(const MoveList *list, const Board *board);
+extern int moveListValid(const MoveList *list, const Board& board);
 extern int squareIs120(int sq);
 extern int squareOnBoard(int sq);
 extern int sideValid(int side);
@@ -306,48 +304,45 @@ extern int fileOrRankValid(int fileOrRank);
 extern int pieceValid(int piece);
 extern int pieceValidEmpty(int piece);
 extern int pieceValidEmptyOffboard(int pce);
-extern void debugAnalysisTest(Board *board, SearchInfo *info);
-extern void mirrorEvalTest(Board *board);
+extern void debugAnalysisTest(Board& board, SearchInfo *info, HashTable *table);
+extern void mirrorEvalTest(Board& board);
 
 // movegen.cpp
-extern void generateAllMoves(const Board *board, MoveList *list);
-extern void generateAllCaptureMoves(const Board *board, MoveList *moveList);
-extern int moveExists(Board *board, int move);
+extern void generateAllMoves(const Board& board, MoveList *list);
+extern void generateAllCaptureMoves(const Board& board, MoveList *moveList);
+extern int moveExists(Board& board, int move);
 extern void initMVVLVA();
 
 // makemove.cpp
-extern int makeMove(Board *board, int move);
-extern void takeMove(Board *board);
-extern void makeNullMove(Board *board);
-extern void takeNullMove(Board *board);
+extern int makeMove(Board& board, int move);
+extern void undoMove(Board& board);
+extern void makeNullMove(Board& board);
+extern void undoNullMove(Board& board);
 
 // perft.cpp
-extern void perftTest(int depth, Board *board);
+extern void perftTest(int depth, Board& board);
 
 // misc.cpp
 extern TimeMS getTimeMS();
-extern void ReadInput(SearchInfo *info);
 
 // search.cpp
-extern void searchPosition(Board *board, SearchInfo *info);
+extern void searchPosition(Board& board, SearchInfo *info, HashTable *table);
+extern int searchPositionThread(SearchThreadData *searchData);
 
 // pvtable.cpp
-extern void clearHashTable(HashTable *hashTable);
-extern int getPVLine(int depth, Board *board);
-extern void initHashTable(HashTable *hashTable, int MB);
-extern void storeHashEntry(Board *board, int move, int score, int flags, int depth);
-extern int probeHashEntry(Board *board, int *move, int *score, int alpha, int beta, int depth);
-extern int probePVTable(const Board *board);
+extern void clearHashTable(HashTable *table);
+extern int getPVLine(int depth, Board& board, const HashTable *table);
+extern void initHashTable(HashTable *table, int MB);
+extern void storeHashEntry(Board& board, HashTable *table, int move, int score, int flags, int depth);
+extern int probeHashEntry(Board& board, HashTable *table, int *move, int *score, int alpha, int beta, int depth);
+extern int probePVTable(const Board& board, const HashTable *table);
+extern void tempHashTest(char *fen);
 
 // board.cpp
-extern int evalPosition(const Board *board);
-extern void mirrorBoard(Board *board);
+extern int evalPosition(const Board& board);
+extern void mirrorBoard(Board& board);
 
 // uci.cpp
-extern void uciLoop(Board *board, SearchInfo *info);
-
-// xboard.cpp
-extern void xBoardLoop(Board *board, SearchInfo *info);
-extern void consoleLoop(Board *board, SearchInfo *info);
+extern void uciLoop(Board& board, SearchInfo *info);
 
 #endif //MAIOLICA_DEFS_H

@@ -3,7 +3,7 @@
 
 /// Not using bools here, as compiler adds 'not 0 or 1' checking, and ints should be determined to be 8 bit here anyway
 
-int moveListValid(const MoveList *list, const Board *board) {
+int moveListValid(const MoveList *list, const Board& board) {
     if (list->count < 0 || list->count >= MAX_POSITION_MOVES) {
         return false;
     }
@@ -15,7 +15,7 @@ int moveListValid(const MoveList *list, const Board *board) {
         if (!squareOnBoard(to) || !squareOnBoard(from)) {
             return false;
         }
-        if (!pieceValid(board->pieces[from])) {
+        if (!pieceValid(board.pieces[from])) {
             printBoard(board);
             return false;
         }
@@ -51,8 +51,7 @@ int pieceValidEmptyOffboard(const int pce) {
     return (pieceValidEmpty(pce) || pce == OFFBOARD);
 }
 
-void debugAnalysisTest(Board *board, SearchInfo *info) {
-
+void debugAnalysisTest(Board& board, SearchInfo *info, HashTable *table) {
     FILE *file;
     file = fopen("lct2.epd","r");
     char lineIn [1024];
@@ -68,18 +67,18 @@ void debugAnalysisTest(Board *board, SearchInfo *info) {
         while(fgets (lineIn , 1024 , file) != nullptr) {
             info->startTime = getTimeMS();
             info->stopTime = info->startTime + time;
-            clearHashTable(board->hashTable);
+            clearHashTable(table);
             parseFen(lineIn, board);
             printf("\n%s\n", lineIn);
             printf("time:%d start:%lld stop:%lld depth:%d timeset:%d\n",
                    time, info->startTime, info->stopTime, info->depth, info->timeSet);
-            searchPosition(board, info);
+            searchPosition(board, info, table);
             memset(&lineIn[0], 0, sizeof(lineIn));
         }
     }
 }
 
-void mirrorEvalTest(Board *board) {
+void mirrorEvalTest(Board& board) {
     FILE *file;
     file = fopen("mirror.epd","r");
     char lineIn [1024];

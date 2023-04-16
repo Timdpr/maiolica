@@ -1,18 +1,31 @@
 #include "defs.h"
 #include <cstdio>
 #include <cstring>
+#include <thread>
 
 /// This is what we expect the largest input to be:
 #define INPUT_BUFFER (400 * 6)
 
-int fastAtoi(const char* str) {
+std::thread MainSearchThread;
+
+std::thread launchSearchThread(Board& board, SearchInfo *info, HashTable *table) {
+    auto *pSearchData = new SearchThreadData{&board, info, table};
+    return std::thread(searchPositionThread, pSearchData);
+}
+
+void joinSearchThread(SearchInfo *info) {
+    info->stopped = true;
+    MainSearchThread.join();
+}
+
+static int fastAtoi(const char* str) {
     int val = 0;
     uint8_t x;
     while ((x = uint8_t(*str++ - '0')) <= 9) val = val * 10 + x;
     return val;
 }
 
-void parseGo(const char* line, SearchInfo *info, Board *board) {
+void parseGo(const char* line, SearchInfo *info, Board& board, HashTable *table) {
     // e.g. go depth 6 wtime 180000 btime 100000 binc 1000 winc 1000 movetime 1000 movestogo 40
     int depth = -1;
     int movesToGo = 30; // defaulting to sudden death time control
@@ -27,19 +40,19 @@ void parseGo(const char* line, SearchInfo *info, Board *board) {
 
     }
 
-    if ((ptr = strstr(line,"binc")) && board->side == BLACK) {
+    if ((ptr = strstr(line,"binc")) && board.side == BLACK) {
         increment = fastAtoi(ptr + 5); // atoi converts string to integer
     }
 
-    if ((ptr = strstr(line,"winc")) && board->side == WHITE) {
+    if ((ptr = strstr(line,"winc")) && board.side == WHITE) {
         increment = fastAtoi(ptr + 5);
     }
 
-    if ((ptr = strstr(line,"wtime")) && board->side == WHITE) {
+    if ((ptr = strstr(line,"wtime")) && board.side == WHITE) {
         time = fastAtoi(ptr + 6);
     }
 
-    if ((ptr = strstr(line,"btime")) && board->side == BLACK) {
+    if ((ptr = strstr(line,"btime")) && board.side == BLACK) {
         time = fastAtoi(ptr + 6);
     }
 
@@ -78,11 +91,11 @@ void parseGo(const char* line, SearchInfo *info, Board *board) {
     std::printf("time:%d start:%lld stop:%lld depth:%d timeset:%d\n",
            time, info->startTime, info->stopTime, info->depth, info->timeSet);
 
-    searchPosition(board, info); // print best move to the gui
+    MainSearchThread = launchSearchThread(board, info, table); // search position and print best move
 }
 
 /// reads a fen or 'startpos', possibly followed by moves
-void parsePosition(const char* lineIn, Board *board) {
+void parsePosition(const char* lineIn, Board& board) {
     lineIn += 9; // move pointer forward 9 chars
     const char *ptrChar = lineIn;
 
@@ -110,7 +123,7 @@ void parsePosition(const char* lineIn, Board *board) {
                 break;
             }
             makeMove(board, move); // make the move
-            board->ply = 0; // set ply back to 0, since it gets incremented to 1 in makeMove
+            board.ply = 0; // set ply back to 0, since it gets incremented to 1 in makeMove
             while (*ptrChar && *ptrChar != ' ') { // while we are pointing to something AND haven't found a space
                 ptrChar++; // move pointer through the move
             }
@@ -120,8 +133,7 @@ void parsePosition(const char* lineIn, Board *board) {
     printBoard(board);
 }
 
-void uciLoop(Board *board, SearchInfo *info) {
-    info->gameMode = UCI_MODE;
+void uciLoop(Board& board, SearchInfo *info) {
     // turn off any kind of buffering - stop bad commands etc.
     setbuf(stdin, nullptr);
     setbuf(stdout, nullptr);
@@ -154,16 +166,29 @@ void uciLoop(Board *board, SearchInfo *info) {
         } else if (!strncmp(line, "position", 8)) {
             parsePosition(line, board);
 
-        // if 'ucinewgame' then parse the start position
+        // if 'ucinewgame' then clear hash table and parse the start position
         } else if (!strncmp(line, "ucinewgame", 10)) {
+            clearHashTable(hashTable);
             parsePosition("position startpos\n", board);
 
         // if 'go' then parse go!
         } else if (!strncmp(line, "go", 2)) {
-            parseGo(line, info, board);
+             parseGo(line, info, board, hashTable);
 
-        // if 'quit' then set quit to true
+        // extra convenience function: start infinite analysis
+        } else if (!strncmp(line, "run", 3)) {
+            parseFen(START_FEN, board);
+            parseGo("go infinite", info, board, hashTable);
+
+        // if 'stop' then stop main search thread
+        } else if (!strncmp(line, "stop", 4)) {
+            joinSearchThread(info);
+
+        // if 'quit' then stop main search thread and set quit to true
         } else if (!strncmp(line, "quit", 4)) {
+            if (MainSearchThread.joinable()) {
+                joinSearchThread(info);
+            }
             info->quit = true;
             break;
 
@@ -174,7 +199,7 @@ void uciLoop(Board *board, SearchInfo *info) {
             printf("uciok\n");
 
         } else if (!strncmp(line, "debug", 4)) {
-            debugAnalysisTest(board, info);
+            debugAnalysisTest(board, info, hashTable);
             break;
 
         } else if (!strncmp(line, "setoption name Hash value ", 26)) {
@@ -182,7 +207,7 @@ void uciLoop(Board *board, SearchInfo *info) {
             if (MB < 4) MB = 4;
             if (MB > 2048) MB = 2048;
             printf("Set Hash to %d MB\n", MB);
-            initHashTable(board->hashTable, MB);
+            initHashTable(hashTable, MB);
         }
 
         // if quit was set, then quit!
