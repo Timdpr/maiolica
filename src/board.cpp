@@ -252,8 +252,6 @@ void resetBoard(Board& board) {
     board.castlingPerms = 0;
 
     board.positionKey = U64(0);
-
-    // TODO: Missing resetting material?
 }
 
 void printBoard(const Board& board) {

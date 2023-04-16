@@ -26,8 +26,9 @@ std::exit(0);}
 #define MAX_DEPTH 64
 #define START_FEN "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
 
-#define INF_BOUND 30000
-#define IS_MATE (INF_BOUND - MAX_DEPTH)
+#define INF_BOUND 32000
+#define ALPHABETA_BOUND 30000
+#define IS_MATE (ALPHABETA_BOUND - MAX_DEPTH)
 
 typedef std::uint64_t U64;
 typedef std::chrono::milliseconds::rep TimeMS;
@@ -335,6 +336,7 @@ extern void initHashTable(HashTable *table, int MB);
 extern void storeHashEntry(Board& board, HashTable *table, int move, int score, int flags, int depth);
 extern int probeHashEntry(Board& board, HashTable *table, int *move, int *score, int alpha, int beta, int depth);
 extern int probePVTable(const Board& board, const HashTable *table);
+extern void tempHashTest(char *fen);
 
 // board.cpp
 extern int evalPosition(const Board& board);

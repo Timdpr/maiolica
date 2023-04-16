@@ -18,7 +18,7 @@ void joinSearchThread(SearchInfo *info) {
     MainSearchThread.join();
 }
 
-int fastAtoi(const char* str) {
+static int fastAtoi(const char* str) {
     int val = 0;
     uint8_t x;
     while ((x = uint8_t(*str++ - '0')) <= 9) val = val * 10 + x;

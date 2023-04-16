@@ -152,7 +152,7 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo *i
         depth++;
     }
 
-    int score = -INF_BOUND;
+    int score = -ALPHABETA_BOUND;
     int pvMove = NO_MOVE;
 
     if (probeHashEntry(board, table, &pvMove, &score, alpha, beta, depth) == true) {
@@ -180,7 +180,7 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo *i
     int legal = 0;
     int oldAlpha = alpha;
     int bestMove = NO_MOVE;
-    int bestScore = -INF_BOUND;
+    int bestScore = -ALPHABETA_BOUND;
 
     if (pvMove != NO_MOVE) { // if we have a principal variation move
         for (int moveNum = 0; moveNum < moveList->count; ++moveNum) {
@@ -252,7 +252,7 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo *i
     if (legal == 0) { // if we don't have any legal moves...
         // ...and the king square of our side is attacked by the opposite side, we are checkmated
         if (inCheck) {
-            return -INF_BOUND + board.ply; // return mate score PLUS PLYS TO GO UNTIL MATE
+            return -ALPHABETA_BOUND + board.ply; // return mate score PLUS PLYS TO GO UNTIL MATE
         } else {
             return 0;
         }
@@ -289,7 +289,7 @@ void searchPosition(Board& board, SearchInfo *info, HashTable *table) {
     int bestMove = board.pvArray[0];
 
     for (int currentDepth = 1; currentDepth <= info->depth; ++currentDepth) {
-        int bestScore = alphaBeta(-INF_BOUND, INF_BOUND, currentDepth, board, info, table, true);
+        int bestScore = alphaBeta(-ALPHABETA_BOUND, ALPHABETA_BOUND, currentDepth, board, info, table, true);
         if (info->stopped == true) { // Because we may have stopped partway through alphaBeta, we break here so the previous results are returned
             break;
         }
