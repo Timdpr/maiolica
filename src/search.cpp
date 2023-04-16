@@ -1,11 +1,11 @@
 #include "defs.h"
+#include <cstring>
 
 /// Check if time is up / interrupt from gui
 static void checkUp(SearchInfo *info) {
     if (info->timeSet == true && getTimeMS() > info->stopTime) {
         info->stopped = true;
     }
-    ReadInput(info);
 }
 
 /// Swap the move at 'moveNum' index with the 'best' move in the moveList
@@ -263,6 +263,20 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo *i
         storeHashEntry(board, table,  bestMove, alpha, HF_ALPHA, depth);
     }
     return alpha;
+}
+
+int searchPositionThread(void *data) {
+    auto *searchData = (SearchThreadData *)data;
+//    Board *board = (Board *)malloc(sizeof(Board));
+    auto board = new Board{};
+
+    // TODO: Check what the next 2 lines do. If it is the same, then great! Using memcpy seems to give a segfault.
+    board = searchData->originalPosition;
+//    memcpy(board, &searchData->originalPosition, sizeof(Board));
+
+    searchPosition(*board, searchData->info, searchData->ttable);
+    free(board);
+    return 0;
 }
 
 void searchPosition(Board& board, SearchInfo *info, HashTable *table) {

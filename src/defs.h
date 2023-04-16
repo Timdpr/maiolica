@@ -159,6 +159,13 @@ struct SearchInfo {
     int nullCut;
 };
 
+/// Data to send to search thread
+struct SearchThreadData {
+    Board *originalPosition;
+    SearchInfo *info;
+    HashTable *ttable;
+};
+
 
 /* -- MACROS -- */
 
@@ -316,18 +323,18 @@ extern void perftTest(int depth, Board& board);
 
 // misc.cpp
 extern TimeMS getTimeMS();
-extern void ReadInput(SearchInfo *info);
 
 // search.cpp
-extern void searchPosition(Board& board, SearchInfo *info, HashTable *table );
+extern void searchPosition(Board& board, SearchInfo *info, HashTable *table);
+extern int searchPositionThread(void *data);
 
 // pvtable.cpp
 extern void clearHashTable(HashTable *table);
-extern int getPVLine(int depth, Board& board, HashTable *table);
+extern int getPVLine(int depth, Board& board, const HashTable *table);
 extern void initHashTable(HashTable *table, int MB);
 extern void storeHashEntry(Board& board, HashTable *table, int move, int score, int flags, int depth);
 extern int probeHashEntry(Board& board, HashTable *table, int *move, int *score, int alpha, int beta, int depth);
-extern int probePVTable(const Board& board, HashTable *table);
+extern int probePVTable(const Board& board, const HashTable *table);
 
 // board.cpp
 extern int evalPosition(const Board& board);

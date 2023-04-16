@@ -3,7 +3,7 @@
 HashTable hashTable[1];
 
 /// Populate Board's pvArray
-int getPVLine(const int depth, Board& board, HashTable *table) {
+int getPVLine(const int depth, Board& board, const HashTable *table) {
     ASSERT(depth < MAX_DEPTH && depth >= 1)
 
     int move = probePVTable(board, table);
@@ -70,7 +70,7 @@ int probeHashEntry(Board& board, HashTable *table, int *move, int *score, int al
     // get index out of pos key modulo the number of entries!
     int index = board.positionKey % table->numEntries;
 
-    ASSERT(index >= 0 && index <= board.hashTable->numEntries - 1)
+    ASSERT(index >= 0 && index <= hashTable->numEntries - 1)
     ASSERT(depth >=1 && depth < MAX_DEPTH)
     ASSERT(alpha < beta)
     ASSERT(alpha >= -INF_BOUND && alpha <= INF_BOUND)
@@ -83,8 +83,8 @@ int probeHashEntry(Board& board, HashTable *table, int *move, int *score, int al
         if (table->hTable[index].depth >= depth) { // if depth >= search depth
             table->hit++; // we have a hit!
 
-            ASSERT(board.hashTable->hTable[index].depth >= 1 && board.hashTable->hTable[index].depth < MAX_DEPTH)
-            ASSERT(board.hashTable->hTable[index].flags >= HF_ALPHA && board.hashTable->hTable[index].flags <= HF_EXACT)
+            ASSERT(hashTable->hTable[index].depth >= 1 && hashTable->hTable[index].depth < MAX_DEPTH)
+            ASSERT(hashTable->hTable[index].flags >= HF_ALPHA && hashTable->hTable[index].flags <= HF_EXACT)
 
             // get score & adjust according to ply if it is a mate score (we got rid of this when storing)
             *score = table->hTable[index].score;
@@ -123,7 +123,7 @@ void storeHashEntry(Board& board, HashTable *table, const int move, int score, c
     // make index out of pos key modulo the number of entries!
     int index = board.positionKey % table->numEntries;
 
-    ASSERT(index >= 0 && index <= board.hashTable->numEntries - 1)
+    ASSERT(index >= 0 && index <= hashTable->numEntries - 1)
     ASSERT(depth >= 1 && depth < MAX_DEPTH)
     ASSERT(flags >= HF_ALPHA && flags <= HF_EXACT)
     ASSERT(score >= -INF_BOUND && score <= INF_BOUND)
@@ -157,10 +157,10 @@ void storeHashEntry(Board& board, HashTable *table, const int move, int score, c
     table->hTable[index].age = table->currentAge;
 }
 
-int probePVTable(const Board& board, HashTable *table) {
+int probePVTable(const Board& board, const HashTable *table) {
     // get index out of pos key modulo the number of entries!
     int index = board.positionKey % table->numEntries;
-    ASSERT(index >= 0 && index <= board.hashTable->numEntries - 1)
+    ASSERT(index >= 0 && index <= hashTable->numEntries - 1)
 
     // if pos keys are equal, we can return move at the index
     if (table->hTable[index].positionKey == board.positionKey) {

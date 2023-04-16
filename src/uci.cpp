@@ -1,9 +1,23 @@
 #include "defs.h"
 #include <cstdio>
 #include <cstring>
+#include <thread>
 
 /// This is what we expect the largest input to be:
 #define INPUT_BUFFER (400 * 6)
+
+std::thread MainSearchThread;
+
+std::thread launchSearchThread(Board *board, SearchInfo *info, HashTable *table) {
+    auto *pSearchData = new SearchThreadData{board, info, table};
+
+    return std::thread(searchPositionThread, (void *)pSearchData);
+}
+
+void joinSearchThread(SearchInfo *info) {
+    info->stopped = true;
+    MainSearchThread.join();
+}
 
 int fastAtoi(const char* str) {
     int val = 0;
@@ -12,7 +26,7 @@ int fastAtoi(const char* str) {
     return val;
 }
 
-void parseGo(const char* line, SearchInfo *info, Board& board) {
+void parseGo(const char* line, SearchInfo *info, Board& board, HashTable *table) {
     // e.g. go depth 6 wtime 180000 btime 100000 binc 1000 winc 1000 movetime 1000 movestogo 40
     int depth = -1;
     int movesToGo = 30; // defaulting to sudden death time control
@@ -78,7 +92,8 @@ void parseGo(const char* line, SearchInfo *info, Board& board) {
     std::printf("time:%d start:%lld stop:%lld depth:%d timeset:%d\n",
            time, info->startTime, info->stopTime, info->depth, info->timeSet);
 
-    searchPosition(board, info, hashTable); // print best move to the gui
+//    searchPosition(board, info, hashTable); // print best move to the gui
+    MainSearchThread = launchSearchThread(&board, info, table);
 }
 
 /// reads a fen or 'startpos', possibly followed by moves
@@ -160,15 +175,20 @@ void uciLoop(Board& board, SearchInfo *info) {
 
         // if 'go' then parse go!
         } else if (!strncmp(line, "go", 2)) {
-             parseGo(line, info, board);
+             parseGo(line, info, board, hashTable);
 
         // extra convenience function: start infinite analysis
         } else if (!strncmp(line, "run", 3)) {
             parseFen(START_FEN, board);
-            parseGo("go infinite", info, board);
+            parseGo("go infinite", info, board, hashTable);
 
-        // if 'quit' then set quit to true
+        // if 'stop' then stop main search thread
+        } else if (!strncmp(line, "stop", 4)) {
+            joinSearchThread(info);
+
+        // if 'quit' then stop main search thread and set quit to true
         } else if (!strncmp(line, "quit", 4)) {
+            joinSearchThread(info);
             info->quit = true;
             break;
 
