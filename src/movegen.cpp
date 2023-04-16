@@ -37,7 +37,7 @@ const int pieceDirection [13][8] = {
     { -1,-10,  1, 10, -9,-11, 11,  9 },
     { -1,-10,  1, 10, -9,-11, 11,  9 }
 };
-/// Tells you how many directions there are in the rows of the pieceDirection array (indexed by piece).
+/// Tells you how many directions there are in the rows of the pieceDirection array (indexed by piece)
 const int pieceDirectionNumbers[13] = { 0, 0, 8, 4, 4, 8, 8, 0, 8, 4, 4, 8, 8 };
 
 /// Adds a 'quiet' (non-capture) Move to the MoveList using the given 'move' integer
@@ -430,7 +430,6 @@ void initMVVLVA() {
 int moveExists(Board& board, const int move) {
     MoveList moveList[1];
     generateAllMoves(board, moveList);
-
     for (int moveNum = 0; moveNum < moveList->count; ++moveNum) {
         if (!makeMove(board, moveList->moves[moveNum].move)) {
             continue;
