@@ -326,7 +326,7 @@ extern TimeMS getTimeMS();
 
 // search.cpp
 extern void searchPosition(Board& board, SearchInfo *info, HashTable *table);
-extern int searchPositionThread(void *data);
+extern int searchPositionThread(SearchThreadData *searchData);
 
 // pvtable.cpp
 extern void clearHashTable(HashTable *table);

@@ -265,17 +265,22 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo *i
     return alpha;
 }
 
-int searchPositionThread(void *data) {
-    auto *searchData = (SearchThreadData *)data;
-//    Board *board = (Board *)malloc(sizeof(Board));
-    auto board = new Board{};
+int searchPositionThread(SearchThreadData *searchData) {
+//    auto *searchData = (SearchThreadData *)data;
+    // Create new empty board, deep copy original position into it, then search
 
-    // TODO: Check what the next 2 lines do. If it is the same, then great! Using memcpy seems to give a segfault.
-    board = searchData->originalPosition;
-//    memcpy(board, &searchData->originalPosition, sizeof(Board));
-
+    // C way:
+    auto *board = (Board *)malloc(sizeof(Board));
+    memcpy(board, searchData->originalPosition, sizeof(Board));
     searchPosition(*board, searchData->info, searchData->ttable);
     free(board);
+
+    // C++ way:
+//    auto board = new Board{};
+//    std::memcpy(board, searchData->originalPosition, sizeof(Board));
+//    searchPosition(*board, searchData->info, searchData->ttable);
+//    delete board;
+
     return 0;
 }
 

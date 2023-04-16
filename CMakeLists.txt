@@ -9,16 +9,16 @@ set(CMAKE_CXX_STANDARD 20)
 # -flto = link time optimisation https://gcc.gnu.org/wiki/LinkTimeOptimization
 
 if(MINGW)
-    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -static-libstdc++ -static-libgcc")
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -static-libstdc++ -static-libgcc -flto")
+    set(CMAKE_CXX_FLAGS_DEBUG "-g -pthread -mdynamic-no-pic -static-libstdc++ -static-libgcc")
+    set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG -pthread -static-libstdc++ -static-libgcc -flto")
 else()
-    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -mdynamic-no-pic")
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -mdynamic-no-pic -flto")
+    set(CMAKE_CXX_FLAGS_DEBUG "-g -pthread -mdynamic-no-pic")
+    set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG -pthread -mdynamic-no-pic -flto")
 endif()
 
 # Enable sanitisers when in debug:
-#set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=address -fsanitize-address-use-after-return=always -fno-omit-frame-pointer")
-#set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=undefined -fsanitize=integer -fsanitize=float-divide-by-zero -fsanitize=implicit-conversion -fsanitize=bounds -fsanitize=nullability")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=address -fsanitize-address-use-after-return=always -fno-omit-frame-pointer")
+set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=undefined -fsanitize=integer -fsanitize=float-divide-by-zero -fsanitize=implicit-conversion -fsanitize=bounds -fsanitize=nullability")
 
 message("CMAKE_CXX_FLAGS_DEBUG is ${CMAKE_CXX_FLAGS_DEBUG}")
 message("CMAKE_CXX_FLAGS_RELEASE is ${CMAKE_CXX_FLAGS_RELEASE}")

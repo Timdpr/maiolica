@@ -8,10 +8,9 @@
 
 std::thread MainSearchThread;
 
-std::thread launchSearchThread(Board *board, SearchInfo *info, HashTable *table) {
-    auto *pSearchData = new SearchThreadData{board, info, table};
-
-    return std::thread(searchPositionThread, (void *)pSearchData);
+std::thread launchSearchThread(Board& board, SearchInfo *info, HashTable *table) {
+    auto *pSearchData = new SearchThreadData{&board, info, table};
+    return std::thread(searchPositionThread, pSearchData);
 }
 
 void joinSearchThread(SearchInfo *info) {
@@ -92,8 +91,7 @@ void parseGo(const char* line, SearchInfo *info, Board& board, HashTable *table)
     std::printf("time:%d start:%lld stop:%lld depth:%d timeset:%d\n",
            time, info->startTime, info->stopTime, info->depth, info->timeSet);
 
-//    searchPosition(board, info, hashTable); // print best move to the gui
-    MainSearchThread = launchSearchThread(&board, info, table);
+    MainSearchThread = launchSearchThread(board, info, table); // search position and print best move
 }
 
 /// reads a fen or 'startpos', possibly followed by moves
