@@ -186,7 +186,9 @@ void uciLoop(Board& board, SearchInfo *info) {
 
         // if 'quit' then stop main search thread and set quit to true
         } else if (!strncmp(line, "quit", 4)) {
-            joinSearchThread(info);
+            if (MainSearchThread.joinable()) {
+                joinSearchThread(info);
+            }
             info->quit = true;
             break;
 
