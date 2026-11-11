@@ -233,7 +233,7 @@ void resetBoard(Board& board) {
         board.material[i] = 0;
     }
 
-    for (unsigned long long & pawn : board.pawns) {
+    for (U64& pawn : board.pawns) {
         pawn = U64(0);
     }
 
