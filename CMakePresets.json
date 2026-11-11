@@ -1,0 +1,39 @@
+{
+  "version": 6,
+  "cmakeMinimumRequired": { "major": 3, "minor": 25, "patch": 0 },
+  "configurePresets": [
+    { "name": "base", "hidden": true, "binaryDir": "${sourceDir}/cmake-build-${presetName}" },
+    { "name": "release", "displayName": "Release (LTO)", "inherits": "base",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release" } },
+    { "name": "native", "displayName": "Release, tuned for this CPU", "inherits": "base",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "MAIOLICA_NATIVE": "ON" } },
+    { "name": "profile", "displayName": "RelWithDebInfo (for Instruments / sample)", "inherits": "base",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo" } },
+    { "name": "debug", "displayName": "Debug (ASSERTs on)", "inherits": "base",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug" } },
+    { "name": "asan", "displayName": "Debug + ASan/UBSan", "inherits": "base",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Debug", "MAIOLICA_SANITIZE": "address,undefined" } },
+    { "name": "tsan", "displayName": "RelWithDebInfo + TSan", "inherits": "base",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "RelWithDebInfo", "MAIOLICA_SANITIZE": "thread" } },
+    { "name": "microbench", "displayName": "Release + microbenchmarks", "inherits": "base",
+      "cacheVariables": { "CMAKE_BUILD_TYPE": "Release", "MAIOLICA_MICROBENCH": "ON" } }
+  ],
+  "buildPresets": [
+    { "name": "release", "configurePreset": "release" },
+    { "name": "native", "configurePreset": "native" },
+    { "name": "profile", "configurePreset": "profile" },
+    { "name": "debug", "configurePreset": "debug" },
+    { "name": "asan", "configurePreset": "asan" },
+    { "name": "tsan", "configurePreset": "tsan" },
+    { "name": "microbench", "configurePreset": "microbench" }
+  ],
+  "testPresets": [
+    { "name": "release", "configurePreset": "release", "output": { "outputOnFailure": true },
+      "filter": { "exclude": { "label": "full" } } },
+    { "name": "full", "configurePreset": "release", "output": { "outputOnFailure": true } },
+    { "name": "debug", "configurePreset": "debug", "output": { "outputOnFailure": true },
+      "filter": { "include": { "label": "smoke" } } },
+    { "name": "asan", "configurePreset": "asan", "output": { "outputOnFailure": true },
+      "filter": { "include": { "label": "smoke" } } }
+  ]
+}

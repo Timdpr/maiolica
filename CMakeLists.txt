@@ -1,33 +1,100 @@
-cmake_minimum_required(VERSION 3.15)
-project(maiolica)
+cmake_minimum_required(VERSION 3.21)
+project(maiolica VERSION 1.0 LANGUAGES CXX)
 
-set(CMAKE_CXX_STANDARD 20)
-
-# Compiler options:
-# -O3 = agressive optimisation https://gcc.gnu.org/onlinedocs/gcc/Optimize-Options.html
-# -mdyn... = https://bugzilla.mozilla.org/show_bug.cgi?id=165851
-# -flto = link time optimisation https://gcc.gnu.org/wiki/LinkTimeOptimization
-
-if(MINGW)
-    set(CMAKE_CXX_FLAGS_DEBUG "-g -pthread -mdynamic-no-pic -static-libstdc++ -static-libgcc")
-    set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG -pthread -static-libstdc++ -static-libgcc -flto")
-else()
-    set(CMAKE_CXX_FLAGS_DEBUG "-g -pthread -mdynamic-no-pic")
-    set(CMAKE_CXX_FLAGS_RELEASE "-O2 -DNDEBUG -pthread -mdynamic-no-pic -flto")
+# Default to an optimised build, since that's what you want for playing
+if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)
+    set(CMAKE_BUILD_TYPE Release CACHE STRING "Build type" FORCE)
 endif()
+set(CMAKE_CXX_EXTENSIONS OFF)         # -std=c++20, not gnu++20
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON) # for clangd / clang-tidy
 
-# Enable sanitisers when in debug:
-#set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=address -fsanitize-address-use-after-return=always -fno-omit-frame-pointer")
-#set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -fsanitize=undefined -fsanitize=integer -fsanitize=float-divide-by-zero -fsanitize=implicit-conversion -fsanitize=bounds -fsanitize=nullability")
+option(MAIOLICA_NATIVE "Tune for this machine's CPU (-mcpu/-march=native). Binaries may not run elsewhere" OFF)
+option(MAIOLICA_LTO "Link time optimisation in optimised builds (~5% faster)" ON)
+option(MAIOLICA_MICROBENCH "Build microbenchmarks (fetches Google Benchmark)" OFF)
+set(MAIOLICA_SANITIZE "" CACHE STRING "Sanitisers, e.g. 'address,undefined' or 'thread'")
+set(MAIOLICA_PGO "" CACHE STRING "'generate', or the path to a .profdata file to optimise with")
 
-message("CMAKE_CXX_FLAGS_DEBUG is ${CMAKE_CXX_FLAGS_DEBUG}")
-message("CMAKE_CXX_FLAGS_RELEASE is ${CMAKE_CXX_FLAGS_RELEASE}")
+find_package(Threads REQUIRED)
 
-add_executable(maiolica
-        src/main.cpp src/defs.h src/data.cpp src/init.cpp
+# Everything but main.cpp, so tests and benchmarks can link the engine too
+add_library(maiolica_core OBJECT
+        src/defs.h src/data.cpp src/init.cpp
         src/io.cpp src/uci.cpp
         src/board.cpp src/bitboards.cpp src/hashkeys.cpp
-        src/attack.cpp src/movegen.cpp src/validate.cpp src/makemove.cpp src/misc.cpp src/search.cpp src/pvtable.cpp src/evaluate.cpp
-        src/perft.cpp
+        src/attack.cpp src/movegen.cpp src/validate.cpp src/makemove.cpp src/misc.cpp
+        src/search.cpp src/pvtable.cpp src/evaluate.cpp
+        src/perft.cpp src/bench.cpp
         )
-target_compile_options(maiolica PRIVATE -Wall -Wextra -Wno-unused-parameter $<$<CONFIG:DEBUG>:-DDEBUG>)
+target_include_directories(maiolica_core PUBLIC src)
+target_compile_features(maiolica_core PUBLIC cxx_std_20)
+target_compile_definitions(maiolica_core PUBLIC $<$<CONFIG:Debug>:DEBUG>) # turns on ASSERT()
+target_compile_options(maiolica_core PUBLIC -Wall -Wextra -Wshadow -Wimplicit-fallthrough -Wno-unused-parameter)
+target_link_libraries(maiolica_core PUBLIC Threads::Threads)
+
+if(MAIOLICA_NATIVE) # on an M1 this is already the default CPU, so it changes nothing there
+    if(CMAKE_SYSTEM_PROCESSOR MATCHES "arm64|aarch64")
+        target_compile_options(maiolica_core PUBLIC -mcpu=native)
+    else()
+        target_compile_options(maiolica_core PUBLIC -march=native)
+    endif()
+endif()
+
+if(MAIOLICA_SANITIZE)
+    target_compile_options(maiolica_core PUBLIC -fsanitize=${MAIOLICA_SANITIZE} -fno-omit-frame-pointer -fno-sanitize-recover=all)
+    target_link_options(maiolica_core PUBLIC -fsanitize=${MAIOLICA_SANITIZE})
+endif()
+
+if(MAIOLICA_PGO STREQUAL "generate")
+    target_compile_options(maiolica_core PUBLIC -fprofile-instr-generate)
+    target_link_options(maiolica_core PUBLIC -fprofile-instr-generate)
+elseif(MAIOLICA_PGO)
+    target_compile_options(maiolica_core PUBLIC -fprofile-instr-use=${MAIOLICA_PGO} -Wno-profile-instr-out-of-date)
+endif()
+
+add_executable(maiolica src/main.cpp)
+target_link_libraries(maiolica PRIVATE maiolica_core)
+if(MINGW) # self-contained windows .exe
+    target_link_options(maiolica PRIVATE -static)
+endif()
+
+# -- Tests: perft tiers (smoke is small enough for debug/sanitiser builds) and the bench signature --
+enable_testing()
+add_executable(perft_tests tests/perft_tests.cpp)
+target_link_libraries(perft_tests PRIVATE maiolica_core)
+foreach(tier smoke quick full)
+    add_test(NAME perft_${tier} COMMAND perft_tests ${tier})
+    set_tests_properties(perft_${tier} PROPERTIES LABELS ${tier})
+endforeach()
+
+file(STRINGS tests/bench_signature.txt MAIOLICA_BENCH LIMIT_COUNT 1)
+add_test(NAME bench_signature COMMAND maiolica bench)
+set_tests_properties(bench_signature PROPERTIES LABELS quick # too slow for debug builds
+        PASS_REGULAR_EXPRESSION "Nodes searched  : ${MAIOLICA_BENCH}\n")
+
+# -- Optional microbenchmarks, for iterating on hot functions (bench/perft still decide) --
+if(MAIOLICA_MICROBENCH)
+    include(FetchContent)
+    set(BENCHMARK_ENABLE_TESTING OFF CACHE BOOL "" FORCE)
+    set(BENCHMARK_ENABLE_GTEST_TESTS OFF CACHE BOOL "" FORCE)
+    FetchContent_Declare(benchmark
+            GIT_REPOSITORY https://github.com/google/benchmark.git
+            GIT_TAG v1.9.1
+            GIT_SHALLOW TRUE)
+    FetchContent_MakeAvailable(benchmark)
+    add_executable(microbench tests/microbench.cpp)
+    target_link_libraries(microbench PRIVATE maiolica_core benchmark::benchmark)
+endif()
+
+# LTO last, so it applies to everything above
+if(MAIOLICA_LTO AND NOT MAIOLICA_SANITIZE)
+    include(CheckIPOSupported)
+    check_ipo_supported(RESULT ipo_ok OUTPUT ipo_msg)
+    if(ipo_ok)
+        foreach(target maiolica_core maiolica perft_tests)
+            set_property(TARGET ${target} PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
+            set_property(TARGET ${target} PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO ON)
+        endforeach()
+    else()
+        message(STATUS "LTO not supported: ${ipo_msg}")
+    endif()
+endif()
