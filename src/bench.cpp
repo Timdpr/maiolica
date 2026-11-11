@@ -37,4 +37,5 @@ void bench() {
     std::printf("Total time (ms) : %lld\n", (long long)elapsed);
     std::printf("Nodes searched  : %lld\n", totalNodes);
     std::printf("Nodes/second    : %lld\n", totalNodes * 1000 / elapsed);
+    std::printf("%lld nodes %lld nps\n", totalNodes, totalNodes * 1000 / elapsed); // the line OpenBench reads
 }
