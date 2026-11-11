@@ -13,10 +13,11 @@ int checkBoard(const Board& board) {
 
     // Set up various counters
     int expectedPieceNums[13] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
-    int expectedBigPieces[2] = { 0, 0 };
-    int expectedMajorPieces[2] = { 0, 0 };
-    int expectedMinorPieces[2] = { 0, 0 };
-    int expectedMaterial[2] = { 0, 0 };
+    // sized 3 since empty squares have colour BOTH
+    int expectedBigPieces[3] = { 0, 0, 0 };
+    int expectedMajorPieces[3] = { 0, 0, 0 };
+    int expectedMinorPieces[3] = { 0, 0, 0 };
+    int expectedMaterial[3] = { 0, 0, 0 };
 
     for (int square64 = 0; square64 < 64; ++square64) {
         int square120 = INDEX_64_TO_120(square64);
