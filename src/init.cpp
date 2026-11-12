@@ -13,11 +13,6 @@ static U64 rand64() {
 int sq120ToSq64[BRD_SQ_NUM];
 int sq64ToSq120[64];
 
-/// All 1s
-U64 setMask[64];
-/// All 0s
-U64 clearMask[64];
-
 // Initialised with random numbers
 U64 pieceKeys[13][120]; // [pieces][squares]
 U64 sideKey;
@@ -128,17 +123,6 @@ static void initHashKeys() {
     }
 }
 
-static void initBitMasks() {
-    for (int i = 0; i < 64; i++) {
-        setMask[i] = U64(0);
-        clearMask[i] = U64(0);
-    }
-    for (int i = 0; i < 64; i++) {
-        setMask[i] |= U64(1) << i; // shift 1 into every position
-        clearMask[i] = ~setMask[i]; // bitwise complement: clearMask is the inverse of setMask!
-    }
-}
-
 static void initSquare120To64() {
     for (int &i : sq120ToSq64) {
         i = 65; // initialise with impossible values
@@ -162,7 +146,6 @@ static void initSquare120To64() {
 /// Initialise everything!
 void initAll() {
     initSquare120To64();
-    initBitMasks();
     initHashKeys();
     initFilesRanksBoard();
     initEvalMasks();

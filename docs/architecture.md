@@ -8,7 +8,7 @@ C++20 UCI engine. Single-threaded search, 10x12 mailbox board, pawn-only bitboar
 |---|---|
 | `src/defs.h` | Everything shared: constants, enums, structs (`Board`, `Move`, `MoveList`, `HashEntry`, `HashTable`, `Undo`, `SearchInfo`), move/square macros, globals, all function decls. |
 | `src/main.cpp` | `initAll`, 64MB TT, then `bench`, `console` or `replay` from the command line; otherwise prints a banner and runs `uciLoop` |
-| `src/init.cpp` | Builds runtime tables: 120<->64 maps, set/clear masks, Zobrist keys, `filesBoard`/`ranksBoard`, eval masks, MVV-LVA (`initAll`) |
+| `src/init.cpp` | Builds runtime tables: 120<->64 maps, Zobrist keys, `filesBoard`/`ranksBoard`, eval masks, MVV-LVA (`initAll`) |
 | `src/data.cpp` | Constant per-piece tables (`pieceValues`, `pieceColours`, `bigPieces`, `pieceKnight`…), `pieceChars`, `mirror64` |
 | `src/board.cpp` | `resetBoard`, `parseFen`, `updateMaterialLists`, `checkBoard` (debug cross-check), `printBoard`, `mirrorBoard` |
 | `src/hashkeys.cpp` | `generatePositionKey` (from scratch; make/undo update incrementally) |

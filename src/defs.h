@@ -175,9 +175,9 @@ struct SearchInfo {
 
 // - Bitboard macros:
 /// Clear the bit for the given (64-based) square
-#define CLEAR_BIT(bitboard, sq) ((bitboard) &= clearMask[(sq)])
+#define CLEAR_BIT(bitboard, sq) ((bitboard) &= ~(U64(1) << (sq)))
 /// Set the bit for the given (64-based) square
-#define SET_BIT(bitboard, sq) ((bitboard) |= setMask[(sq)])
+#define SET_BIT(bitboard, sq) ((bitboard) |= (U64(1) << (sq)))
 
 // - Piece checking macros:
 #define IS_KNIGHT(piece) (pieceKnight[(piece)])
@@ -216,8 +216,6 @@ constexpr int NO_MOVE = 0;
 extern int sq120ToSq64[BRD_SQ_NUM];
 extern int sq64ToSq120[64];
 
-extern U64 setMask[64];
-extern U64 clearMask[64];
 extern U64 pieceKeys[13][120];
 extern U64 sideKey;
 extern U64 castleKeys[16];
