@@ -1,0 +1,55 @@
+# Testing & measuring
+
+Three questions, three tools. Use the one that matches what a change claims.
+
+| Claim | Proof | Tool |
+|---|---|---|
+| "Movegen is still correct" | perft counts match published values | `ctest` (perft tiers) |
+| "Search is unchanged" | bench node count identical | `maiolica bench`, `tests/bench_signature.txt` |
+| "It's faster" | fewer instructions/cycles over interleaved runs | `scripts/ab.sh` |
+| "It's stronger" (or no weaker) | SPRT passes | `scripts/match.sh` |
+
+## Perft
+`tests/perft_tests.cpp` covers the six CPW positions (plus mirrored pos4) and Peter Ellis Jones' tricky positions (en passant pins, castling through check, promotions, stalemate). Counts come from [CPW Perft Results](https://www.chessprogramming.org/Perft_Results). Never add a count that hasn't been published or cross-checked with another engine.
+
+| Tier | Where it runs | Time (M1 Pro) |
+|---|---|---|
+| `smoke` | debug and asan presets, where `ASSERT(checkBoard)` runs at every node | 0.2s release, 17s asan |
+| `quick` | release preset and CI | ~1.7s |
+| `full` | `ctest --preset full` | ~20s |
+
+## Bench signature
+`./maiolica bench` searches 9 fixed positions to fixed depths, each on a fresh board with a cleared 16MB table, and prints the total node count.
+
+It is deterministic because the Zobrist keys come from a fixed-seed splitmix64. It's identical in Release, Debug and ASan builds, and should be identical across platforms; CI checks Linux and macOS.
+
+- **Refactor or speedup:** the count must not change. If it does, the change altered search: find out why before going on.
+- **Intentional search or eval change:** update `tests/bench_signature.txt` and add `Bench: N` to the commit message.
+- Positions without history can't show repetition or fifty-move fixes. Test those through UCI.
+
+## Speed
+```sh
+scripts/ab.sh HEAD . 9          # last commit vs working tree, 9 interleaved runs of bench
+scripts/ab.sh master HEAD 9 perft
+```
+- **Instructions retired:** nearly noise-free, the metric for identical-search changes. A self-test of the same code shows ±0.00%.
+- **Cycles and wall time:** wobble by ~1–3% when the laptop is busy.
+- **Microbenchmarks:** `cmake --preset microbench && cmake --build --preset microbench && cmake-build-microbench/microbench` times movegen, make/undo, attacks and eval in isolation. They're good for iterating, but LTO inlines these functions into the real search, so only `ab.sh` decides.
+- **Profiling:** build the `profile` preset, then `sample` or Instruments on `maiolica bench`.
+- **PGO:** `scripts/pgo.sh` gives a profile-guided build in `cmake-build-pgo/` (~3–5% faster).
+
+## Strength (SPRT)
+```sh
+scripts/match.sh master gain     # elo0=0 elo1=10: does it gain?
+scripts/match.sh master nonreg   # elo0=-10 elo1=0: doesn't lose (simplifications, bug fixes)
+```
+The script builds the working tree and the base ref. It plays 8+0.08 games with Hash 16, from `books/8moves_v3.pgn`, in pairs with colours swapped, 6 at a time. The SPRT uses the logistic model with α = β = 0.05, and results land in `matches/<date>-<ref>/`.
+
+Setup is a one-off:
+- Build fastchess in `external/fastchess`: `git clone --depth 1 https://github.com/Disservin/fastchess external/fastchess && make -C external/fastchess -j`.
+- Unzip the book from official-stockfish/books into `books/`.
+
+## Sanitisers
+- `ctest --preset asan` runs Debug with ASan and UBSan.
+- The `tsan` preset is for the search thread: drive it over UCI.
+- For a full search check, run `cmake-build-asan/maiolica bench` (slow, ~3 min). It must print the same signature as release.
