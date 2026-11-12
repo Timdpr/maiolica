@@ -1,0 +1,23 @@
+[Event "Self-play: both castles, promotions, underpromotion, disambiguation"]
+[White "a"]
+[Black "b"]
+[Result "0-1"]
+[Termination "normal"]
+
+1. d4 Nf6 2. c4 e6 3. Nc3 Bb4 4. Qc2 c5 5. dxc5 Bxc5 6. Nf3 b6 7. Bg5 Bb7 8. e4 h6 9. Bxf6
+Qxf6 10. O-O-O O-O 11. Bd3 Nc6 12. Rhe1 d6 13. Qd2 Rac8 14. Na4 Bb4 15. Nc3 Na5 16. Qe2
+Bxc3 17. bxc3 Qxc3+ 18. Kb1 Nxc4 19. Bxc4 Rxc4 20. Nd2 Rb4+ 21. Nb3 Bxe4+ 22. Qxe4 Rxe4
+23. Rxe4 d5 24. Red4 Qc7 25. f4 f5 26. Rc1 Qd7 27. Nd2 Rc8 28. Rxc8+ Qxc8 29. Nf3 Qc5 30.
+a4 Qc3 31. h3 g5 32. fxg5 hxg5 33. Rd2 Qb3+ 34. Kc1 Qc4+ 35. Kb2 g4 36. hxg4 fxg4 37. Nd4
+e5 38. Nb5 a6 39. Na7 d4 40. Rc2 Qxa4 41. Rc6 d3 42. Rc8+ Kg7 43. Rc7+ Kf6 44. Rc6+ Kf7
+45. Rc7+ Ke8 46. Rc8+ Kd7 47. Rc3 Qb4+ 48. Rb3 Qd4+ 49. Kc1 Qc4+ 50. Kb2 d2 51. Rc3 d1=N+
+52. Kc2 Qe2+ 53. Kc1 Nxc3 54. g3 Qh2 55. Nc6 Ne2+ 56. Kd1 Kxc6 57. Ke1 Kc7 58. Kd2 Nd4+
+59. Kd1 Qe2+ 60. Kc1 Qc2# 0-1
+
+[Event "En passant and a promotion with check"]
+[White "test"]
+[Black "test"]
+[FEN "4k3/8/8/8/3p4/8/4P3/4K3 w - - 0 1"]
+[Result "*"]
+
+1. e4 dxe3 2. Kd1 e2+ 3. Kd2 e1=Q+ 4. Kxe1 Kd7 *
