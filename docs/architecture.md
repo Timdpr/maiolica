@@ -20,7 +20,7 @@ C++20 UCI engine. Single-threaded search, 10x12 mailbox board, pawn-only bitboar
 | `src/evaluate.cpp` | `evalPosition`, `materialDraw`, piece-square tables |
 | `src/uci.cpp` | `uciLoop` and its commands, `sendLine` (all protocol output), the search thread, time budget, options |
 | `src/io.cpp` | `printSquare`, `printMove` (`thread_local` buffers; `0000` for `NO_MOVE`), `printMoveList`, `parseMove` (UCI string → move via movegen) |
-| `src/bitboards.cpp` | `popBit` (De Bruijn-style fold), `countBits`, `printBitBoard` |
+| `src/bitboards.cpp` | `popBit`, `countBits` (both via `<bit>`), `printBitBoard` |
 | `src/perft.cpp` | `perft` (accumulates global `leafNodes`), `perftTest` (divide output) |
 | `src/validate.cpp` | `squareOnBoard`, `pieceValid`… used by `ASSERT`; `debugAnalysisTest` (lct2.epd), `mirrorEvalTest` (mirror.epd) |
 | `src/misc.cpp` | `getTimeMS` (steady_clock ms) |
