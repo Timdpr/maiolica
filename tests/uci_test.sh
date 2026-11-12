@@ -75,6 +75,8 @@ check "big increment is capped" $'debug on\nposition startpos\ngo wtime 500 btim
     'time budget 337 ms'
 check "negative clock still moves at once" $'debug on\nposition startpos\ngo wtime -30 btime 5000 winc 100 binc 100\n~0.5\nquit' \
     'time budget 1 ms'
+order "ponder ignores the node limit" $'position startpos moves e2e4\ngo ponder nodes 3000\n~0.5\nisready\nponderhit\n~0.5\nquit' \
+    '^readyok' '^bestmove'
 order "go nodes stops by itself" $'position startpos\ngo nodes 3000\n~0.5\nisready\nquit' '^bestmove' '^readyok'
 check "messy whitespace" $'position   fen  rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1   moves\te7e5  g1f3\nd\nquit' \
     '^  \.  \.  \.  \.  \.  N  \.  \.   3$' # the knight's on f3, so both moves were played

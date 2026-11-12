@@ -3,9 +3,9 @@
 #include <string>
 #include <thread>
 
-/// Check if time (or the node limit) is up
+/// Check if time (or the node limit) is up. Neither applies while pondering: that only ends when the gui says so
 static void checkUp(SearchInfo *info) {
-    if ((info->timeSet && getTimeMS() > info->stopTime) || (info->nodeLimit && info->nodes >= info->nodeLimit)) {
+    if ((info->timeSet && getTimeMS() > info->stopTime) || (info->nodeLimit && info->nodes >= info->nodeLimit && !info->ponder)) {
         info->stopped = true;
     }
 }
