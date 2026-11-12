@@ -4,7 +4,7 @@
 /// Returns char array of the algebraic representation of the square
 char *printSquare(const int square) {
 
-    static char squareString[3];
+    thread_local static char squareString[3]; // thread_local, so the search & input threads can both print
 
     int file = filesBoard[square];
     int rank = ranksBoard[square];
@@ -14,9 +14,13 @@ char *printSquare(const int square) {
     return squareString;
 }
 
-/// Returns char array of the algebraic representation of the move
+/// Returns char array of the algebraic representation of the move ('0000' if there isn't one)
 char *printMove(const int move) {
-    static char moveString[6];
+    thread_local static char moveString[6];
+    if (move == NO_MOVE) {
+        snprintf(moveString, sizeof(moveString), "0000");
+        return moveString;
+    }
 
     // Get elements of the move
     int fileFrom = filesBoard[GET_FROM(move)];

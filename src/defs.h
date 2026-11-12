@@ -1,6 +1,7 @@
 #ifndef MAIOLICA_DEFS_H
 #define MAIOLICA_DEFS_H
 
+#include <atomic>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -141,29 +142,24 @@ struct Board {
     int searchKillers[2][MAX_DEPTH]; // indexed by 2 killer moves, by depth
 };
 
-///
+/// Limits & stats for a search. The atomics are shared between the search & input threads
 struct SearchInfo {
     TimeMS startTime;
-    TimeMS stopTime;
+    std::atomic<TimeMS> stopTime{0};
+    std::atomic<bool> timeSet{false}; // only stop on time if this is set
     int depth;
-    int timeSet; // total time set for all moves
-    int movesToGo;
+    long nodeLimit; // 'go nodes', 0 if none
+    bool infinite; // 'go infinite': don't send bestmove until told to stop
 
     long nodes; // count of all positions the engine visits in the search tree
+    int selDepth; // deepest ply reached
 
-    int quit; // quit entirely if set to true
-    int stopped;
+    std::atomic<bool> stopped{false};
+    std::atomic<bool> ponder{false}; // pondering: no time limit & no bestmove until 'ponderhit' or 'stop'
 
     float failHigh; // divide fhf by fh to get an idea of how good move ordering is
     float failHighFirst; // try to make it >90%
     int nullCut;
-};
-
-/// Data to send to search thread
-struct SearchThreadData {
-    Board *originalPosition;
-    SearchInfo *info;
-    HashTable *ttable;
 };
 
 
@@ -301,7 +297,7 @@ extern int fileOrRankValid(int fileOrRank);
 extern int pieceValid(int piece);
 extern int pieceValidEmpty(int piece);
 extern int pieceValidEmptyOffboard(int pce);
-extern void debugAnalysisTest(Board& board, SearchInfo *info, HashTable *table);
+extern void debugAnalysisTest(const char *epdFile, Board& board, SearchInfo *info, HashTable *table);
 extern void mirrorEvalTest(Board& board);
 
 // movegen.cpp
@@ -326,7 +322,6 @@ extern TimeMS getTimeMS();
 
 // search.cpp
 extern void searchPosition(Board& board, SearchInfo *info, HashTable *table);
-extern int searchPositionThread(SearchThreadData *searchData);
 
 // pvtable.cpp
 extern void clearHashTable(HashTable *table);
@@ -336,13 +331,16 @@ extern void storeHashEntry(Board& board, HashTable *table, int move, int score, 
 extern int probeHashEntry(Board& board, HashTable *table, int *move, int *score, int alpha, int beta, int depth);
 extern int probePVTable(const Board& board, const HashTable *table);
 extern void tempHashTest(char *fen);
+extern int hashFull(const HashTable *table);
 
 // board.cpp
 extern int evalPosition(const Board& board);
 extern void mirrorBoard(Board& board);
 
 // uci.cpp
-extern void uciLoop(Board& board, SearchInfo *info);
+extern void uciLoop();
+extern void sendLine(const char *format, ...);
+extern bool debugMode;
 
 // bench.cpp
 extern void bench();

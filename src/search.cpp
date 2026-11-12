@@ -1,9 +1,11 @@
 #include "defs.h"
-#include <cstring>
+#include <algorithm>
+#include <string>
+#include <thread>
 
-/// Check if time is up / interrupt from gui
+/// Check if time (or the node limit) is up
 static void checkUp(SearchInfo *info) {
-    if (info->timeSet == true && getTimeMS() > info->stopTime) {
+    if ((info->timeSet && getTimeMS() > info->stopTime) || (info->nodeLimit && info->nodes >= info->nodeLimit)) {
         info->stopped = true;
     }
 }
@@ -29,7 +31,7 @@ static void pickNextMove(int moveNum, MoveList *moveList) {
 
 static int isRepetition(const Board& board) {
     // start at current ply minus how long since the fifty move rule was reset, and look at hash keys
-    for (int i = board.historyPly - board.fiftyMove; i < board.historyPly-1; ++i) { // todo: quicker way to do this in yt comments?
+    for (int i = std::max(0, board.historyPly - board.fiftyMove); i < board.historyPly-1; ++i) { // the fen's clock can predate our history // todo: quicker way to do this in yt comments?
         ASSERT(i >= 0 && i < MAX_GAME_MOVES)
         // if current hash key matches, then this must be a repetition!
         if (board.positionKey == board.history[i].positionKey) {
@@ -57,8 +59,8 @@ static void clearForSearch(Board& board, SearchInfo *info, HashTable *table) {
 
     board.ply = 0;
 
-    info->stopped = 0;
     info->nodes = 0;
+    info->selDepth = 0;
     info->failHigh = 0;
     info->failHighFirst = 0;
 }
@@ -71,6 +73,7 @@ static int quiescence(int alpha, int beta, Board& board, SearchInfo *info) {
         checkUp(info);
     }
     info->nodes++;
+    info->selDepth = std::max(info->selDepth, board.ply);
 
     if ((isRepetition(board) || board.fiftyMove >= 100) && board.ply) { // no repetition or 50 move AND we have at least one move
         return 0;
@@ -105,7 +108,7 @@ static int quiescence(int alpha, int beta, Board& board, SearchInfo *info) {
         score = -quiescence(-beta, -alpha, board, info);
         undoMove(board);
 
-        if (info->stopped == true) { // if we have been told to stop, stop, but AFTER TAKEMOVE!!
+        if (info->stopped.load(std::memory_order_relaxed)) { // if we have been told to stop, stop, but AFTER TAKEMOVE!!
             return 0;
         }
 
@@ -138,7 +141,7 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo *i
     }
     info->nodes++;
 
-    if (isRepetition(board) || board.fiftyMove >= 100) {
+    if ((isRepetition(board) || board.fiftyMove >= 100) && board.ply) { // not at the root, or we'd have no move to play
         return 0;
     }
     if (board.ply > MAX_DEPTH - 1) { // at max depth allowed!
@@ -165,7 +168,7 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo *i
         makeNullMove(board);
         score = -alphaBeta(-beta, -beta+1, depth-4, board, info, table, false);
         undoNullMove(board);
-        if (info->stopped == true) {
+        if (info->stopped.load(std::memory_order_relaxed)) {
             return 0;
         }
         if (score >= beta && abs(score) < IS_MATE) {
@@ -213,7 +216,7 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo *i
         }
         undoMove(board);
 
-        if (info->stopped == true) { // if we have been told to stop, stop, but AFTER TAKEMOVE!!
+        if (info->stopped.load(std::memory_order_relaxed)) { // if we have been told to stop, stop, but AFTER TAKEMOVE!!
             return 0;
         }
 
@@ -264,44 +267,61 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo *i
     return alpha;
 }
 
-int searchPositionThread(SearchThreadData *searchData) {
-//    auto *searchData = (SearchThreadData *)data;
-    // Create new empty board, deep copy original position into it, then search
+/// The first legal move, so we always have something to play. NO_MOVE if there are none
+static int firstLegalMove(Board& board) {
+    MoveList moveList[1];
+    generateAllMoves(board, moveList);
+    for (int moveNum = 0; moveNum < moveList->count; ++moveNum) {
+        if (makeMove(board, moveList->moves[moveNum].move)) {
+            undoMove(board);
+            return moveList->moves[moveNum].move;
+        }
+    }
+    return NO_MOVE;
+}
 
-    // C way:
-    auto *board = (Board *)malloc(sizeof(Board));
-    memcpy(board, searchData->originalPosition, sizeof(Board));
-    searchPosition(*board, searchData->info, searchData->ttable);
-    free(board);
-
-    // C++ way:
-//    auto board = new Board{};
-//    std::memcpy(board, searchData->originalPosition, sizeof(Board));
-//    searchPosition(*board, searchData->info, searchData->ttable);
-//    delete board;
-
-    return 0;
+/// Score as uci wants it: 'cp x', or 'mate y' with y in moves (negative if we're getting mated)
+static std::string scoreToUci(const int score) {
+    if (score > IS_MATE) return "mate " + std::to_string((ALPHABETA_BOUND - score + 1) / 2);
+    if (score < -IS_MATE) return "mate " + std::to_string(-(ALPHABETA_BOUND + score) / 2);
+    return "cp " + std::to_string(score);
 }
 
 void searchPosition(Board& board, SearchInfo *info, HashTable *table) {
     clearForSearch(board, info, table);
-    int bestMove = board.pvArray[0];
+    int bestMove = firstLegalMove(board); // in case we're stopped before depth 1 is done
+    int ponderMove = NO_MOVE;
 
     for (int currentDepth = 1; currentDepth <= info->depth; ++currentDepth) {
         int bestScore = alphaBeta(-ALPHABETA_BOUND, ALPHABETA_BOUND, currentDepth, board, info, table, true);
-        if (info->stopped == true) { // Because we may have stopped partway through alphaBeta, we break here so the previous results are returned
+        if (info->stopped) { // Because we may have stopped partway through alphaBeta, we break here so the previous results are returned
             break;
         }
         int pvMoves = getPVLine(currentDepth, board, table);
-        bestMove = board.pvArray[0];
-
-        printf("info score cp %d depth %d nodes %ld time %lld pv",
-               bestScore, currentDepth, info->nodes, getTimeMS() - info->startTime);
-
-        for (int pvNum = 0; pvNum < pvMoves; ++pvNum) {
-            printf(" %s", printMove(board.pvArray[pvNum]));
+        if (pvMoves > 0) {
+            bestMove = board.pvArray[0];
+            ponderMove = pvMoves > 1 ? board.pvArray[1] : NO_MOVE;
         }
-        printf("\n");
+
+        std::string pv;
+        for (int pvNum = 0; pvNum < pvMoves; ++pvNum) {
+            pv += ' ';
+            pv += printMove(board.pvArray[pvNum]);
+        }
+        TimeMS time = getTimeMS() - info->startTime;
+        sendLine("info depth %d seldepth %d score %s nodes %ld nps %lld hashfull %d time %lld pv%s",
+                 currentDepth, info->selDepth, scoreToUci(bestScore).c_str(), info->nodes,
+                 (long long)(info->nodes * 1000 / (time + 1)), hashFull(table), (long long)time, pv.c_str());
     }
-     printf("bestmove %s\n", printMove(bestMove));
+
+    // 'go infinite' & pondering mustn't send bestmove until the gui says so
+    while ((info->infinite || info->ponder) && !info->stopped) {
+        std::this_thread::sleep_for(std::chrono::milliseconds(1));
+    }
+    std::string best = printMove(bestMove); // copy, as printMove reuses its buffer
+    if (ponderMove != NO_MOVE) {
+        sendLine("bestmove %s ponder %s", best.c_str(), printMove(ponderMove));
+    } else {
+        sendLine("bestmove %s", best.c_str());
+    }
 }

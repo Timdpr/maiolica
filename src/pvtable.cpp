@@ -89,22 +89,29 @@ void clearHashTable(HashTable *table) {
  * by dynamically declaring the memory for what is essentially an array
  */
 void initHashTable(HashTable *table, const int MB) {
-    int hashSize = 0x100000 * MB;
-    table->numEntries = hashSize / sizeof(HashEntry); // how many entries can we fit inside?
+    size_t hashSize = 0x100000 * size_t(MB); // size_t, as an int overflows at 2048MB
+    table->numEntries = int(hashSize / sizeof(HashEntry)); // how many entries can we fit inside?
     table->numEntries -= 2; // make sure we don't go over!
 
     if (table->hTable != nullptr) {
         free(table->hTable); // free table pointer's memory
     }
-    // Todo: May have to change this substantially for larger sizes...
-    table->hTable = (HashEntry *) malloc(table->numEntries * sizeof(HashEntry)); // allocate memory with similar logic to how it was freed!
-    if (table->hTable == nullptr) {
-        printf("Hash table allocation failed, trying again with %dMB", MB/2);
+    table->hTable = (HashEntry *) malloc(size_t(table->numEntries) * sizeof(HashEntry)); // allocate memory with similar logic to how it was freed!
+    if (table->hTable == nullptr && MB > 1) {
+        sendLine("info string hash allocation failed, trying %dMB", MB / 2);
         initHashTable(table, MB / 2);
-    } else {
+    } else if (table->hTable != nullptr) {
         clearHashTable(table);
-        printf("HashTable init complete with %d entries\n", table->numEntries);
     }
+}
+
+/// How full the table is, in permill, sampled from the first 1000 entries (for 'info hashfull')
+int hashFull(const HashTable *table) {
+    int used = 0;
+    for (int i = 0; i < 1000 && i < table->numEntries; ++i) {
+        used += table->hTable[i].positionKey != 0 && table->hTable[i].age == table->currentAge;
+    }
+    return used;
 }
 
 /// Get move indexed with this board's position key from principal variation table (if it exists)
