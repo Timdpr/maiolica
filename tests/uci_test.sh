@@ -82,6 +82,9 @@ check "debug on/off keeps the loop going" $'debug on\ndebug off\nisready\nquit' 
 check "eof without quit exits" $'uci' 'uciok'
 check "go perft" $'go perft 3\nquit' 'Nodes searched: 8902'
 check "bench" $'bench\nquit' 'nodes [0-9]+ nps'
+epd=$(mktemp) && echo "8/8/4k3/8/8/4K3/8/8 w - - 0 1" > "$epd"
+check "epd doesn't inherit go infinite" $'go infinite\nstop\nepd '"$epd"$'\nisready\nquit' 'readyok'
+rm -f "$epd"
 
 echo "$failures failure(s)"
 exit $((failures > 0))

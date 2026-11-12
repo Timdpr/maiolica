@@ -58,6 +58,8 @@ void debugAnalysisTest(const char *epdFile, Board& board, SearchInfo *info, Hash
 
     info->depth = MAX_DEPTH - 2;
     info->timeSet = true;
+    info->infinite = false; // not whatever the last 'go' asked for
+    info->nodeLimit = 0;
     int time = 1140000;
 
     if (file == nullptr) {
