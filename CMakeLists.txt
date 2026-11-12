@@ -23,7 +23,7 @@ add_library(maiolica_core OBJECT
         src/board.cpp src/bitboards.cpp src/hashkeys.cpp
         src/attack.cpp src/movegen.cpp src/validate.cpp src/makemove.cpp src/misc.cpp
         src/search.cpp src/pvtable.cpp src/evaluate.cpp
-        src/perft.cpp src/bench.cpp
+        src/perft.cpp src/bench.cpp src/console.cpp
         )
 target_include_directories(maiolica_core PUBLIC src)
 target_compile_features(maiolica_core PUBLIC cxx_std_20)
@@ -73,6 +73,12 @@ set_tests_properties(fen PROPERTIES LABELS "smoke;quick")
 
 add_test(NAME uci COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/uci_test.sh $<TARGET_FILE:maiolica>)
 set_tests_properties(uci PROPERTIES LABELS quick)
+
+# console & replay: san moves (castles, promotions, en passant, disambiguation) & a quick game
+add_test(NAME replay COMMAND maiolica replay ${CMAKE_CURRENT_SOURCE_DIR}/tests/replay_test.pgn 0)
+set_tests_properties(replay PROPERTIES LABELS quick PASS_REGULAR_EXPRESSION "move 4: Kd7" FAIL_REGULAR_EXPRESSION "couldn't read")
+add_test(NAME console COMMAND sh -c "printf 'time 0.2\\ne4\\nquit\\n' | '$<TARGET_FILE:maiolica>' console")
+set_tests_properties(console PROPERTIES LABELS quick PASS_REGULAR_EXPRESSION "Black plays [a-h][1-8][a-h][1-8]")
 
 file(STRINGS tests/bench_signature.txt MAIOLICA_BENCH LIMIT_COUNT 1)
 add_test(NAME bench_signature COMMAND maiolica bench)

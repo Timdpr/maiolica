@@ -10,6 +10,7 @@
 #include <thread>
 
 bool debugMode = false; // 'debug on' sends some extra 'info string's
+void (*lineHandler)(const char *line) = nullptr; // the console sets this, to show the search its own way
 
 static Board board{}; // the position the gui has set up
 static SearchInfo info{};
@@ -26,6 +27,10 @@ void sendLine(const char *format, ...) {
     va_start(args, format);
     std::vsnprintf(line, sizeof(line), format, args);
     va_end(args);
+    if (lineHandler) {
+        lineHandler(line);
+        return;
+    }
     std::lock_guard lock(mutex);
     std::fputs(line, stdout);
     std::fputc('\n', stdout);

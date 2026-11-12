@@ -341,6 +341,11 @@ extern void mirrorBoard(Board& board);
 extern void uciLoop();
 extern void sendLine(const char *format, ...);
 extern bool debugMode;
+extern void (*lineHandler)(const char *line);
+
+// console.cpp
+extern void consoleLoop();
+extern void replayPgn(const char *file, int delay);
 
 // bench.cpp
 extern void bench();

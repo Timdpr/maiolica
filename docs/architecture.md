@@ -7,7 +7,7 @@ C++20 UCI engine. Single-threaded search, 10x12 mailbox board, pawn-only bitboar
 | File | What lives there |
 |---|---|
 | `src/defs.h` | Everything shared: constants, enums, structs (`Board`, `Move`, `MoveList`, `HashEntry`, `HashTable`, `Undo`, `SearchInfo`), move/square macros, globals, all function decls. (Its "// board.cpp" comment above `evalPosition` is wrong: that lives in evaluate.cpp.) |
-| `src/main.cpp` | `initAll`, 64MB TT, `maiolica bench` CLI arg; otherwise prints a banner and runs `uciLoop` |
+| `src/main.cpp` | `initAll`, 64MB TT, then `bench`, `console` or `replay` from the command line; otherwise prints a banner and runs `uciLoop` |
 | `src/init.cpp` | Builds runtime tables: 120<->64 maps, set/clear masks, Zobrist keys, `filesBoard`/`ranksBoard`, eval masks, MVV-LVA (`initAll`) |
 | `src/data.cpp` | Constant per-piece tables (`pieceValues`, `pieceColours`, `bigPieces`, `pieceKnight`…), `pieceChars`, `mirror64` |
 | `src/board.cpp` | `resetBoard`, `parseFen`, `updateMaterialLists`, `checkBoard` (debug cross-check), `printBoard`, `mirrorBoard` |
@@ -24,6 +24,7 @@ C++20 UCI engine. Single-threaded search, 10x12 mailbox board, pawn-only bitboar
 | `src/perft.cpp` | `perft` (accumulates global `leafNodes`), `perftTest` (divide output) |
 | `src/validate.cpp` | `squareOnBoard`, `pieceValid`… used by `ASSERT`; `debugAnalysisTest` (lct2.epd), `mirrorEvalTest` (mirror.epd) |
 | `src/misc.cpp` | `getTimeMS` (steady_clock ms) |
+| `src/console.cpp` | `./maiolica console` & `replay`: the terminal board (ansi/unicode, or plain), a game against the engine, san move input, pgn replay, game result detection. Self-contained; it borrows the search's output through `lineHandler` and runs nothing during uci |
 | `src/bench.cpp` | `bench()`: 9 fixed FENs at fixed depths, fresh `Board`/`SearchInfo`, 16MB TT cleared per position. Total nodes is the **bench signature** |
 | `tests/perft_tests.cpp` | Perft regression, tiers `smoke` (8 cases, debug/sanitiser-sized), `quick` (19, default, ~1s), `full` (6, ~20s); ctest `perft_<tier>` |
 | `tests/bench_signature.txt` | Expected node total (currently `4527030`); ctest `bench_signature` greps `Nodes searched  : N` from `maiolica bench` |
@@ -144,7 +145,7 @@ Protocol details are in [uci.md](uci.md).
 - The input thread owns one `std::thread searchThread`. `stopSearch()` sets `stopped`, clears `ponder` and joins; it runs before every `go`, `setoption`, `ucinewgame`, dev command and on exit, and is a no-op when idle. `position` doesn't stop a search, since the search works on its own copy.
 - `go` sets every `SearchInfo` field on the input thread (including `stopped = false`) *before* launching, then hands the thread a heap copy of the board (`std::make_unique<Board>`), so the gui can carry on.
 - Shared between the threads: `stopped`, `ponder`, `timeSet`, `stopTime` (atomics; `ponderhit` writes `stopTime` then `timeSet`). Everything else is written before launch or by the search thread only.
-- All protocol output goes through `sendLine` (printf-style, one mutex-guarded write + flush per line), so `readyok` can't land mid `info` line. `printMove` uses `thread_local` buffers.
+- All protocol output goes through `sendLine` (printf-style, one mutex-guarded write + flush per line), so `readyok` can't land mid `info` line. If `lineHandler` is set (only by the console), lines go to it instead, so the console can show the search its own way. `printMove` uses `thread_local` buffers.
 - Global TT `hashTable`, reallocated by `setoption name Hash` after stopping the search.
 
 ## Reproducibility
