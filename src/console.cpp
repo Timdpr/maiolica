@@ -55,7 +55,8 @@ static void onSearchLine(const char *line) {
 
     std::istringstream in(line);
     std::string token, score, pv;
-    long depth = 0, nodes = 0, time = 0;
+    long depth = 0, time = 0;
+    long long nodes = 0;
     while (in >> token) {
         if (token == "depth") in >> depth;
         else if (token == "nodes") in >> nodes;

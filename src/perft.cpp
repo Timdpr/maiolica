@@ -1,7 +1,7 @@
 #include "defs.h"
 #include <cstdio>
 
-long leafNodes;
+long long leafNodes;
 
 void perft(int depth, Board& board) {
     ASSERT(checkBoard(board))
@@ -40,13 +40,13 @@ void perftTest(int depth, Board& board) {
             continue;
         }
 
-        long cumNodes = leafNodes;
+        long long cumNodes = leafNodes;
         perft(depth - 1, board);
 
         undoMove(board);
-        long oldNodes = leafNodes - cumNodes;
-        printf("%s: %ld\n", printMove(move), oldNodes);
+        long long oldNodes = leafNodes - cumNodes;
+        printf("%s: %lld\n", printMove(move), oldNodes);
     }
 
-    printf("\nNodes searched: %ld (%lld ms)\n", leafNodes, (long long)(getTimeMS() - start));
+    printf("\nNodes searched: %lld (%lld ms)\n", leafNodes, (long long)(getTimeMS() - start));
 }

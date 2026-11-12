@@ -309,7 +309,7 @@ void searchPosition(Board& board, SearchInfo& info, HashTable& table) {
             pv += printMove(board.pvArray[pvNum]);
         }
         TimeMS time = getTimeMS() - info.startTime;
-        sendLine("info depth %d seldepth %d score %s nodes %ld nps %lld hashfull %d time %lld pv%s",
+        sendLine("info depth %d seldepth %d score %s nodes %lld nps %lld hashfull %d time %lld pv%s",
                  currentDepth, info.selDepth, scoreToUci(bestScore).c_str(), info.nodes,
                  (long long)(info.nodes * 1000 / (time + 1)), hashFull(table), (long long)time, pv.c_str());
     }

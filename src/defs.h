@@ -150,10 +150,10 @@ struct SearchInfo {
     std::atomic<TimeMS> stopTime{0};
     std::atomic<bool> timeSet{false}; // only stop on time if this is set
     int depth;
-    long nodeLimit; // 'go nodes', 0 if none
+    long long nodeLimit; // 'go nodes', 0 if none
     bool infinite; // 'go infinite': don't send bestmove until told to stop
 
-    long nodes; // count of all positions the engine visits in the search tree
+    long long nodes; // count of all positions the engine visits in the search tree
     int selDepth; // deepest ply reached
 
     std::atomic<bool> stopped{false};
@@ -309,7 +309,7 @@ void makeNullMove(Board& board);
 void undoNullMove(Board& board);
 
 // perft.cpp
-extern long leafNodes;
+extern long long leafNodes;
 void perft(int depth, Board& board);
 void perftTest(int depth, Board& board);
 
