@@ -332,6 +332,7 @@ void replayPgn(const char *file, const int delay) {
             continue;
         }
         if (c == '[') { // a tag pair: [Name "value"]
+            if (moves) newGame(); // tags after moves: the last game had no result on the end
             size_t end = text.find(']', i);
             std::string tag = text.substr(i + 1, end - i - 1);
             i = end == std::string::npos ? text.size() : end + 1;
