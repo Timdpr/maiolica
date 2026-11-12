@@ -56,6 +56,8 @@ static const char *badFens[] = {
     "kk6/8/8/8/8/8/8/4K3 w - - 0 1",                                      // two black kings
     "4k3/8/8/8/8/8/NNNNNNNN/NNN1K3 w - - 0 1",                            // 11 white knights
     "4k3/8/8/8/8/8/QQQQQQQQ/QQQQQQQK w - - 0 1",                          // 15 white queens
+    "4k3/P7/8/8/8/8/QQQQQQQQ/QQ2K3 w - - 0 1",                            // 10 queens, and a pawn that could make 11
+    "4k3/pppppppp/8/8/8/8/8/nnn1K3 b - - 0 1",                            // same for black: 3 knights + 8 pawns
     "P3k3/8/8/8/8/8/8/4K3 w - - 0 1",                                     // pawn on rank 8
     "4k3/8/8/8/8/8/8/p3K3 w - - 0 1",                                     // pawn on rank 1
     "",                                                                   // empty string
