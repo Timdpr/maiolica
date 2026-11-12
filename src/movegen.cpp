@@ -41,44 +41,44 @@ const int pieceDirection [13][8] = {
 const int pieceDirectionNumbers[13] = { 0, 0, 8, 4, 4, 8, 8, 0, 8, 4, 4, 8, 8 };
 
 /// Adds a 'quiet' (non-capture) Move to the MoveList using the given 'move' integer
-static void addQuietMove(const Board& board, int move, MoveList *moveList) {
+static void addQuietMove(const Board& board, int move, MoveList& moveList) {
     ASSERT(squareOnBoard(GET_FROM(move)))
     ASSERT(squareOnBoard(GET_TO(move)))
     // MoveList's 'count' variable is essentially 'current index + 1'
     // So at the 'count' index in MoveList's Move array, set the Move's 'move' int to the given move
-    moveList->moves[moveList->count].move = move;
+    moveList.moves[moveList.count].move = move;
     // Then set that Move's score. If move is in killer moves list, score accordingly, else score by searchHistory array!
     if (board.searchKillers[0][board.ply] == move) {
-        moveList->moves[moveList->count].score = 900000;
+        moveList.moves[moveList.count].score = 900000;
     } else if (board.searchKillers[1][board.ply] == move) {
-        moveList->moves[moveList->count].score = 800000;
+        moveList.moves[moveList.count].score = 800000;
     } else {
-        moveList->moves[moveList->count].score = board.searchHistory[board.pieces[GET_FROM(move)]][GET_TO(move)];
+        moveList.moves[moveList.count].score = board.searchHistory[board.pieces[GET_FROM(move)]][GET_TO(move)];
     }
-    moveList->count++; // Then update the counter
+    moveList.count++; // Then update the counter
 }
 
 /// Adds a capturing Move to the MoveList using the given 'move' integer
-static void addCaptureMove(const Board& board, int move, MoveList *moveList) {
+static void addCaptureMove(const Board& board, int move, MoveList& moveList) {
     ASSERT(squareOnBoard(GET_FROM(move)))
     ASSERT(squareOnBoard(GET_TO(move)))
     ASSERT(pieceValid(GET_CAPTURED(move)))
-    moveList->moves[moveList->count].move = move;
-    moveList->moves[moveList->count].score = mVVLVAScores[GET_CAPTURED(move)][board.pieces[GET_FROM(move)]] + 1000000; // +1m makes sure these are searched first
-    moveList->count++;
+    moveList.moves[moveList.count].move = move;
+    moveList.moves[moveList.count].score = mVVLVAScores[GET_CAPTURED(move)][board.pieces[GET_FROM(move)]] + 1000000; // +1m makes sure these are searched first
+    moveList.count++;
 }
 
 /// Adds an en passant Move to the MoveList using the given 'move' integer
-static void addEnPassantMove(const Board& board, int move, MoveList *moveList) {
+static void addEnPassantMove(const Board& board, int move, MoveList& moveList) {
     ASSERT(squareOnBoard(GET_FROM(move)))
     ASSERT(squareOnBoard(GET_TO(move)))
-    moveList->moves[moveList->count].move = move;
-    moveList->moves[moveList->count].score = 105 + 1000000; // effectively pawn takes pawn. +1m makes sure these are searched first
-    moveList->count++;
+    moveList.moves[moveList.count].move = move;
+    moveList.moves[moveList.count].score = 105 + 1000000; // effectively pawn takes pawn. +1m makes sure these are searched first
+    moveList.count++;
 }
 
 /// Add a capturing move by a white pawn to the Move list. Set 'captured' to EMPTY if it is not a capturing move
-static void addWhitePawnCaptureMove(const Board& board, const int from, const int to, const int captured, MoveList *list) {
+static void addWhitePawnCaptureMove(const Board& board, const int from, const int to, const int captured, MoveList& list) {
     ASSERT(pieceValidEmpty(captured))
     ASSERT(squareOnBoard(from))
     ASSERT(squareOnBoard(to))
@@ -94,7 +94,7 @@ static void addWhitePawnCaptureMove(const Board& board, const int from, const in
 }
 
 /// Add a non-capturing move by a white pawn to the Move list
-static void addWhitePawnMove(const Board& board, const int from, const int to, MoveList *list) {
+static void addWhitePawnMove(const Board& board, const int from, const int to, MoveList& list) {
     ASSERT(squareOnBoard(from))
     ASSERT(squareOnBoard(to))
     // if pawn starts on rank 7, then it will finish on rank 8, where it has to promote
@@ -109,7 +109,7 @@ static void addWhitePawnMove(const Board& board, const int from, const int to, M
 }
 
 /// Add a move by a black pawn to the Move list. Set 'captured' to EMPTY if it is not a capturing move
-static void addBlackPawnCaptureMove(const Board& board, const int from, const int to, const int captured, MoveList *list) {
+static void addBlackPawnCaptureMove(const Board& board, const int from, const int to, const int captured, MoveList& list) {
     ASSERT(pieceValidEmpty(captured))
     ASSERT(squareOnBoard(from))
     ASSERT(squareOnBoard(to))
@@ -125,7 +125,7 @@ static void addBlackPawnCaptureMove(const Board& board, const int from, const in
 }
 
 /// Add a move by a black pawn to the Move list. Set 'captured' to EMPTY if it is not a capturing move
-static void addBlackPawnMove(const Board& board, const int from, const int to, MoveList *list) {
+static void addBlackPawnMove(const Board& board, const int from, const int to, MoveList& list) {
     ASSERT(squareOnBoard(from))
     ASSERT(squareOnBoard(to))
     // if pawn starts on rank 2, then it will finish on rank 1, where it has to promote
@@ -139,10 +139,10 @@ static void addBlackPawnMove(const Board& board, const int from, const int to, M
     }
 }
 
-void generateAllMoves(const Board& board, MoveList *moveList) {
+void generateAllMoves(const Board& board, MoveList& moveList) {
     ASSERT(checkBoard(board))
 
-    moveList->count = 0;
+    moveList.count = 0;
     int side = board.side;
 
     // PAWNS and CASTLING:
@@ -304,10 +304,10 @@ void generateAllMoves(const Board& board, MoveList *moveList) {
     }
 }
 
-void generateAllCaptureMoves(const Board& board, MoveList *moveList) {
+void generateAllCaptureMoves(const Board& board, MoveList& moveList) {
     ASSERT(checkBoard(board))
 
-    moveList->count = 0;
+    moveList.count = 0;
     int side = board.side;
 
     // PAWNS and CASTLING:
@@ -428,14 +428,14 @@ void initMVVLVA() {
 
 /// Check that a move is legal given the board state
 int moveExists(Board& board, const int move) {
-    MoveList moveList[1];
+    MoveList moveList;
     generateAllMoves(board, moveList);
-    for (int moveNum = 0; moveNum < moveList->count; ++moveNum) {
-        if (!makeMove(board, moveList->moves[moveNum].move)) {
+    for (int moveNum = 0; moveNum < moveList.count; ++moveNum) {
+        if (!makeMove(board, moveList.moves[moveNum].move)) {
             continue;
         }
         undoMove(board);
-        if (moveList->moves[moveNum].move == move) {
+        if (moveList.moves[moveNum].move == move) {
             return true;
         }
     }

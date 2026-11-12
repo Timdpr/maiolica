@@ -11,22 +11,22 @@ static void checkUp(SearchInfo *info) {
 }
 
 /// Swap the move at 'moveNum' index with the 'best' move in the moveList
-static void pickNextMove(int moveNum, MoveList *moveList) {
+static void pickNextMove(int moveNum, MoveList& moveList) {
     int bestScore = 0;
     int bestMoveNum = moveNum;
-    for (int i = moveNum; i < moveList->count; ++i) { // find move with highest score
-        if (moveList->moves[i].score > bestScore) {
-            bestScore = moveList->moves[i].score;
+    for (int i = moveNum; i < moveList.count; ++i) { // find move with highest score
+        if (moveList.moves[i].score > bestScore) {
+            bestScore = moveList.moves[i].score;
             bestMoveNum = i;
         }
     }
-    ASSERT(moveNum >= 0 && moveNum < moveList->count)
-    ASSERT(bestMoveNum >= 0 && bestMoveNum < moveList->count)
+    ASSERT(moveNum >= 0 && moveNum < moveList.count)
+    ASSERT(bestMoveNum >= 0 && bestMoveNum < moveList.count)
     ASSERT(bestMoveNum >= moveNum)
     // and swap it with move at 'moveNum'
-    Move tempMove = moveList->moves[moveNum];
-    moveList->moves[moveNum] = moveList->moves[bestMoveNum];
-    moveList->moves[bestMoveNum] = tempMove;
+    Move tempMove = moveList.moves[moveNum];
+    moveList.moves[moveNum] = moveList.moves[bestMoveNum];
+    moveList.moves[bestMoveNum] = tempMove;
 }
 
 static int isRepetition(const Board& board) {
@@ -92,15 +92,15 @@ static int quiescence(int alpha, int beta, Board& board, SearchInfo *info) {
         alpha = score;
     }
 
-    MoveList moveList[1];
+    MoveList moveList;
     generateAllCaptureMoves(board, moveList); // note - only capture moves!
     int legal = 0;
 
-    for (int moveNum = 0; moveNum < moveList->count; ++moveNum) {
+    for (int moveNum = 0; moveNum < moveList.count; ++moveNum) {
         // order the moves
         pickNextMove(moveNum, moveList);
         // skip if it is not legal
-        if (!makeMove(board, moveList->moves[moveNum].move)) {
+        if (!makeMove(board, moveList.moves[moveNum].move)) {
             continue;
         }
         legal++;
@@ -121,7 +121,7 @@ static int quiescence(int alpha, int beta, Board& board, SearchInfo *info) {
                 return beta;
             }
             alpha = score;       // otherwise, update score and bestMove
-//            bestMove = moveList->moves[moveNum].move;
+//            bestMove = moveList.moves[moveNum].move;
         }
     }
     // todo: should we store the best move in the hash table (if alpha != the   alpha given to the function) here?
@@ -177,7 +177,7 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo *i
         }
     }
 
-    MoveList moveList[1];
+    MoveList moveList;
     generateAllMoves(board, moveList);
     int legal = 0;
     int oldAlpha = alpha;
@@ -185,9 +185,9 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo *i
     int bestScore = -ALPHABETA_BOUND;
 
     if (pvMove != NO_MOVE) { // if we have a principal variation move
-        for (int moveNum = 0; moveNum < moveList->count; ++moveNum) {
-            if (moveList->moves[moveNum].move == pvMove) { // if pv move is in our move list
-                moveList->moves[moveNum].score = 2000000; // give it a big score in our list so it is searched first!
+        for (int moveNum = 0; moveNum < moveList.count; ++moveNum) {
+            if (moveList.moves[moveNum].move == pvMove) { // if pv move is in our move list
+                moveList.moves[moveNum].score = 2000000; // give it a big score in our list so it is searched first!
             }
         }
     }
@@ -196,11 +196,11 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo *i
     int foundPV = false;
 
     // for each move generated
-    for (int moveNum = 0; moveNum < moveList->count; ++moveNum) {
+    for (int moveNum = 0; moveNum < moveList.count; ++moveNum) {
         // order the moves
         pickNextMove(moveNum, moveList);
         // skip if it is not legal
-        if (!makeMove(board, moveList->moves[moveNum].move)) {
+        if (!makeMove(board, moveList.moves[moveNum].move)) {
             continue;
         }
         legal++;
@@ -222,7 +222,7 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo *i
 
          if (score > bestScore) {
             bestScore = score;
-            bestMove = moveList->moves[moveNum].move;
+            bestMove = moveList.moves[moveNum].move;
             if (score > alpha) {     // if score is greater than alpha...
                 if (score >= beta) { // if we have beta cutoff, return beta...
                     if (legal == 1) {
@@ -230,20 +230,20 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo *i
                     }
                     info->failHigh++;
                     // A killer move is a move that has caused a beta cutoff but isn't a capture move:
-                    if (!(moveList->moves[moveNum].move & MFLAG_CAPTURING)) {
+                    if (!(moveList.moves[moveNum].move & MFLAG_CAPTURING)) {
                         // if criteria for killer move is met, shuffle killer moves down by 1...
                         board.searchKillers[1][board.ply] = board.searchKillers[0][board.ply];
                         // ...and add current move
-                        board.searchKillers[0][board.ply] = moveList->moves[moveNum].move;
+                        board.searchKillers[0][board.ply] = moveList.moves[moveNum].move;
                     }
                     storeHashEntry(board, table,  bestMove, beta, HF_BETA, depth);
                     return beta;
                 }
                 foundPV = true;
                 alpha = score;       // otherwise, update score and bestMove
-                bestMove = moveList->moves[moveNum].move;
+                bestMove = moveList.moves[moveNum].move;
                 // Update search history
-                if (!(moveList->moves[moveNum].move & MFLAG_CAPTURING)) {
+                if (!(moveList.moves[moveNum].move & MFLAG_CAPTURING)) {
                     // increment by depth to prioritise moves nearer the root of the tree
                     board.searchHistory[board.pieces[GET_FROM(bestMove)]][GET_TO(bestMove)] += depth;
                 }
@@ -269,12 +269,12 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo *i
 
 /// The first legal move, so we always have something to play. NO_MOVE if there are none
 static int firstLegalMove(Board& board) {
-    MoveList moveList[1];
+    MoveList moveList;
     generateAllMoves(board, moveList);
-    for (int moveNum = 0; moveNum < moveList->count; ++moveNum) {
-        if (makeMove(board, moveList->moves[moveNum].move)) {
+    for (int moveNum = 0; moveNum < moveList.count; ++moveNum) {
+        if (makeMove(board, moveList.moves[moveNum].move)) {
             undoMove(board);
-            return moveList->moves[moveNum].move;
+            return moveList.moves[moveNum].move;
         }
     }
     return NO_MOVE;

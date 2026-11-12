@@ -127,11 +127,11 @@ static int parseAnyMove(const std::string& text, Board& board) {
     for (char c : text) {
         if (!std::strchr("+#!?", c)) san += c;
     }
-    MoveList moveList[1];
+    MoveList moveList;
     generateAllMoves(board, moveList);
     int found = NO_MOVE;
-    for (int moveNum = 0; moveNum < moveList->count; ++moveNum) {
-        int move = moveList->moves[moveNum].move;
+    for (int moveNum = 0; moveNum < moveList.count; ++moveNum) {
+        int move = moveList.moves[moveNum].move;
         if (!sanMatches(san, move, board) || !makeMove(board, move)) continue;
         undoMove(board);
         if (found != NO_MOVE) return NO_MOVE; // ambiguous
@@ -149,11 +149,11 @@ static bool playMove(Board& board, const int move) {
 
 /// The result if the game's over (mate, stalemate, fifty moves, threefold, bare minor pieces), otherwise nullptr
 static const char *gameResult(Board& board) {
-    MoveList moveList[1];
+    MoveList moveList;
     generateAllMoves(board, moveList);
     bool canMove = false;
-    for (int moveNum = 0; moveNum < moveList->count && !canMove; ++moveNum) {
-        if (makeMove(board, moveList->moves[moveNum].move)) {
+    for (int moveNum = 0; moveNum < moveList.count && !canMove; ++moveNum) {
+        if (makeMove(board, moveList.moves[moveNum].move)) {
             undoMove(board);
             canMove = true;
         }

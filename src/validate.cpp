@@ -3,15 +3,15 @@
 
 /// Not using bools here, as compiler adds 'not 0 or 1' checking, and ints should be determined to be 8 bit here anyway
 
-int moveListValid(const MoveList *list, const Board& board) {
-    if (list->count < 0 || list->count >= MAX_POSITION_MOVES) {
+int moveListValid(const MoveList& list, const Board& board) {
+    if (list.count < 0 || list.count >= MAX_POSITION_MOVES) {
         return false;
     }
     int from = 0;
     int to = 0;
-    for (int moveNum = 0; moveNum < list->count; ++moveNum) {
-        to = GET_TO(list->moves[moveNum].move);
-        from = GET_FROM(list->moves[moveNum].move);
+    for (int moveNum = 0; moveNum < list.count; ++moveNum) {
+        to = GET_TO(list.moves[moveNum].move);
+        from = GET_FROM(list.moves[moveNum].move);
         if (!squareOnBoard(to) || !squareOnBoard(from)) {
             return false;
         }

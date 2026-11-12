@@ -281,11 +281,11 @@ int isSquareAttacked(int square, int attackingSide, const Board& board);
 // io.cpp
 char *printSquare(int square);
 char *printMove(int move);
-void printMoveList(const MoveList *moveList);
+void printMoveList(const MoveList& moveList);
 [[nodiscard]] int parseMove(const char *ptrChar, Board& board);
 
 // validate.cpp
-int moveListValid(const MoveList *list, const Board& board);
+int moveListValid(const MoveList& list, const Board& board);
 int squareIs120(int sq);
 int squareOnBoard(int sq);
 int sideValid(int side);
@@ -297,8 +297,8 @@ void debugAnalysisTest(const char *epdFile, Board& board, SearchInfo *info, Hash
 void mirrorEvalTest(Board& board);
 
 // movegen.cpp
-void generateAllMoves(const Board& board, MoveList *list);
-void generateAllCaptureMoves(const Board& board, MoveList *moveList);
+void generateAllMoves(const Board& board, MoveList& list);
+void generateAllCaptureMoves(const Board& board, MoveList& moveList);
 [[nodiscard]] int moveExists(Board& board, int move);
 void initMVVLVA();
 

@@ -11,11 +11,11 @@ void perft(int depth, Board& board) {
         return;
     }
 
-    MoveList moveList[1];
+    MoveList moveList;
     generateAllMoves(board, moveList);
 
-    for (int moveNum = 0; moveNum < moveList->count; ++moveNum) {
-        if (!makeMove(board, moveList->moves[moveNum].move)) {
+    for (int moveNum = 0; moveNum < moveList.count; ++moveNum) {
+        if (!makeMove(board, moveList.moves[moveNum].move)) {
             continue;
         }
         perft(depth-1, board);
@@ -30,11 +30,11 @@ void perftTest(int depth, Board& board) {
     leafNodes = 0;
     TimeMS start = getTimeMS();
 
-    MoveList moveList[1];
+    MoveList moveList;
     generateAllMoves(board, moveList);
 
-    for (int moveNum = 0; moveNum < moveList->count; ++moveNum) {
-        int move = moveList->moves[moveNum].move;
+    for (int moveNum = 0; moveNum < moveList.count; ++moveNum) {
+        int move = moveList.moves[moveNum].move;
 
         if (!makeMove(board, move)) {
             continue;
