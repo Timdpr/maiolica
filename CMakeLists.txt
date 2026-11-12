@@ -79,6 +79,8 @@ add_test(NAME replay COMMAND maiolica replay ${CMAKE_CURRENT_SOURCE_DIR}/tests/r
 set_tests_properties(replay PROPERTIES LABELS quick PASS_REGULAR_EXPRESSION "move 4: Kd7" FAIL_REGULAR_EXPRESSION "couldn't read")
 add_test(NAME console COMMAND sh -c "printf 'time 0.2\\ne4\\nquit\\n' | '$<TARGET_FILE:maiolica>' console")
 set_tests_properties(console PROPERTIES LABELS quick PASS_REGULAR_EXPRESSION "Black plays [a-h][1-8][a-h][1-8]")
+add_test(NAME console_typo COMMAND sh -c "printf 'force\\nnf3\\nquit\\n' | '$<TARGET_FILE:maiolica>' console")
+set_tests_properties(console_typo PROPERTIES LABELS quick PASS_REGULAR_EXPRESSION "not a legal move or command: nf3")
 
 file(STRINGS tests/bench_signature.txt MAIOLICA_BENCH LIMIT_COUNT 1)
 add_test(NAME bench_signature COMMAND maiolica bench)

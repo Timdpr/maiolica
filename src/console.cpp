@@ -99,10 +99,15 @@ static bool sanMatches(std::string san, const int move, const Board& board) {
     if (san.size() < 2 || san[san.size() - 2] != 'a' + filesBoard[to] || san.back() != '1' + ranksBoard[to]) return false;
     san.resize(san.size() - 2);
     // then the piece letter (none for pawns)
-    char type = !san.empty() && std::isupper(san[0]) ? san[0] : 'P';
+    char type = 'P';
+    if (!san.empty() && std::isupper(san[0])) {
+        type = san[0];
+        san.erase(0, 1);
+    }
     if (std::toupper(pieceChars[piece]) != type) return false;
-    // anything left is a capture 'x' or the from file/rank
+    // anything left is a capture 'x' (or the '-' of e2-e4) or the from file/rank
     for (char c : san) {
+        if (!std::strchr("abcdefgh12345678x-", c)) return false; // so a mistyped 'nf3' isn't read as a pawn to f3
         if (c >= 'a' && c <= 'h' && c - 'a' != filesBoard[from]) return false;
         if (c >= '1' && c <= '8' && c - '1' != ranksBoard[from]) return false;
     }
