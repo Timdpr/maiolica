@@ -74,19 +74,18 @@ set_tests_properties(fen PROPERTIES LABELS "smoke;quick")
 add_test(NAME uci COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/uci_test.sh $<TARGET_FILE:maiolica>)
 set_tests_properties(uci PROPERTIES LABELS quick)
 
-# console & replay: san moves (castles, promotions, en passant, disambiguation) & a quick game
-add_test(NAME replay COMMAND maiolica replay ${CMAKE_CURRENT_SOURCE_DIR}/tests/replay_test.pgn 0)
-set_tests_properties(replay PROPERTIES LABELS quick PASS_REGULAR_EXPRESSION "move 4: Kd7" FAIL_REGULAR_EXPRESSION "couldn't read")
-add_test(NAME console COMMAND sh -c "printf 'time 0.2\\ne4\\nquit\\n' | '$<TARGET_FILE:maiolica>' console")
-set_tests_properties(console PROPERTIES LABELS quick PASS_REGULAR_EXPRESSION "Black plays [a-h][1-8][a-h][1-8]")
-add_test(NAME console_typo COMMAND sh -c "printf 'force\\nnf3\\nquit\\n' | '$<TARGET_FILE:maiolica>' console")
-set_tests_properties(console_typo PROPERTIES LABELS quick PASS_REGULAR_EXPRESSION "not a legal move or command: nf3")
+# console & replay: san moves (castles, promotions, en passant, disambiguation) & a quick game.
+# These grep for the line they want under pipefail, so a crash after printing it still fails the test
+add_test(NAME replay COMMAND bash -o pipefail -c "'$<TARGET_FILE:maiolica>' replay '${CMAKE_CURRENT_SOURCE_DIR}/tests/replay_test.pgn' 0 | grep -E \"move 4: Kd7|couldn't read\"")
+set_tests_properties(replay PROPERTIES LABELS quick FAIL_REGULAR_EXPRESSION "couldn't read")
+add_test(NAME console COMMAND bash -o pipefail -c "printf 'time 0.2\\ne4\\nquit\\n' | '$<TARGET_FILE:maiolica>' console | grep -E 'Black plays [a-h][1-8][a-h][1-8]'")
+add_test(NAME console_typo COMMAND bash -o pipefail -c "printf 'force\\nnf3\\nquit\\n' | '$<TARGET_FILE:maiolica>' console | grep 'not a legal move or command: nf3'")
+set_tests_properties(console console_typo PROPERTIES LABELS quick)
 
 file(STRINGS tests/bench_signature.txt MAIOLICA_BENCH LIMIT_COUNT 1)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS tests/bench_signature.txt) # so an edit is picked up by the next build
-add_test(NAME bench_signature COMMAND maiolica bench)
-set_tests_properties(bench_signature PROPERTIES LABELS quick # too slow for debug builds
-        PASS_REGULAR_EXPRESSION "Nodes searched  : ${MAIOLICA_BENCH}\n")
+add_test(NAME bench_signature COMMAND bash -o pipefail -c "'$<TARGET_FILE:maiolica>' bench | grep -x 'Nodes searched  : ${MAIOLICA_BENCH}'")
+set_tests_properties(bench_signature PROPERTIES LABELS quick) # too slow for debug builds
 
 # -- Optional microbenchmarks, for iterating on hot functions (bench/perft still decide) --
 if(MAIOLICA_MICROBENCH)
