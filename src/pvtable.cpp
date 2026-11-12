@@ -121,7 +121,7 @@ int probeHashEntry(Board& board, HashTable *table, int *move, int *score, int al
             }
         }
     }
-    return NO_MOVE;
+    return false;
 }
 
 /// Store a move in the table

@@ -59,10 +59,10 @@ void printMoveList(const MoveList *moveList) {
 /// Takes algebraic notation for move, and returns move int
 int parseMove(const char *ptrChar, Board& board) {
     // Make sure that rank/file is within correct bounds
-    if (ptrChar[1] > '8' || ptrChar[1] < '1') return false;
-    if (ptrChar[3] > '8' || ptrChar[3] < '1') return false;
-    if (ptrChar[0] > 'h' || ptrChar[0] < 'a') return false;
-    if (ptrChar[2] > 'h' || ptrChar[2] < 'a') return false;
+    if (ptrChar[1] > '8' || ptrChar[1] < '1') return NO_MOVE;
+    if (ptrChar[3] > '8' || ptrChar[3] < '1') return NO_MOVE;
+    if (ptrChar[0] > 'h' || ptrChar[0] < 'a') return NO_MOVE;
+    if (ptrChar[2] > 'h' || ptrChar[2] < 'a') return NO_MOVE;
     // Get from/to square
     int from = FILE_RANK_TO_SQUARE_INDEX(ptrChar[0] - 'a', ptrChar[1] - '1');
     int to = FILE_RANK_TO_SQUARE_INDEX(ptrChar[2] - 'a', ptrChar[3] - '1');

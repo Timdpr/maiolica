@@ -80,7 +80,7 @@ const int kingOpening[64] = {
 #define ENDGAME_MATERIAL (1 * pieceValues[wR] + 2 * pieceValues[wN] + 2 * pieceValues[wP])
 
 /// based on sjeng
-int materialDraw(const Board& board) {
+static int materialDraw(const Board& board) {
     if (!board.pieceCounts[wR] && !board.pieceCounts[bR] && !board.pieceCounts[wQ] && !board.pieceCounts[bQ]) {
         if (!board.pieceCounts[bB] && !board.pieceCounts[wB]) {
             if (board.pieceCounts[wN] < 3 && board.pieceCounts[bN] < 3) {  return true; }
