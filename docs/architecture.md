@@ -6,8 +6,8 @@ C++20 UCI engine. Single-threaded search, 10x12 mailbox board, pawn-only bitboar
 
 | File | What lives there |
 |---|---|
-| `src/defs.h` | Everything shared: constants, enums, structs (`Board`, `Move`, `MoveList`, `HashEntry`, `HashTable`, `Undo`, `SearchInfo`, `SearchThreadData`), move/square macros, globals, all function decls. (Its "// board.cpp" comment above `evalPosition` is wrong: that lives in evaluate.cpp.) |
-| `src/main.cpp` | `initAll`, 64MB TT, `maiolica bench` CLI arg; otherwise waits for `uci` (or `quit`) then enters `uciLoop` |
+| `src/defs.h` | Everything shared: constants, enums, structs (`Board`, `Move`, `MoveList`, `HashEntry`, `HashTable`, `Undo`, `SearchInfo`), move/square macros, globals, all function decls. (Its "// board.cpp" comment above `evalPosition` is wrong: that lives in evaluate.cpp.) |
+| `src/main.cpp` | `initAll`, 64MB TT, `maiolica bench` CLI arg; otherwise prints a banner and runs `uciLoop` |
 | `src/init.cpp` | Builds runtime tables: 120<->64 maps, set/clear masks, Zobrist keys, `filesBoard`/`ranksBoard`, eval masks, MVV-LVA (`initAll`) |
 | `src/data.cpp` | Constant per-piece tables (`pieceValues`, `pieceColours`, `bigPieces`, `pieceKnight`…), `pieceChars`, `mirror64` |
 | `src/board.cpp` | `resetBoard`, `parseFen`, `updateMaterialLists`, `checkBoard` (debug cross-check), `printBoard`, `mirrorBoard` |
@@ -15,11 +15,11 @@ C++20 UCI engine. Single-threaded search, 10x12 mailbox board, pawn-only bitboar
 | `src/attack.cpp` | `isSquareAttacked(sq, attackingSide, board)` |
 | `src/movegen.cpp` | `generateAllMoves`, `generateAllCaptureMoves`, `MOVE()` macro, move scoring, `initMVVLVA`, `moveExists` |
 | `src/makemove.cpp` | `makeMove`/`undoMove`, `makeNullMove`/`undoNullMove`, `HASH_*` macros, `castlePermArray` |
-| `src/search.cpp` | `searchPosition` (iterative deepening), `alphaBeta`, `quiescence`, `pickNextMove`, `isRepetition`, `checkUp`, `searchPositionThread` |
+| `src/search.cpp` | `searchPosition` (iterative deepening), `alphaBeta`, `quiescence`, `pickNextMove`, `isRepetition`, `checkUp`, `firstLegalMove`, `scoreToUci` |
 | `src/pvtable.cpp` | Transposition table: `initHashTable`, `clearHashTable`, `probeHashEntry`, `storeHashEntry`, `probePVTable`, `getPVLine`; global `hashTable[1]` |
 | `src/evaluate.cpp` | `evalPosition`, `materialDraw`, piece-square tables |
-| `src/uci.cpp` | `uciLoop`, `parseGo`, `parsePosition`, search thread launch/join |
-| `src/io.cpp` | `printSquare`, `printMove` (static buffers), `printMoveList`, `parseMove` (UCI string → move via movegen) |
+| `src/uci.cpp` | `uciLoop` and its commands, `sendLine` (all protocol output), the search thread, time budget, options |
+| `src/io.cpp` | `printSquare`, `printMove` (`thread_local` buffers; `0000` for `NO_MOVE`), `printMoveList`, `parseMove` (UCI string → move via movegen) |
 | `src/bitboards.cpp` | `popBit` (De Bruijn-style fold), `countBits`, `printBitBoard` |
 | `src/perft.cpp` | `perft` (accumulates global `leafNodes`), `perftTest` (divide output) |
 | `src/validate.cpp` | `squareOnBoard`, `pieceValid`… used by `ASSERT`; `debugAnalysisTest` (lct2.epd), `mirrorEvalTest` (mirror.epd) |
@@ -38,7 +38,7 @@ Build/presets in `CMakeLists.txt`/`CMakePresets.json` (release, native, profile,
 - `pawns[3]`: pawn bitboards `[WHITE]`, `[BLACK]`, `[BOTH]` (64-index). The only bitboards; used by eval and `checkBoard`.
 - `pieceList[13][10]` + `pieceCounts[13]`: squares of each piece type. Removal is swap-with-last (`clearPiece`), so **list order depends on move history and feeds generation order**. Initial order comes from `updateMaterialLists` scanning squares 0..119.
 - `kingSq[2]`; `material[2]` (sum of `pieceValues`, **king's 50000 included**); `bigPieces[2]` (non-pawns, king included); `majorPieces[2]` (R, Q **and K** per `data.cpp`, despite the defs.h comment); `minorPieces[2]` (N, B).
-- `side`, `enPasSq` (`NO_SQ` if none), `fiftyMove` (half-moves; FEN halfmove clock is not parsed, starts at 0), `castlingPerms` (4 bits: `wK_CA`=1, `wQ_CA`=2, `bK_CA`=4, `bQ_CA`=8).
+- `side`, `enPasSq` (`NO_SQ` if none), `fiftyMove` (half-moves, from the FEN's halfmove clock), `castlingPerms` (4 bits: `wK_CA`=1, `wQ_CA`=2, `bK_CA`=4, `bQ_CA`=8).
 - `ply` = depth from search root (reset by `clearForSearch`, and after each move in `parsePosition`); `historyPly` = index into `history[MAX_GAME_MOVES=2048]` of `Undo {move, castlingPerms, enPasSq, fiftyMove, positionKey}`.
 - `positionKey`: Zobrist key, kept incrementally.
 - **Search state lives in `Board` too:** `pvArray[MAX_DEPTH]`, `searchHistory[13][120]` (piece × to-square), `searchKillers[2][MAX_DEPTH]` (by ply). `Board` is big (57KB, mostly `history`) and copied with `memcpy` for the search thread, so it must stay trivially copyable.
@@ -87,7 +87,7 @@ Scores (set at generation; `alphaBeta` then sets the TT move to 2,000,000):
 `makeMove` saves the key, move, fifty, EP and castling into `history[historyPly]`, then incrementally updates everything through `clearPiece`/`addPiece`/`movePiece` (key via `HASH_PIECE`, material, big/major/minor counts, pawn bitboards, piece lists):
 - EP removes the pawn behind `to`; castling moves the rook first (switch on `to`).
 - Hashes out EP and castling, applies `castlingPerms &= castlePermArray[from] & [to]`, hashes castling back in.
-- Capture → `clearPiece(to)`, fifty = 0. Pawn move → fifty = 0; a double push always sets `enPasSq` and hashes it, capturable or not (B12).
+- Capture → `clearPiece(to)`, fifty = 0. Pawn move → fifty = 0; a double push always sets `enPasSq` and hashes it, capturable or not, so the same position can get two keys (a strength issue, left for an SPRT).
 - Moves the piece, swaps in the promoted piece, updates `kingSq`, flips side and `HASH_SIDE`.
 - **Legality:** if the mover's king is now attacked, `undoMove` and return false. Every caller must handle the false.
 
@@ -97,12 +97,12 @@ Zobrist: `pieceKeys[13][120]` (row `EMPTY` doubles as the EP-square key), `sideK
 
 ## Search (search.cpp)
 
-`searchPosition`: `clearForSearch` (zero history/killers, `currentAge++`, `ply = 0`, reset `stopped`/`nodes`/fail-high stats), then depths 1..`info->depth` with a full window (±`ALPHABETA_BOUND` 30000), no aspiration. A stopped iteration is discarded; otherwise `getPVLine` fills `pvArray`, prints `info score cp … depth … nodes … time … pv …`. Ends with `bestmove`, initialised from `pvArray[0]`. If no iteration completes, that's never written, so `printMove(NO_MOVE)` prints garbage (known issue).
+`searchPosition`: `clearForSearch` (zero history/killers, `currentAge++`, `ply = 0`, reset `nodes`/`selDepth`/fail-high stats; `stopped` is reset by the caller, before the thread starts), then depths 1..`info->depth` with a full window (±`ALPHABETA_BOUND` 30000), no aspiration. A stopped iteration is discarded; otherwise `getPVLine` fills `pvArray` and it sends `info depth … seldepth … score cp|mate … nodes … nps … hashfull … time … pv …`. `bestmove` starts as `firstLegalMove` (so stopping before depth 1 still plays something; `0000` if mated or stalemated), then takes `pvArray[0]`, with `pvArray[1]` as the ponder move. In `infinite` or `ponder` mode it then waits for `stopped`/`ponderhit` before sending `bestmove`.
 
 `alphaBeta(alpha, beta, depth, board, info, table, nullMoveAllowed)`, negamax, in this order:
 1. `depth == 0` → `quiescence` (which counts the node).
 2. `checkUp` when `(nodes & 2047) == 0`; `nodes++`.
-3. Repetition or `fiftyMove >= 100` → 0 (no `board.ply` guard here, unlike quiescence, so a repetition at the root scores 0 and yields no bestmove: known issue). `ply > MAX_DEPTH-1` → eval.
+3. Repetition or `fiftyMove >= 100` → 0 (only at `ply > 0`, so the root always searches its moves). `ply > MAX_DEPTH-1` → eval.
 4. In check → `depth++` (before the TT probe, so stored depths include the extension).
 5. `probeHashEntry`: a hit returns its score; the TT move is returned even when too shallow.
 6. Null move if allowed, not in check, `ply > 0`, `bigPieces[side] > 1` (king counts, so ≥1 real piece) and `depth >= 4`: search `depth-4` (R=3) with window (−beta, −beta+1) and null disabled; `score >= beta` and not a mate score → return beta (not stored in the TT).
@@ -110,9 +110,9 @@ Zobrist: `pieceKeys[13][120]` (row `EMPTY` doubles as the EP-square key), `sideK
 8. Beta cutoff: non-captures (by `MFLAG_CAPTURING`) shift into killers at this ply; store `HF_BETA` with beta; return beta. Alpha raised: quiet moves get `searchHistory[piece][to] += depth` (only on alpha raises, not on cutoffs).
 9. No legal moves: `-ALPHABETA_BOUND + ply` if in check, else 0. Store `HF_EXACT` (bestScore) if alpha rose, else `HF_ALPHA` (alpha, with the best fail-low move).
 
-`quiescence`: checkUp/nodes, repetition/fifty (only at `ply > 0`), max-ply eval, stand pat (`eval >= beta` → beta, raise alpha), then `generateAllCaptureMoves` with the same ordering. No TT, no check evasions, no delta pruning.
+`quiescence`: checkUp/nodes/`selDepth`, repetition/fifty (only at `ply > 0`), max-ply eval, stand pat (`eval >= beta` → beta, raise alpha), then `generateAllCaptureMoves` with the same ordering. No TT, no check evasions, no delta pruning.
 
-`isRepetition` scans `history[historyPly - fiftyMove .. historyPly-2]` for the current key; one earlier occurrence counts as a draw. `checkUp` only checks the clock (`timeSet && now > stopTime`); a GUI `stop` reaches the search via `info->stopped`. On `stopped`, both searches return 0 after undoing the move.
+`isRepetition` scans `history[max(0, historyPly - fiftyMove) .. historyPly-2]` for the current key; one earlier occurrence counts as a draw. `checkUp` checks the clock (`timeSet && now > stopTime`) and `nodeLimit`; a GUI `stop` reaches the search via the atomic `info->stopped`, read with relaxed ordering in the move loops. On `stopped`, both searches return 0 after undoing the move.
 
 Mate scores: `IS_MATE` = 30000 − 64. Printed as `cp` (no `score mate` yet).
 
@@ -135,26 +135,17 @@ White-relative score, negated for black at the end. Tables are a1-first from whi
 - `materialDraw` (from Sjeng): returns 0 for drawish minor/rook-only material.
 
 Known issues, left as they are until a fix passes an SPRT (they change play):
-- **E1:** the `materialDraw` gate reads `pieceCounts[wP] && !pieceCounts[bP]` (meant to be `!wP && !bP`), so it fires only when white has pawns and black has none. This makes eval colour-asymmetric.
-- **E2:** `material` includes the king's 50000, so the 1400 threshold is never met and `kingEndgame` is never used.
+- **Pawnless draws:** the `materialDraw` gate reads `pieceCounts[wP] && !pieceCounts[bP]` (meant to be `!wP && !bP`), so it fires only when white has pawns and black has none. This makes eval colour-asymmetric.
+- **Endgame king:** `material` includes the king's 50000, so the 1400 threshold is never met and `kingEndgame` is never used.
 
 ## Threading and UCI (uci.cpp)
 
-Minimal and fragile; due a rewrite, so don't build on it.
-- `go` parses time controls (`time/movesToGo - 50 + inc`, `movetime` sets movesToGo = 1), then starts the global `std::thread MainSearchThread` running `searchPositionThread`. That gets a `new SearchThreadData{&board, info, table}` (never freed) and `memcpy`s the board inside the thread.
-- `stop`/`quit` set `info->stopped` (a plain `int`, a data race) and `join()`. `go` doesn't join a previous thread.
-- The search thread prints `info`/`bestmove` itself. Global TT `hashTable`; `setoption name Hash value N` (4..2048) reallocates it.
-- Known issues:
-  - a second `go` without `stop` aborts (the thread is reassigned while joinable), so GUI games die at move 2;
-  - an idle `stop` throws from `join()`;
-  - `go infinite` then an immediate `stop` deadlocks;
-  - EOF spins at 100% CPU;
-  - `debug` runs an EPD test and leaves the loop;
-  - position parsing uses fixed offsets, so extra spaces corrupt the board;
-  - non-UCI output (board dumps, a `time:` line);
-  - `Hash` isn't advertised;
-  - mates print as `cp`;
-  - time management can go negative or overspend with large increments.
+Protocol details are in [uci.md](uci.md).
+- The input thread owns one `std::thread searchThread`. `stopSearch()` sets `stopped`, clears `ponder` and joins; it runs before every `go`, `setoption`, `ucinewgame`, dev command and on exit, and is a no-op when idle. `position` doesn't stop a search, since the search works on its own copy.
+- `go` sets every `SearchInfo` field on the input thread (including `stopped = false`) *before* launching, then hands the thread a heap copy of the board (`std::make_unique<Board>`), so the gui can carry on.
+- Shared between the threads: `stopped`, `ponder`, `timeSet`, `stopTime` (atomics; `ponderhit` writes `stopTime` then `timeSet`). Everything else is written before launch or by the search thread only.
+- All protocol output goes through `sendLine` (printf-style, one mutex-guarded write + flush per line), so `readyok` can't land mid `info` line. `printMove` uses `thread_local` buffers.
+- Global TT `hashTable`, reallocated by `setoption name Hash` after stopping the search.
 
 ## Reproducibility
 

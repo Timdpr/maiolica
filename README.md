@@ -13,4 +13,4 @@ cmake --preset release && cmake --build --preset release
 ./cmake-build-release/maiolica bench    # quick benchmark
 ctest --preset release                  # perft & bench tests
 ```
-See [docs/architecture.md](docs/architecture.md) for how it works and [docs/testing.md](docs/testing.md) for testing & measuring.
+See [docs/uci.md](docs/uci.md) for the protocol & extra commands, [docs/architecture.md](docs/architecture.md) for how it works and [docs/testing.md](docs/testing.md) for testing & measuring.
