@@ -83,6 +83,7 @@ add_test(NAME console_typo COMMAND sh -c "printf 'force\\nnf3\\nquit\\n' | '$<TA
 set_tests_properties(console_typo PROPERTIES LABELS quick PASS_REGULAR_EXPRESSION "not a legal move or command: nf3")
 
 file(STRINGS tests/bench_signature.txt MAIOLICA_BENCH LIMIT_COUNT 1)
+set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS tests/bench_signature.txt) # so an edit is picked up by the next build
 add_test(NAME bench_signature COMMAND maiolica bench)
 set_tests_properties(bench_signature PROPERTIES LABELS quick # too slow for debug builds
         PASS_REGULAR_EXPRESSION "Nodes searched  : ${MAIOLICA_BENCH}\n")
