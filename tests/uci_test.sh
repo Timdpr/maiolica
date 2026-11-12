@@ -70,6 +70,8 @@ check "root repetition still plays a move" $'position startpos moves g1f3 g8f6 f
 check "tiny clock still plays a legal move" $'position startpos\ngo wtime 30 btime 30\n~0.5\nquit' '^bestmove [a-h][1-8][a-h][1-8]'
 check "big increment is capped" $'debug on\nposition startpos\ngo wtime 500 btime 500 winc 5000 binc 5000\n~1\nquit' \
     'time budget 337 ms'
+check "negative clock still moves at once" $'debug on\nposition startpos\ngo wtime -30 btime 5000 winc 100 binc 100\n~0.5\nquit' \
+    'time budget 1 ms'
 check "go nodes" $'position startpos\ngo nodes 3000\n~0.5\nquit' '^bestmove'
 check "messy whitespace" $'position   fen  rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1   moves\te7e5  g1f3\nd\nquit' \
     'side character: b'

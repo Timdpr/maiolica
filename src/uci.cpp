@@ -1,5 +1,6 @@
 #include "defs.h"
 #include <algorithm>
+#include <climits>
 #include <cstdarg>
 #include <cstring>
 #include <iostream>
@@ -52,7 +53,7 @@ static TimeMS timeBudget(long time, long inc, long movesToGo, long moveTime) {
     if (moveTime >= 0) {
         return std::max(1L, moveTime - moveOverhead);
     }
-    if (time < 0) {
+    if (time == LONG_MIN) { // no clock given. A negative one is real (we've overrun), & gets the 1 ms below
         return -1;
     }
     long cap = std::max(1L, (time - moveOverhead) * 3 / 4);
@@ -62,7 +63,7 @@ static TimeMS timeBudget(long time, long inc, long movesToGo, long moveTime) {
 /// e.g. go depth 6 wtime 180000 btime 100000 binc 1000 winc 1000 movetime 1000 movestogo 40
 static void parseGo(std::istringstream& in) {
     stopSearch();
-    long time[2] = {-1, -1}, inc[2] = {0, 0}, movesToGo = 0, moveTime = -1, depth = MAX_DEPTH;
+    long time[2] = {LONG_MIN, LONG_MIN}, inc[2] = {0, 0}, movesToGo = 0, moveTime = -1, depth = MAX_DEPTH;
     bool ponder = false;
     info.nodeLimit = 0;
     info.infinite = false;

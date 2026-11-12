@@ -19,7 +19,7 @@ Maiolica speaks [UCI](https://www.shredderchess.com/download/div/uci.zip), so it
 
 ### `go`
 `wtime btime winc binc movestogo movetime depth nodes infinite ponder`. `searchmoves` and `mate` are ignored.
-- **Time budget:** `time / movestogo + inc - Move Overhead`, where movestogo is 30 if not given. It is capped at 3/4 of the clock left after overhead, and always at least 1 ms. `movetime` uses `movetime - Move Overhead`. The search stops on the budget, checked every 2048 nodes.
+- **Time budget:** `time / movestogo + inc - Move Overhead`, where movestogo is 30 if not given. It is capped at 3/4 of the clock left after overhead, and always at least 1 ms, which is also what a negative clock (an overrun) gets. `movetime` uses `movetime - Move Overhead`. The search stops on the budget, checked every 2048 nodes.
 - **`depth`** is clamped to 1–62. With no limits at all, it searches to depth 62.
 - **`nodes`** stops within 2048 nodes of the limit.
 - **`infinite`** and **`ponder`** never send `bestmove` until `stop` (or `ponderhit`, then the budget runs out), even if the search finishes first.
