@@ -74,7 +74,7 @@ void debugAnalysisTest(const char *epdFile, Board& board, SearchInfo *info, Hash
             parseFen(lineIn, board);
             printf("\n%s\n", lineIn);
             printf("time:%d start:%lld stop:%lld depth:%d timeset:%d\n",
-                   time, info->startTime, info->stopTime.load(), info->depth, info->timeSet.load());
+                   time, (long long)info->startTime, (long long)info->stopTime.load(), info->depth, info->timeSet.load());
             searchPosition(board, info, table);
             memset(&lineIn[0], 0, sizeof(lineIn));
         }
