@@ -51,15 +51,15 @@ int pieceValidEmptyOffboard(const int pce) {
     return (pieceValidEmpty(pce) || pce == OFFBOARD);
 }
 
-void debugAnalysisTest(const char *epdFile, Board& board, SearchInfo *info, HashTable *table) {
+void debugAnalysisTest(const char *epdFile, Board& board, SearchInfo& info, HashTable& table) {
     FILE *file;
     file = fopen(epdFile, "r");
     char lineIn [1024];
 
-    info->depth = MAX_DEPTH - 2;
-    info->timeSet = true;
-    info->infinite = false; // not whatever the last 'go' asked for
-    info->nodeLimit = 0;
+    info.depth = MAX_DEPTH - 2;
+    info.timeSet = true;
+    info.infinite = false; // not whatever the last 'go' asked for
+    info.nodeLimit = 0;
     int time = 1140000;
 
     if (file == nullptr) {
@@ -67,14 +67,14 @@ void debugAnalysisTest(const char *epdFile, Board& board, SearchInfo *info, Hash
         return;
     } else {
         while(fgets (lineIn , 1024 , file) != nullptr) {
-            info->startTime = getTimeMS();
-            info->stopTime = info->startTime + time;
-            info->stopped = false;
+            info.startTime = getTimeMS();
+            info.stopTime = info.startTime + time;
+            info.stopped = false;
             clearHashTable(table);
             parseFen(lineIn, board);
             printf("\n%s\n", lineIn);
             printf("time:%d start:%lld stop:%lld depth:%d timeset:%d\n",
-                   time, (long long)info->startTime, (long long)info->stopTime.load(), info->depth, info->timeSet.load());
+                   time, (long long)info.startTime, (long long)info.stopTime.load(), info.depth, info.timeSet.load());
             searchPosition(board, info, table);
             memset(&lineIn[0], 0, sizeof(lineIn));
         }

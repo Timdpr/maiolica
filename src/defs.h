@@ -252,7 +252,7 @@ extern U64 whitePassedMask[64]; // does the indexed white pawn have a 'clear run
 extern U64 blackPassedMask[64]; // does the indexed black pawn have a 'clear run' to promotion?
 extern U64 isolatedPawnMask[64]; // is the indexed pawn 'isolated'?
 
-extern HashTable hashTable[1]; // initialise hash table to size 1 array, but this will be dynamically allocated
+extern HashTable hashTable; // its array of entries is allocated by initHashTable
 
 /* -- FUNCTIONS -- */
 
@@ -293,7 +293,7 @@ int fileOrRankValid(int fileOrRank);
 int pieceValid(int piece);
 int pieceValidEmpty(int piece);
 int pieceValidEmptyOffboard(int pce);
-void debugAnalysisTest(const char *epdFile, Board& board, SearchInfo *info, HashTable *table);
+void debugAnalysisTest(const char *epdFile, Board& board, SearchInfo& info, HashTable& table);
 void mirrorEvalTest(Board& board);
 
 // movegen.cpp
@@ -317,16 +317,16 @@ void perftTest(int depth, Board& board);
 TimeMS getTimeMS();
 
 // search.cpp
-void searchPosition(Board& board, SearchInfo *info, HashTable *table);
+void searchPosition(Board& board, SearchInfo& info, HashTable& table);
 
 // pvtable.cpp
-void clearHashTable(HashTable *table);
-int getPVLine(int depth, Board& board, const HashTable *table);
-void initHashTable(HashTable *table, int MB);
-void storeHashEntry(Board& board, HashTable *table, int move, int score, int flags, int depth);
-[[nodiscard]] int probeHashEntry(Board& board, HashTable *table, int *move, int *score, int alpha, int beta, int depth);
-int probePVTable(const Board& board, const HashTable *table);
-int hashFull(const HashTable *table);
+void clearHashTable(HashTable& table);
+int getPVLine(int depth, Board& board, const HashTable& table);
+void initHashTable(HashTable& table, int MB);
+void storeHashEntry(Board& board, HashTable& table, int move, int score, int flags, int depth);
+[[nodiscard]] int probeHashEntry(Board& board, HashTable& table, int *move, int *score, int alpha, int beta, int depth);
+int probePVTable(const Board& board, const HashTable& table);
+int hashFull(const HashTable& table);
 
 // evaluate.cpp
 int evalPosition(const Board& board);

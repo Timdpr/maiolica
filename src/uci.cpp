@@ -100,7 +100,7 @@ static void parseGo(std::istringstream& in) {
     }
 
     // search a copy of the board (on the heap, it's big), so the gui can carry on setting positions
-    searchThread = std::thread([copy = std::make_unique<Board>(board)] { searchPosition(*copy, &info, hashTable); });
+    searchThread = std::thread([copy = std::make_unique<Board>(board)] { searchPosition(*copy, info, hashTable); });
 }
 
 /// The opponent played the move we were pondering on, so start the clock for real
@@ -228,7 +228,7 @@ void uciLoop() {
             stopSearch();
             std::string file = "lct2.epd";
             in >> file;
-            debugAnalysisTest(file.c_str(), board, &info, hashTable);
+            debugAnalysisTest(file.c_str(), board, info, hashTable);
         } else if (!command.empty() && debugMode) {
             sendLine("info string unknown command: %s", command.c_str());
         }

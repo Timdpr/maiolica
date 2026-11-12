@@ -16,7 +16,7 @@ C++20 UCI engine. Single-threaded search, 10x12 mailbox board, pawn-only bitboar
 | `src/movegen.cpp` | `generateAllMoves`, `generateAllCaptureMoves`, `MOVE()` macro, move scoring, `initMVVLVA`, `moveExists` |
 | `src/makemove.cpp` | `makeMove`/`undoMove`, `makeNullMove`/`undoNullMove`, `HASH_*` macros, `castlePermArray` |
 | `src/search.cpp` | `searchPosition` (iterative deepening), `alphaBeta`, `quiescence`, `pickNextMove`, `isRepetition`, `checkUp`, `firstLegalMove`, `scoreToUci` |
-| `src/pvtable.cpp` | Transposition table: `initHashTable`, `clearHashTable`, `probeHashEntry`, `storeHashEntry`, `probePVTable`, `getPVLine`; global `hashTable[1]` |
+| `src/pvtable.cpp` | Transposition table: `initHashTable`, `clearHashTable`, `probeHashEntry`, `storeHashEntry`, `probePVTable`, `getPVLine`; global `hashTable` |
 | `src/evaluate.cpp` | `evalPosition`, `materialDraw`, piece-square tables |
 | `src/uci.cpp` | `uciLoop` and its commands, `sendLine` (all protocol output), the search thread, time budget, options |
 | `src/io.cpp` | `printSquare`, `printMove` (`thread_local` buffers; `0000` for `NO_MOVE`), `printMoveList`, `parseMove` (UCI string → move via movegen) |
@@ -98,7 +98,7 @@ Zobrist: `pieceKeys[13][120]` (row `EMPTY` doubles as the EP-square key), `sideK
 
 ## Search (search.cpp)
 
-`searchPosition`: `clearForSearch` (zero history/killers, `currentAge++`, `ply = 0`, reset `nodes`/`selDepth`/fail-high stats; `stopped` is reset by the caller, before the thread starts), then depths 1..`info->depth` with a full window (±`ALPHABETA_BOUND` 30000), no aspiration. A stopped iteration is discarded; otherwise `getPVLine` fills `pvArray` and it sends `info depth … seldepth … score cp|mate … nodes … nps … hashfull … time … pv …`. `bestmove` is `pvArray[0]`, with `pvArray[1]` as the ponder move. If no iteration finished it falls back to `firstLegalMove` (`0000` if mated or stalemated); that runs after the search, because making and undoing a move can reorder the piece lists. In `infinite` or `ponder` mode it then waits for `stopped`/`ponderhit` before sending `bestmove`.
+`searchPosition`: `clearForSearch` (zero history/killers, `currentAge++`, `ply = 0`, reset `nodes`/`selDepth`/fail-high stats; `stopped` is reset by the caller, before the thread starts), then depths 1..`info.depth` with a full window (±`ALPHABETA_BOUND` 30000), no aspiration. A stopped iteration is discarded; otherwise `getPVLine` fills `pvArray` and it sends `info depth … seldepth … score cp|mate … nodes … nps … hashfull … time … pv …`. `bestmove` is `pvArray[0]`, with `pvArray[1]` as the ponder move. If no iteration finished it falls back to `firstLegalMove` (`0000` if mated or stalemated); that runs after the search, because making and undoing a move can reorder the piece lists. In `infinite` or `ponder` mode it then waits for `stopped`/`ponderhit` before sending `bestmove`.
 
 `alphaBeta(alpha, beta, depth, board, info, table, nullMoveAllowed)`, negamax, in this order:
 1. `depth == 0` → `quiescence` (which counts the node).
@@ -113,7 +113,7 @@ Zobrist: `pieceKeys[13][120]` (row `EMPTY` doubles as the EP-square key), `sideK
 
 `quiescence`: checkUp/nodes/`selDepth`, repetition/fifty (only at `ply > 0`), max-ply eval, stand pat (`eval >= beta` → beta, raise alpha), then `generateAllCaptureMoves` with the same ordering. No TT, no check evasions, no delta pruning.
 
-`isRepetition` scans `history[max(0, historyPly - fiftyMove) .. historyPly-2]` for the current key; one earlier occurrence counts as a draw. `checkUp` checks the clock (`timeSet && now > stopTime`) and `nodeLimit`; a GUI `stop` reaches the search via the atomic `info->stopped`, read with relaxed ordering in the move loops. On `stopped`, both searches return 0 after undoing the move.
+`isRepetition` scans `history[max(0, historyPly - fiftyMove) .. historyPly-2]` for the current key; one earlier occurrence counts as a draw. `checkUp` checks the clock (`timeSet && now > stopTime`) and `nodeLimit`; a GUI `stop` reaches the search via the atomic `info.stopped`, read with relaxed ordering in the move loops. On `stopped`, both searches return 0 after undoing the move.
 
 Mate scores: `IS_MATE` = 30000 − 64. Anything beyond it is printed as `score mate N` (`scoreToUci`).
 

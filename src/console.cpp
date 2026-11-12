@@ -190,7 +190,7 @@ static int think(Board& board, const int moveTime, const int depth) {
     info.stopTime = info.startTime + moveTime;
     info.timeSet = moveTime > 0;
     searchingSide = board.side;
-    searchPosition(board, &info, hashTable); // on this thread: there's nothing else to listen to
+    searchPosition(board, info, hashTable); // on this thread: there's nothing else to listen to
     std::printf("\n");
     return parseAnyMove(engineMove, board);
 }
