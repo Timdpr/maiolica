@@ -19,16 +19,16 @@ std::abort();}
 #define ASSERT(n)
 #endif
 
-#define NAME "Maiolica 1.0"
-#define BRD_SQ_NUM 120 // number of squares on the main, 'mailbox representation' board
-#define MAX_GAME_MOVES 2048
-#define MAX_POSITION_MOVES 256
-#define MAX_DEPTH 64
-#define START_FEN "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
+constexpr const char *NAME = "Maiolica 1.0";
+constexpr int BRD_SQ_NUM = 120; // number of squares on the main, 'mailbox representation' board
+constexpr int MAX_GAME_MOVES = 2048;
+constexpr int MAX_POSITION_MOVES = 256;
+constexpr int MAX_DEPTH = 64;
+constexpr const char *START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
-#define INF_BOUND 32000
-#define ALPHABETA_BOUND 30000
-#define IS_MATE (ALPHABETA_BOUND - MAX_DEPTH)
+constexpr int INF_BOUND = 32000;
+constexpr int ALPHABETA_BOUND = 30000;
+constexpr int IS_MATE = ALPHABETA_BOUND - MAX_DEPTH;
 
 using U64 = std::uint64_t;
 using TimeMS = std::chrono::milliseconds::rep;
@@ -199,17 +199,17 @@ struct SearchInfo {
 /// Get promoted piece from move int
 #define GET_PROMOTED(move) (((move)>>20) & 0xF)
 /// Set en passant flag in move by ORing in this flag
-#define MFLAG_EN_PASSANT 0x40000
+constexpr int MFLAG_EN_PASSANT = 0x40000;
 /// Set pawn start flag in move by ORing in this flag
-#define MFLAG_PAWN_START 0x80000
+constexpr int MFLAG_PAWN_START = 0x80000;
 /// Set castling flag in move by ORing in this flag
-#define MFLAG_CASTLING 0x1000000
+constexpr int MFLAG_CASTLING = 0x1000000;
 /// AND with this mask to see if a move captures (a captured piece, or en passant)
-#define MFLAG_CAPTURING 0x7C000
+constexpr int MFLAG_CAPTURING = 0x7C000;
 /// AND with this mask to see if a move promotes
-#define MFLAG_PROMOTION 0xF00000
+constexpr int MFLAG_PROMOTION = 0xF00000;
 
-#define NO_MOVE 0
+constexpr int NO_MOVE = 0;
 
 /* -- GLOBAL -- */  // TODO: Consider making these non-global...
 
