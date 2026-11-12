@@ -14,10 +14,10 @@ e5 38. Nb5 a6 39. Na7 d4 40. Rc2 Qxa4 41. Rc6 d3 42. Rc8+ Kg7 43. Rc7+ Kf6 44. R
 52. Kc2 Qe2+ 53. Kc1 Nxc3 54. g3 Qh2 55. Nc6 Ne2+ 56. Kd1 Kxc6 57. Ke1 Kc7 58. Kd2 Nd4+
 59. Kd1 Qe2+ 60. Kc1 Qc2# 0-1
 
-[Event "En passant and a promotion with check"]
+[Event "En passant, a promotion with check and annotation codes"]
 [White "test"]
 [Black "test"]
 [FEN "4k3/8/8/8/3p4/8/4P3/4K3 w - - 0 1"]
 [Result "*"]
 
-1. e4 dxe3 2. Kd1 e2+ 3. Kd2 e1=Q+ 4. Kxe1 Kd7 *
+1. e4 $1 dxe3 2. Kd1 e2+ $18 3. Kd2 e1=Q+ 4. Kxe1 Kd7 *
