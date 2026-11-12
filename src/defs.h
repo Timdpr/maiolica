@@ -30,8 +30,8 @@ std::abort();}
 #define ALPHABETA_BOUND 30000
 #define IS_MATE (ALPHABETA_BOUND - MAX_DEPTH)
 
-typedef std::uint64_t U64;
-typedef std::chrono::milliseconds::rep TimeMS;
+using U64 = std::uint64_t;
+using TimeMS = std::chrono::milliseconds::rep;
 
 
 /* -- ENUMS -- */
@@ -66,7 +66,7 @@ enum { HF_NONE, HF_ALPHA, HF_BETA, HF_EXACT };
 0000 0000 0000 0011 1111 1000 0000 -> 'To' square: >>7, 0x7F                      <br>
 0000 0000 0011 1100 0000 0000 0000 -> Piece captured, if any: >>14, 0xF           <br>
 0000 0000 0100 0000 0000 0000 0000 -> En passant?: bit and, 0x40000               <br>
-0000 0000 1000 1100 0000 0000 0000 -> Pawn start move?: bit and, 0x80000          <br>
+0000 0000 1000 0000 0000 0000 0000 -> Pawn start move?: bit and, 0x80000          <br>
 0000 1111 0000 0000 0000 0000 0000 -> What piece was promoted, if any: >>20, 0xF  <br>
 0001 0000 0000 0000 0000 0000 0000 -> Was it a castling move?: bit and, 0x1000000
 
@@ -81,7 +81,7 @@ struct MoveList {
     int count;
 };
 
-/// Principal variation entry
+/// Transposition table entry
 struct HashEntry {
     U64 positionKey;
     int move;
@@ -91,7 +91,7 @@ struct HashEntry {
     int age;
 };
 
-/// Principal variation table
+/// Transposition table
 struct HashTable {
     HashEntry *hTable; // pointer to element
     int numEntries;
@@ -204,9 +204,9 @@ struct SearchInfo {
 #define MFLAG_PAWN_START 0x80000
 /// Set castling flag in move by ORing in this flag
 #define MFLAG_CASTLING 0x1000000
-/// Set capturing flag in move by ORing in this flag
+/// AND with this mask to see if a move captures (a captured piece, or en passant)
 #define MFLAG_CAPTURING 0x7C000
-/// Set promotion flag in move by ORing in this flag
+/// AND with this mask to see if a move promotes
 #define MFLAG_PROMOTION 0xF00000
 
 #define NO_MOVE 0
@@ -257,91 +257,91 @@ extern HashTable hashTable[1]; // initialise hash table to size 1 array, but thi
 /* -- FUNCTIONS -- */
 
 // init.cpp
-extern void initAll();
+void initAll();
 
 // bitboards.cpp
-extern void printBitBoard(U64 bitBoard);
-extern int popBit(U64 *bitboard);
-extern int countBits(U64 bitboard);
+void printBitBoard(U64 bitBoard);
+int popBit(U64 *bitboard);
+int countBits(U64 bitboard);
 
 // hashkeys.cpp
-extern U64 generatePositionKey(const Board& board);
+U64 generatePositionKey(const Board& board);
 
 // board.cpp
-extern int checkBoard(const Board& board);
-extern void updateMaterialLists(Board& board);
-extern int parseFen(const char *fen, Board& board);
-extern void resetBoard(Board& board);
-extern void printBoard(const Board& board);
+int checkBoard(const Board& board);
+void updateMaterialLists(Board& board);
+int parseFen(const char *fen, Board& board);
+void resetBoard(Board& board);
+void printBoard(const Board& board);
+void mirrorBoard(Board& board);
 
 // attack.cpp
-extern int isSquareAttacked(int square, int attackingSide, const Board& board);
+int isSquareAttacked(int square, int attackingSide, const Board& board);
 
 // io.cpp
-extern char *printSquare(int square);
-extern char *printMove(int move);
-extern void printMoveList(const MoveList *moveList);
-extern int parseMove(const char *ptrChar, Board& board);
+char *printSquare(int square);
+char *printMove(int move);
+void printMoveList(const MoveList *moveList);
+int parseMove(const char *ptrChar, Board& board);
 
 // validate.cpp
-extern int moveListValid(const MoveList *list, const Board& board);
-extern int squareIs120(int sq);
-extern int squareOnBoard(int sq);
-extern int sideValid(int side);
-extern int fileOrRankValid(int fileOrRank);
-extern int pieceValid(int piece);
-extern int pieceValidEmpty(int piece);
-extern int pieceValidEmptyOffboard(int pce);
-extern void debugAnalysisTest(const char *epdFile, Board& board, SearchInfo *info, HashTable *table);
-extern void mirrorEvalTest(Board& board);
+int moveListValid(const MoveList *list, const Board& board);
+int squareIs120(int sq);
+int squareOnBoard(int sq);
+int sideValid(int side);
+int fileOrRankValid(int fileOrRank);
+int pieceValid(int piece);
+int pieceValidEmpty(int piece);
+int pieceValidEmptyOffboard(int pce);
+void debugAnalysisTest(const char *epdFile, Board& board, SearchInfo *info, HashTable *table);
+void mirrorEvalTest(Board& board);
 
 // movegen.cpp
-extern void generateAllMoves(const Board& board, MoveList *list);
-extern void generateAllCaptureMoves(const Board& board, MoveList *moveList);
-extern int moveExists(Board& board, int move);
-extern void initMVVLVA();
+void generateAllMoves(const Board& board, MoveList *list);
+void generateAllCaptureMoves(const Board& board, MoveList *moveList);
+int moveExists(Board& board, int move);
+void initMVVLVA();
 
 // makemove.cpp
-extern int makeMove(Board& board, int move);
-extern void undoMove(Board& board);
-extern void makeNullMove(Board& board);
-extern void undoNullMove(Board& board);
+int makeMove(Board& board, int move);
+void undoMove(Board& board);
+void makeNullMove(Board& board);
+void undoNullMove(Board& board);
 
 // perft.cpp
 extern long leafNodes;
-extern void perft(int depth, Board& board);
-extern void perftTest(int depth, Board& board);
+void perft(int depth, Board& board);
+void perftTest(int depth, Board& board);
 
 // misc.cpp
-extern TimeMS getTimeMS();
+TimeMS getTimeMS();
 
 // search.cpp
-extern void searchPosition(Board& board, SearchInfo *info, HashTable *table);
+void searchPosition(Board& board, SearchInfo *info, HashTable *table);
 
 // pvtable.cpp
-extern void clearHashTable(HashTable *table);
-extern int getPVLine(int depth, Board& board, const HashTable *table);
-extern void initHashTable(HashTable *table, int MB);
-extern void storeHashEntry(Board& board, HashTable *table, int move, int score, int flags, int depth);
-extern int probeHashEntry(Board& board, HashTable *table, int *move, int *score, int alpha, int beta, int depth);
-extern int probePVTable(const Board& board, const HashTable *table);
-extern int hashFull(const HashTable *table);
+void clearHashTable(HashTable *table);
+int getPVLine(int depth, Board& board, const HashTable *table);
+void initHashTable(HashTable *table, int MB);
+void storeHashEntry(Board& board, HashTable *table, int move, int score, int flags, int depth);
+int probeHashEntry(Board& board, HashTable *table, int *move, int *score, int alpha, int beta, int depth);
+int probePVTable(const Board& board, const HashTable *table);
+int hashFull(const HashTable *table);
 
-// board.cpp
-extern int evalPosition(const Board& board);
-extern void mirrorBoard(Board& board);
+// evaluate.cpp
+int evalPosition(const Board& board);
 
 // uci.cpp
-extern void uciLoop();
-extern void sendLine(const char *format, ...);
+void uciLoop();
+void sendLine(const char *format, ...);
 extern bool debugMode;
 extern void (*lineHandler)(const char *line);
 
 // console.cpp
-extern void consoleLoop();
-extern void replayPgn(const char *file, int delay);
+void consoleLoop();
+void replayPgn(const char *file, int delay);
 
 // bench.cpp
-extern void bench();
+void bench();
 
 #endif //MAIOLICA_DEFS_H
