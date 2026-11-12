@@ -13,4 +13,12 @@ cmake --preset release && cmake --build --preset release
 ./cmake-build-release/maiolica bench    # quick benchmark
 ctest --preset release                  # perft & bench tests
 ```
+## Playing in the terminal
+```sh
+./cmake-build-release/maiolica console              # play it: moves like e4, Nf3 or e2e4, 'help' for commands
+./cmake-build-release/maiolica replay game.pgn 500  # watch the games in a pgn, 500ms a move
+scripts/demo.sh                                     # a quick self play game (via fastchess), then replayed
+```
+Colours & unicode pieces when it's a terminal; plain text otherwise (or with `NO_COLOR` set).
+
 See [docs/uci.md](docs/uci.md) for the protocol & extra commands, [docs/architecture.md](docs/architecture.md) for how it works and [docs/testing.md](docs/testing.md) for testing & measuring.
