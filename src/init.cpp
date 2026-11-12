@@ -1,10 +1,14 @@
-#include <random>
 #include "defs.h"
 
-std::random_device rd;
-std::mt19937_64 gen(rd());
-std::uniform_int_distribution<U64> dist(0, INT64_MAX);
-#define RAND_64 dist(gen)
+/// Fixed-seed splitmix64, so hash keys (and therefore node counts) are the same on every run & platform
+static U64 rngState = 0x4D41494F4C494341ULL; // "MAIOLICA"
+static U64 rand64() {
+    U64 z = (rngState += 0x9E3779B97F4A7C15ULL);
+    z = (z ^ (z >> 30)) * 0xBF58476D1CE4E5B9ULL;
+    z = (z ^ (z >> 27)) * 0x94D049BB133111EBULL;
+    return z ^ (z >> 31);
+}
+#define RAND_64 rand64()
 
 int sq120ToSq64[BRD_SQ_NUM];
 int sq64ToSq120[64];

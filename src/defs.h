@@ -7,14 +7,13 @@
 #include <chrono>
 
 #ifdef DEBUG
+// prints to stderr and aborts, so a failure can't look like success to a test runner
 #define ASSERT(n) \
 if(!(n)) { \
-std::printf("\n*** ASSERTION ERROR ***\n%s : FAILED ",#n); \
-std::printf("on %s ",__DATE__); \
-std::printf("at %s \n",__TIME__); \
-std::printf("At line %d ",__LINE__); \
-std::printf("in file %s \n",__FILE__); \
-std::exit(0);}
+std::fprintf(stderr, "\n*** ASSERTION ERROR ***\n%s : FAILED ",#n); \
+std::fprintf(stderr, "At line %d ",__LINE__); \
+std::fprintf(stderr, "in file %s \n",__FILE__); \
+std::abort();}
 #else
 #define ASSERT(n)
 #endif
@@ -223,8 +222,6 @@ struct SearchThreadData {
 
 /* -- GLOBAL -- */  // TODO: Consider making these non-global...
 
-extern U64 RAND_64;
-
 extern int sq120ToSq64[BRD_SQ_NUM];
 extern int sq64ToSq120[64];
 
@@ -320,6 +317,8 @@ extern void makeNullMove(Board& board);
 extern void undoNullMove(Board& board);
 
 // perft.cpp
+extern long leafNodes;
+extern void perft(int depth, Board& board);
 extern void perftTest(int depth, Board& board);
 
 // misc.cpp
@@ -344,5 +343,8 @@ extern void mirrorBoard(Board& board);
 
 // uci.cpp
 extern void uciLoop(Board& board, SearchInfo *info);
+
+// bench.cpp
+extern void bench();
 
 #endif //MAIOLICA_DEFS_H

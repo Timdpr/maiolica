@@ -130,8 +130,7 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo *i
     ASSERT(checkBoard(board))
 
     if (depth == 0) {
-        info->nodes++;
-        return quiescence(alpha, beta, board, info);
+        return quiescence(alpha, beta, board, info); // quiescence counts this node
     }
     // Check time remaining:
     if ((info->nodes & 2047) == 0) {

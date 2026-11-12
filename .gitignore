@@ -1,6 +1,13 @@
 .idea/
 cmake-build-*/
 
+### Testing ###
+external/
+books/
+matches/
+*.profraw
+*.profdata
+
 ### C++ ###
 # Prerequisites
 *.d
