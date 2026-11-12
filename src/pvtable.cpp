@@ -1,47 +1,5 @@
 #include "defs.h"
 
-// Macros for extracting specific data out of the 'data' 64-bit int
-#define EXTRACT_SCORE(x) ((x & 0xFFFF) - INF_BOUND)
-#define EXTRACT_DEPTH(x) ((x >> 16) & 0x3F)
-#define EXTRACT_FLAGS(x) ((x >> 23) & 0x3)
-#define EXTRACT_MOVE(x) ((int)(x >> 25))
-
-// Macro for combining data into the 'data' 64-bit int
-#define FOLD_DATA(score, depth, flags, move) ( (score + INF_BOUND) | (depth << 16) | (flags << 23) | ((U64)move << 25))
-
-void dataCheck(const int move) {
-    int depth = rand() % MAX_DEPTH;
-    int flags = rand() % 3;
-    int score = rand() % ALPHABETA_BOUND;
-
-    U64 data = FOLD_DATA(score, depth, flags, move);
-
-    printf("Orig : move:%s d:%d fl:%d sc:%d data:%llX\n", printMove(move), depth, flags, score, data);
-    printf("Check: move:%s d:%d fl:%d sc:%d\n\n",
-           printMove(EXTRACT_MOVE(data)),
-           EXTRACT_DEPTH(data),
-           EXTRACT_FLAGS(data),
-           EXTRACT_SCORE(data));
-}
-
-void tempHashTest(char *fen) {
-    Board board{};
-    parseFen(fen, board);
-
-    MoveList moveList[1];
-    generateAllMoves(board, moveList);
-
-    for (int moveNum = 0; moveNum < moveList->count; ++moveNum) {
-        if (!makeMove(board, moveList->moves[moveNum].move)) {
-            continue;
-        }
-        undoMove(board);
-        dataCheck(moveList->moves[moveNum].move);
-    }
-
-
-}
-
 HashTable hashTable[1];
 
 /// Populate Board's pvArray

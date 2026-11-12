@@ -134,7 +134,7 @@ struct Board {
 
     Undo history[MAX_GAME_MOVES]; // holds game state (via 'Undo' struct) at each ply
 
-    int pieceList[13][10]; // 13 types of pieces, and at most 10 of each // TODO: May need to convert this to 1D for speed
+    int pieceList[13][10]; // 13 types of pieces, and at most 10 of each
 
     int pvArray[MAX_DEPTH];
 
@@ -172,16 +172,11 @@ struct SearchInfo {
 #define INDEX_120_TO_64(sq120) (sq120ToSq64[(sq120)])
 /// Takes 64-based square index and returns equivalent 120-based square index
 #define INDEX_64_TO_120(sq64) (sq64ToSq120[(sq64)])
-/// Finds first (least significant) bit in given bitboard, and returns index
 
 // - Bitboard macros:
-///
-#define POP(bitboard) popBit(bitboard)
-/// Returns number of bits in bitboard
-#define COUNT(bitboard) countBits(bitboard)
-///
+/// Clear the bit for the given (64-based) square
 #define CLEAR_BIT(bitboard, sq) ((bitboard) &= clearMask[(sq)])
-///
+/// Set the bit for the given (64-based) square
 #define SET_BIT(bitboard, sq) ((bitboard) |= setMask[(sq)])
 
 // - Piece checking macros:
@@ -330,7 +325,6 @@ extern void initHashTable(HashTable *table, int MB);
 extern void storeHashEntry(Board& board, HashTable *table, int move, int score, int flags, int depth);
 extern int probeHashEntry(Board& board, HashTable *table, int *move, int *score, int alpha, int beta, int depth);
 extern int probePVTable(const Board& board, const HashTable *table);
-extern void tempHashTest(char *fen);
 extern int hashFull(const HashTable *table);
 
 // board.cpp

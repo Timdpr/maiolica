@@ -58,7 +58,7 @@ A move is one `int` (25 bits used); `NO_MOVE` = 0.
 | 20–23 | promoted-to piece | `GET_PROMOTED` (`>>20 & 0xF`), `MFLAG_PROMOTION` 0xF00000 |
 | 24 | castling | `MFLAG_CASTLING` 0x1000000 |
 
-`MFLAG_CAPTURING` 0x7C000 covers captured bits **plus** the EP bit, so EP counts as a capture (EP moves store captured = `EMPTY`). Built by `MOVE(from, to, captured, promoted, flag)` in movegen.cpp. `Move {int move; int score;}`; `MoveList {Move moves[256]; int count;}`. The layout is load-bearing: the TT stores the int, and `FOLD_DATA` shifts it into bits 25+ of a 64-bit word. (The bit diagram comment in defs.h has a typo on the pawn-start line; the masks are right.)
+`MFLAG_CAPTURING` 0x7C000 covers captured bits **plus** the EP bit, so EP counts as a capture (EP moves store captured = `EMPTY`). Built by `MOVE(from, to, captured, promoted, flag)` in movegen.cpp. `Move {int move; int score;}`; `MoveList {Move moves[256]; int count;}`. The layout is load-bearing: the TT stores the int. (The bit diagram comment in defs.h has a typo on the pawn-start line; the masks are right.)
 
 ## Move generation and ordering (movegen.cpp)
 
@@ -124,7 +124,6 @@ Mate scores: `IS_MATE` = 30000 − 64. Anything beyond it is printed as `score m
 - Replace if the slot is empty (key 0), `age < currentAge`, or `entry.depth <= depth`. Age is bumped per search, reset to 0 by `clearHashTable` (`ucinewgame`, bench).
 - Mate scores are stored relative to the node (`±ply` on store, reversed on probe).
 - `getPVLine` walks `probePVTable` moves from the root, checking each with `moveExists`, making it, up to `depth` moves; then undoes back to `ply == 0`.
-- `FOLD_DATA`/`EXTRACT_*` pack score+`INF_BOUND` (16 bits), depth (6), flags (2, at bit 23) and move (bit 25+) into one U64. They're only used by the dead `dataCheck`/`tempHashTest`, and are kept for a future lockless (Lazy SMP) TT.
 
 ## Evaluation (evaluate.cpp)
 
