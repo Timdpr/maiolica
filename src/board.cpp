@@ -1,8 +1,9 @@
 #include "defs.h"
 #include <cstdio>
 
-/// Lots of cross-checking of most elements of the board!
+/// Lots of cross-checking of most elements of the board! (only in debug builds, where ASSERT does something)
 int checkBoard(const Board& board) {
+#ifdef DEBUG
     // Check piece lists match
     for (int piece = wP; piece <= bK; ++piece) {
         for (int pieceNum = 0; pieceNum < board.pieceCounts[piece]; ++pieceNum) {
@@ -77,7 +78,7 @@ int checkBoard(const Board& board) {
 
     ASSERT(board.pieces[board.kingSq[WHITE]] == wK)
     ASSERT(board.pieces[board.kingSq[BLACK]] == bK)
-
+#endif
     return true;
 }
 
@@ -314,7 +315,7 @@ void printBoard(const Board& board) {
             (board.castlingPerms & bK_CA) ? 'k' : '-',
             (board.castlingPerms & bQ_CA) ? 'q' : '-'
     );
-    std::printf("position key: %llX\n", board.positionKey);
+    std::printf("position key: %llX\n", (unsigned long long)board.positionKey);
 }
 
 void mirrorBoard(Board& board) {
