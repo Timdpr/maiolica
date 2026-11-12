@@ -19,7 +19,7 @@ const int pieceKing[13]        = { false, false, false, false, false, false, tru
 const int pieceSlides[13]      = { false, false, false, true, true, true, false, false, false, true, true, true, false };
 
 /// Use to get square index for black, as above tables are designed for white
-int mirror64[64] = {
+const int mirror64[64] = {
         56 , 57 , 58 , 59 , 60 , 61 , 62 , 63 ,
         48 , 49 , 50 , 51 , 52 , 53 , 54 , 55 ,
         40 , 41 , 42 , 43 , 44 , 45 , 46 , 47 ,

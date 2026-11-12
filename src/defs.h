@@ -243,7 +243,7 @@ extern const int pieceRookQueen[13]; // used to ask 'is piece a rook or queen?'
 extern const int pieceKing[13]; // used to ask 'is piece a king?'
 extern const int pieceSlides[13]; // used to ask 'is piece a sliding piece?' (queen/rook/bishop)
 
-extern int mirror64[64];
+extern const int mirror64[64];
 
 extern U64 fileBitMask[8]; // all '1's for the indexed file
 extern U64 rankBitMask[8]; // all '1's for the indexed rank
