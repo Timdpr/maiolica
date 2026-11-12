@@ -112,8 +112,8 @@ void updateMaterialLists(Board& board) {
     }
 }
 
-/** Parses a Forsyth–Edwards Notation string and sets the given board with it
- *  TODO: Missing half move clock!!!
+/** Parses a Forsyth–Edwards Notation string and sets the given board with it.
+ *  Returns -1 (leaving a half-built board) if the FEN is malformed
  */
 int parseFen(const char *fen, Board& board) {
     ASSERT(fen != nullptr)
@@ -121,6 +121,7 @@ int parseFen(const char *fen, Board& board) {
     int rank = RANK_8;
     int file = FILE_A;
     int piece = 0;
+    int pieceNums[13] = {}; // so we can refuse more than 10 of a piece (pieceList holds 10) or 1 king
 
     resetBoard(board);
 
@@ -155,15 +156,20 @@ int parseFen(const char *fen, Board& board) {
             // are we at the end of a rank? Decrement rank counter, reset file, increment fen pointer and try again
             case '/':
             case ' ':
+                // every rank needs exactly 8 squares, and the space has to come right after rank 1
+                if (file != 8 || (*fen == ' ') != (rank == RANK_1)) return -1;
                 rank--;
                 file = FILE_A;
                 fen++;
                 continue;
             // if everything above is missed, then we have an error!
             default:
-                std::printf("FEN error! \n");
                 return -1;
         }
+
+        if (file + count > 8) return -1; // too many squares in this rank
+        if ((piece == wP || piece == bP) && (rank == RANK_1 || rank == RANK_8)) return -1;
+        if (piece != EMPTY && ++pieceNums[piece] > ((piece == wK || piece == bK) ? 1 : 10)) return -1;
 
         // empty piece 'count' is set to 1 OR the number of squares to skip,
         // so this will set piece OR skip the required amount of times!
@@ -175,14 +181,18 @@ int parseFen(const char *fen, Board& board) {
         }
         fen++;
     }
+    // we should have had all 8 ranks, and one king each
+    if (rank >= RANK_1 || pieceNums[wK] != 1 || pieceNums[bK] != 1) return -1;
+
     // At this point, our fen pointer should be at the 'side to move' position
-    ASSERT(*fen == 'w' || *fen == 'b')
+    if ((*fen != 'w' && *fen != 'b') || (fen[1] != ' ' && fen[1] != '\0')) return -1;
     board.side = (*fen == 'w') ? WHITE : BLACK;
-    fen += 2;
+    fen++;
+    if (*fen) fen++; // everything after the side is optional, so never step past the end
 
     // Now castling permissions
     for (int i = 0; i < 4; i++) { // could be up to 4 chars here
-        if (*fen == ' ') {
+        if (*fen == ' ' || *fen == '\0') {
             break;
         }
         switch(*fen) {
@@ -194,19 +204,39 @@ int parseFen(const char *fen, Board& board) {
         }
         fen++;
     }
-    fen++;
+    if (*fen) fen++;
+    // drop any right whose king or rook isn't on its home square, or movegen would castle phantom pieces
+    if (board.pieces[E1] != wK) board.castlingPerms &= ~(wK_CA | wQ_CA);
+    if (board.pieces[H1] != wR) board.castlingPerms &= ~wK_CA;
+    if (board.pieces[A1] != wR) board.castlingPerms &= ~wQ_CA;
+    if (board.pieces[E8] != bK) board.castlingPerms &= ~(bK_CA | bQ_CA);
+    if (board.pieces[H8] != bR) board.castlingPerms &= ~bK_CA;
+    if (board.pieces[A8] != bR) board.castlingPerms &= ~bQ_CA;
     ASSERT(board.castlingPerms >= 0 && board.castlingPerms <= 15)
 
     // En passant square:
-    if (*fen != '-') { // if we have an en passant square...
+    if (*fen && *fen != '-') { // if we have an en passant square...
         file = fen[0] - 'a'; // set file and rank ints with ASCII trick
         rank = fen[1] - '1';
 
-        ASSERT(file >= FILE_A && file <= FILE_H)
-        ASSERT(rank >= RANK_1 && rank <= RANK_8)
-
-        board.enPasSq = FILE_RANK_TO_SQUARE_INDEX(file, rank); // set square
+        // only keep it if it's empty and just behind a pawn that double pushed: rank 6 with white to move, 3 with black
+        if (file >= FILE_A && file <= FILE_H && rank == ((board.side == WHITE) ? RANK_6 : RANK_3)) {
+            int sq = FILE_RANK_TO_SQUARE_INDEX(file, rank);
+            int pushedSq = (board.side == WHITE) ? sq - 10 : sq + 10;
+            if (board.pieces[sq] == EMPTY && board.pieces[pushedSq] == ((board.side == WHITE) ? bP : wP)) {
+                board.enPasSq = sq; // set square
+            }
+        }
     }
+
+    // Halfmove clock, if it's there (the fullmove number isn't needed): skip the ep field and spaces first
+    while (*fen && *fen != ' ') fen++;
+    while (*fen == ' ') fen++;
+    int halfMoves = 0;
+    for (; *fen >= '0' && *fen <= '9' && halfMoves <= 100; fen++) {
+        halfMoves = halfMoves * 10 + (*fen - '0');
+    }
+    board.fiftyMove = (halfMoves > 100) ? 100 : halfMoves;
 
     // Generate and set position (hash) key
     board.positionKey = generatePositionKey(board);

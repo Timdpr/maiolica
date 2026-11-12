@@ -66,6 +66,14 @@ foreach(tier smoke quick full)
     set_tests_properties(perft_${tier} PROPERTIES LABELS ${tier})
 endforeach()
 
+add_executable(fen_tests tests/fen_tests.cpp)
+target_link_libraries(fen_tests PRIVATE maiolica_core)
+add_test(NAME fen COMMAND fen_tests)
+set_tests_properties(fen PROPERTIES LABELS "smoke;quick")
+
+add_test(NAME uci COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/uci_test.sh $<TARGET_FILE:maiolica>)
+set_tests_properties(uci PROPERTIES LABELS quick)
+
 file(STRINGS tests/bench_signature.txt MAIOLICA_BENCH LIMIT_COUNT 1)
 add_test(NAME bench_signature COMMAND maiolica bench)
 set_tests_properties(bench_signature PROPERTIES LABELS quick # too slow for debug builds
@@ -90,7 +98,7 @@ if(MAIOLICA_LTO AND NOT MAIOLICA_SANITIZE)
     include(CheckIPOSupported)
     check_ipo_supported(RESULT ipo_ok OUTPUT ipo_msg)
     if(ipo_ok)
-        foreach(target maiolica_core maiolica perft_tests)
+        foreach(target maiolica_core maiolica perft_tests fen_tests)
             set_property(TARGET ${target} PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELEASE ON)
             set_property(TARGET ${target} PROPERTY INTERPROCEDURAL_OPTIMIZATION_RELWITHDEBINFO ON)
         endforeach()
