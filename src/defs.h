@@ -6,6 +6,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <chrono>
+#include <type_traits>
 
 #ifdef DEBUG
 // prints to stderr and aborts, so a failure can't look like success to a test runner
@@ -141,6 +142,7 @@ struct Board {
     int searchHistory[13][BRD_SQ_NUM]; // indexed by piece type and board square
     int searchKillers[2][MAX_DEPTH]; // indexed by 2 killer moves, by depth
 };
+static_assert(std::is_trivially_copyable_v<Board>); // boards get copied whole: for the search thread, & by the gui code
 
 /// Limits & stats for a search. The atomics are shared between the search & input threads
 struct SearchInfo {
@@ -280,7 +282,7 @@ int isSquareAttacked(int square, int attackingSide, const Board& board);
 char *printSquare(int square);
 char *printMove(int move);
 void printMoveList(const MoveList *moveList);
-int parseMove(const char *ptrChar, Board& board);
+[[nodiscard]] int parseMove(const char *ptrChar, Board& board);
 
 // validate.cpp
 int moveListValid(const MoveList *list, const Board& board);
@@ -297,11 +299,11 @@ void mirrorEvalTest(Board& board);
 // movegen.cpp
 void generateAllMoves(const Board& board, MoveList *list);
 void generateAllCaptureMoves(const Board& board, MoveList *moveList);
-int moveExists(Board& board, int move);
+[[nodiscard]] int moveExists(Board& board, int move);
 void initMVVLVA();
 
 // makemove.cpp
-int makeMove(Board& board, int move);
+[[nodiscard]] int makeMove(Board& board, int move);
 void undoMove(Board& board);
 void makeNullMove(Board& board);
 void undoNullMove(Board& board);
@@ -322,7 +324,7 @@ void clearHashTable(HashTable *table);
 int getPVLine(int depth, Board& board, const HashTable *table);
 void initHashTable(HashTable *table, int MB);
 void storeHashEntry(Board& board, HashTable *table, int move, int score, int flags, int depth);
-int probeHashEntry(Board& board, HashTable *table, int *move, int *score, int alpha, int beta, int depth);
+[[nodiscard]] int probeHashEntry(Board& board, HashTable *table, int *move, int *score, int alpha, int beta, int depth);
 int probePVTable(const Board& board, const HashTable *table);
 int hashFull(const HashTable *table);
 

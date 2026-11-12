@@ -12,8 +12,7 @@ int getPVLine(const int depth, Board& board, const HashTable *table) {
     // 'loop through board's pvArray until given depth, as long as legal moves are being found'
     while (move != NO_MOVE && count < depth) {
         ASSERT(count < MAX_DEPTH)
-        if (moveExists(board, move)) {
-            makeMove(board, move);
+        if (moveExists(board, move) && makeMove(board, move)) { // it's legal, so it gets made
             board.pvArray[count++] = move; // populate pvArray with move
         } else {
             break;
