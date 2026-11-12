@@ -10,7 +10,7 @@ Three questions, three tools. Use the one that matches what a change claims.
 | "It's stronger" (or no weaker) | SPRT passes | `scripts/match.sh` |
 | "The protocol still works" | scripted sessions behave | `ctest` (`uci`, `fen`) |
 
-`ctest --preset release` runs perft smoke and quick, `fen`, `uci`, `replay`, `console` and the bench signature (~15s). `replay` plays `tests/replay_test.pgn` (both castles, promotions, underpromotion, disambiguation, en passant, a FEN start) through the san reader. The debug and asan presets run perft smoke and `fen`.
+`ctest --preset release` runs perft smoke and quick, `fen`, `uci`, `replay`, `console`, `console_typo` (a mistyped move is refused, not guessed at) and the bench signature (~15s). `replay` plays `tests/replay_test.pgn` (both castles, promotions, underpromotion, disambiguation, en passant, annotation codes like `$1`, a FEN start) through the san reader. The debug and asan presets run perft smoke and `fen`.
 
 ## Protocol
 - **`tests/uci_test.sh <engine>`** pipes scripted sessions into the engine. A `~N` line sleeps N seconds, so commands can arrive mid-search. Each session has a 20s watchdog, and a crash, hang or non-zero exit fails the test.
@@ -62,4 +62,4 @@ Setup is a one-off:
 ## Sanitisers
 - `ctest --preset asan` runs Debug with ASan and UBSan.
 - The `tsan` preset is for the search thread: drive it over UCI.
-- For a full search check, run `cmake-build-asan/maiolica bench` (slow, ~3 min). It must print the same signature as release.
+- For a full search check, run `cmake-build-asan/maiolica bench` (slow, ~3 min). It must print the same signature as release. For the same reason, `tests/uci_test.sh` against the asan build fails its `bench` session on the 20s watchdog; that one is expected.

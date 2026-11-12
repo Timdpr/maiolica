@@ -183,6 +183,10 @@ int parseFen(const char *fen, Board& board) {
     }
     // we should have had all 8 ranks, and one king each
     if (rank >= RANK_1 || pieceNums[wK] != 1 || pieceNums[bK] != 1) return -1;
+    // and room in pieceList for every pawn to promote to the same piece (true of any legal position)
+    for (int white = wN, black = bN; white <= wQ; white++, black++) {
+        if (pieceNums[white] + pieceNums[wP] > 10 || pieceNums[black] + pieceNums[bP] > 10) return -1;
+    }
 
     // At this point, our fen pointer should be at the 'side to move' position
     if ((*fen != 'w' && *fen != 'b') || (fen[1] != ' ' && fen[1] != '\0')) return -1;

@@ -3,9 +3,9 @@
 #include <string>
 #include <thread>
 
-/// Check if time (or the node limit) is up
+/// Check if time (or the node limit) is up. Neither applies while pondering: that only ends when the gui says so
 static void checkUp(SearchInfo *info) {
-    if ((info->timeSet && getTimeMS() > info->stopTime) || (info->nodeLimit && info->nodes >= info->nodeLimit)) {
+    if ((info->timeSet && getTimeMS() > info->stopTime) || (info->nodeLimit && info->nodes >= info->nodeLimit && !info->ponder)) {
         info->stopped = true;
     }
 }
@@ -289,7 +289,7 @@ static std::string scoreToUci(const int score) {
 
 void searchPosition(Board& board, SearchInfo *info, HashTable *table) {
     clearForSearch(board, info, table);
-    int bestMove = firstLegalMove(board); // in case we're stopped before depth 1 is done
+    int bestMove = NO_MOVE;
     int ponderMove = NO_MOVE;
 
     for (int currentDepth = 1; currentDepth <= info->depth; ++currentDepth) {
@@ -312,6 +312,11 @@ void searchPosition(Board& board, SearchInfo *info, HashTable *table) {
         sendLine("info depth %d seldepth %d score %s nodes %ld nps %lld hashfull %d time %lld pv%s",
                  currentDepth, info->selDepth, scoreToUci(bestScore).c_str(), info->nodes,
                  (long long)(info->nodes * 1000 / (time + 1)), hashFull(table), (long long)time, pv.c_str());
+    }
+    // stopped before depth 1 was done? Play anything legal. Only now, as making & undoing a move
+    // can reorder the piece lists, and doing that before the search would change it
+    if (bestMove == NO_MOVE) {
+        bestMove = firstLegalMove(board);
     }
 
     // 'go infinite' & pondering mustn't send bestmove until the gui says so

@@ -99,10 +99,15 @@ static bool sanMatches(std::string san, const int move, const Board& board) {
     if (san.size() < 2 || san[san.size() - 2] != 'a' + filesBoard[to] || san.back() != '1' + ranksBoard[to]) return false;
     san.resize(san.size() - 2);
     // then the piece letter (none for pawns)
-    char type = !san.empty() && std::isupper(san[0]) ? san[0] : 'P';
+    char type = 'P';
+    if (!san.empty() && std::isupper(san[0])) {
+        type = san[0];
+        san.erase(0, 1);
+    }
     if (std::toupper(pieceChars[piece]) != type) return false;
-    // anything left is a capture 'x' or the from file/rank
+    // anything left is a capture 'x' (or the '-' of e2-e4) or the from file/rank
     for (char c : san) {
+        if (!std::strchr("abcdefgh12345678x-", c)) return false; // so a mistyped 'nf3' isn't read as a pawn to f3
         if (c >= 'a' && c <= 'h' && c - 'a' != filesBoard[from]) return false;
         if (c >= '1' && c <= '8' && c - '1' != ranksBoard[from]) return false;
     }
@@ -300,9 +305,15 @@ void replayPgn(const char *file, const int delay) {
     }
     std::string text((std::istreambuf_iterator<char>(stream)), std::istreambuf_iterator<char>());
     static Board board{};
-    parseFen(START_FEN, board);
-    std::string white = "?", black = "?", termination;
+    std::string white, black, termination;
     int moves = 0;
+    auto newGame = [&] { // a clean slate, for the next game's tags to fill in
+        parseFen(START_FEN, board);
+        white = black = "?";
+        termination.clear();
+        moves = 0;
+    };
+    newGame();
 
     for (size_t i = 0; i < text.size(); ) {
         char c = text[i];
@@ -321,6 +332,7 @@ void replayPgn(const char *file, const int delay) {
             continue;
         }
         if (c == '[') { // a tag pair: [Name "value"]
+            if (moves) newGame(); // tags after moves: the last game had no result on the end
             size_t end = text.find(']', i);
             std::string tag = text.substr(i + 1, end - i - 1);
             i = end == std::string::npos ? text.size() : end + 1;
@@ -340,21 +352,18 @@ void replayPgn(const char *file, const int delay) {
         if (token == "1-0" || token == "0-1" || token == "1/2-1/2" || token == "*") { // end of a game
             std::printf("\n%s %s\n\n", token.c_str(), termination.c_str());
             std::this_thread::sleep_for(std::chrono::milliseconds(delay * 4));
-            parseFen(START_FEN, board);
-            white = black = "?";
-            termination.clear();
-            moves = 0;
+            newGame();
             continue;
         }
         size_t dot = token.rfind('.');
         if (dot != std::string::npos && std::isdigit((unsigned char)token[0])) token.erase(0, dot + 1); // move numbers, like '12.' or '12...e5'
-        if (token.empty()) continue;
+        if (token.empty() || token[0] == '$') continue; // nothing left, or an annotation code like $1
 
         int move = parseAnyMove(token, board);
         if (!playMove(board, move)) {
             std::printf("couldn't read move '%s', skipping the rest of this game\n", token.c_str());
             i = text.find_first_of("[", i); // on to the next game's tags
-            parseFen(START_FEN, board);
+            newGame();
             continue;
         }
         moves++;

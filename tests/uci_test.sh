@@ -32,9 +32,11 @@ check() {
 
 # count <name> <script> <pattern> <expected number of matching lines>
 count() {
-    local n
-    n=$(run "$2" | grep -Ec -- "$3")
-    if [[ $n == "$4" ]]; then echo "ok   $1"; else echo "FAIL $1: $n lines match '$3', expected $4"; ((failures++)); fi
+    local out n
+    out=$(run "$2")
+    n=$(grep -Ec -- "$3" <<< "$out")
+    if [[ $n == "$4" ]] && ! grep -q "EXIT STATUS" <<< "$out"; then echo "ok   $1"; else
+        echo "FAIL $1: $n lines match '$3', expected $4"; sed 's/^/    /' <<< "$out" | tail -15; ((failures++)); fi
 }
 
 # order <name> <script> <pattern> <pattern that must come later>
@@ -43,14 +45,15 @@ order() {
     out=$(run "$2")
     a=$(grep -En -- "$3" <<< "$out" | head -1 | cut -d: -f1)
     b=$(grep -En -- "$4" <<< "$out" | head -1 | cut -d: -f1)
-    if [[ -n $a && -n $b ]] && ((a < b)); then echo "ok   $1"; else
+    if [[ -n $a && -n $b ]] && ((a < b)) && ! grep -q "EXIT STATUS" <<< "$out"; then echo "ok   $1"; else
         echo "FAIL $1: wanted '$3' before '$4'"; sed 's/^/    /' <<< "$out" | tail -15; ((failures++)); fi
 }
 
 check "uci handshake" $'uci\nisready\nquit' 'option name Hash type spin'
 order "uciok before readyok" $'uci\nisready\nquit' '^uciok$' '^readyok$'
-count "only uci lines (and the banner)" $'uci\nisready\nposition startpos moves e2e4\ngo depth 4\n~0.5\nquit' \
-    '^(id|option|uciok|readyok|info|bestmove)( |$)|by Tim Russell$' 15
+session=$'uci\nisready\nposition startpos moves e2e4\ngo depth 4\n~0.5\nquit'
+count "15 uci lines (and the banner)" "$session" '^(id|option|uciok|readyok|info|bestmove)( |$)|by Tim Russell$' 15
+count "and no other lines" "$session" '^' 15
 check "no stray output" $'uci\nucinewgame\nposition startpos moves e2e4\ngo depth 3\n~0.5\nquit' 'bestmove' \
     '^(Board|side|time:|HashTable|Set Hash)'
 count "two gos without stop (normal game flow)" $'position startpos\ngo depth 4\n~0.5\nposition startpos moves e2e4 e7e5\ngo depth 4\n~0.5\nquit' \
@@ -59,7 +62,7 @@ check "idle stop is harmless" $'stop\nstop\nisready\nquit' 'readyok'
 count "go infinite then instant stop" $'position startpos\ngo infinite\nstop\nisready\nquit' '^bestmove [a-h][1-8]' 1
 order "infinite waits for stop" $'position fen 8/8/4k3/8/8/4K3/8/8 w - - 0 1\ngo infinite\n~1\nisready\n~0.2\nstop\nquit' \
     '^readyok' '^bestmove'
-count "infinite sends nothing early" $'position fen 8/8/4k3/8/8/4K3/8/8 w - - 0 1\ngo infinite\n~1\nquit' '^bestmove' 1
+count "infinite then quit: just the one bestmove" $'position fen 8/8/4k3/8/8/4K3/8/8 w - - 0 1\ngo infinite\n~1\nquit' '^bestmove' 1
 order "ponder waits for ponderhit" $'position startpos moves e2e4\ngo ponder wtime 2000 btime 2000\n~0.5\nisready\nponderhit\n~1\nquit' \
     '^readyok' '^bestmove'
 check "mate scores" $'position fen 6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1\ngo depth 4\n~0.5\nquit' 'score mate 1 .*pv a1a8'
@@ -70,9 +73,13 @@ check "root repetition still plays a move" $'position startpos moves g1f3 g8f6 f
 check "tiny clock still plays a legal move" $'position startpos\ngo wtime 30 btime 30\n~0.5\nquit' '^bestmove [a-h][1-8][a-h][1-8]'
 check "big increment is capped" $'debug on\nposition startpos\ngo wtime 500 btime 500 winc 5000 binc 5000\n~1\nquit' \
     'time budget 337 ms'
-check "go nodes" $'position startpos\ngo nodes 3000\n~0.5\nquit' '^bestmove'
+check "negative clock still moves at once" $'debug on\nposition startpos\ngo wtime -30 btime 5000 winc 100 binc 100\n~0.5\nquit' \
+    'time budget 1 ms'
+order "ponder ignores the node limit" $'position startpos moves e2e4\ngo ponder nodes 3000\n~0.5\nisready\nponderhit\n~0.5\nquit' \
+    '^readyok' '^bestmove'
+order "go nodes stops by itself" $'position startpos\ngo nodes 3000\n~0.5\nisready\nquit' '^bestmove' '^readyok'
 check "messy whitespace" $'position   fen  rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1   moves\te7e5  g1f3\nd\nquit' \
-    'side character: b'
+    '^  \.  \.  \.  \.  \.  N  \.  \.   3$' # the knight's on f3, so both moves were played
 check "invalid fen reported" $'position fen xyz w - -\nisready\nquit' 'info string invalid fen'
 check "illegal move reported" $'position startpos moves e2e4 e2e4\nquit' 'info string illegal move: e2e4'
 check "option names ignore case" $'setoption name hash value 8\nsetoption name CLEAR HASH\nisready\nquit' 'readyok'
@@ -80,6 +87,9 @@ check "debug on/off keeps the loop going" $'debug on\ndebug off\nisready\nquit' 
 check "eof without quit exits" $'uci' 'uciok'
 check "go perft" $'go perft 3\nquit' 'Nodes searched: 8902'
 check "bench" $'bench\nquit' 'nodes [0-9]+ nps'
+epd=$(mktemp) && echo "8/8/4k3/8/8/4K3/8/8 w - - 0 1" > "$epd"
+check "epd doesn't inherit go infinite" $'go infinite\nstop\nepd '"$epd"$'\nisready\nquit' 'readyok'
+rm -f "$epd"
 
 echo "$failures failure(s)"
 exit $((failures > 0))

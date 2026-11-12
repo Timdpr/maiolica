@@ -58,6 +58,8 @@ void debugAnalysisTest(const char *epdFile, Board& board, SearchInfo *info, Hash
 
     info->depth = MAX_DEPTH - 2;
     info->timeSet = true;
+    info->infinite = false; // not whatever the last 'go' asked for
+    info->nodeLimit = 0;
     int time = 1140000;
 
     if (file == nullptr) {
@@ -72,7 +74,7 @@ void debugAnalysisTest(const char *epdFile, Board& board, SearchInfo *info, Hash
             parseFen(lineIn, board);
             printf("\n%s\n", lineIn);
             printf("time:%d start:%lld stop:%lld depth:%d timeset:%d\n",
-                   time, info->startTime, info->stopTime.load(), info->depth, info->timeSet.load());
+                   time, (long long)info->startTime, (long long)info->stopTime.load(), info->depth, info->timeSet.load());
             searchPosition(board, info, table);
             memset(&lineIn[0], 0, sizeof(lineIn));
         }
