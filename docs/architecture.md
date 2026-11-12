@@ -30,7 +30,7 @@ C++20 UCI engine. Single-threaded search, 10x12 mailbox board, pawn-only bitboar
 | `tests/bench_signature.txt` | Expected node total (currently `4527030`); ctest `bench_signature` greps `Nodes searched  : N` from `maiolica bench` |
 | `tests/microbench.cpp` | Optional Google Benchmark (`MAIOLICA_MICROBENCH=ON`, `microbench` preset): movegen, captures, make/undo, `isSquareAttacked`, eval. Indicative only; bench/perft decide |
 
-Build/presets in `CMakeLists.txt`/`CMakePresets.json` (release, native, profile, debug, asan, tsan, microbench); `scripts/ab.sh`, `pgo.sh`, `match.sh`.
+Build/presets in `CMakeLists.txt`/`CMakePresets.json` (release, native, profile, debug, asan, tsan, microbench); `scripts/ab.sh`, `pgo.sh`, `match.sh`, `demo.sh`.
 
 ## Board representation (`Board`, defs.h)
 
@@ -115,7 +115,7 @@ Zobrist: `pieceKeys[13][120]` (row `EMPTY` doubles as the EP-square key), `sideK
 
 `isRepetition` scans `history[max(0, historyPly - fiftyMove) .. historyPly-2]` for the current key; one earlier occurrence counts as a draw. `checkUp` checks the clock (`timeSet && now > stopTime`) and `nodeLimit`; a GUI `stop` reaches the search via the atomic `info->stopped`, read with relaxed ordering in the move loops. On `stopped`, both searches return 0 after undoing the move.
 
-Mate scores: `IS_MATE` = 30000 − 64. Printed as `cp` (no `score mate` yet).
+Mate scores: `IS_MATE` = 30000 − 64. Anything beyond it is printed as `score mate N` (`scoreToUci`).
 
 ## Transposition table (pvtable.cpp)
 
@@ -142,7 +142,7 @@ Known issues, left as they are until a fix passes an SPRT (they change play):
 ## Threading and UCI (uci.cpp)
 
 Protocol details are in [uci.md](uci.md).
-- The input thread owns one `std::thread searchThread`. `stopSearch()` sets `stopped`, clears `ponder` and joins; it runs before every `go`, `setoption`, `ucinewgame`, dev command and on exit, and is a no-op when idle. `position` doesn't stop a search, since the search works on its own copy.
+- The input thread owns one `std::thread searchThread`. `stopSearch()` sets `stopped`, clears `ponder` and joins; it runs before every `go`, `setoption`, `ucinewgame`, the dev commands that search or use the table (`bench`, `perft`, `epd`) and on exit, and is a no-op when idle. `d` and `eval` only read the gui's board, so they don't stop it. `position` doesn't stop a search, since the search works on its own copy.
 - `go` sets every `SearchInfo` field on the input thread (including `stopped = false`) *before* launching, then hands the thread a heap copy of the board (`std::make_unique<Board>`), so the gui can carry on.
 - Shared between the threads: `stopped`, `ponder`, `timeSet`, `stopTime` (atomics; `ponderhit` writes `stopTime` then `timeSet`). Everything else is written before launch or by the search thread only.
 - All protocol output goes through `sendLine` (printf-style, one mutex-guarded write + flush per line), so `readyok` can't land mid `info` line. If `lineHandler` is set (only by the console), lines go to it instead, so the console can show the search its own way. `printMove` uses `thread_local` buffers.
