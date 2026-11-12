@@ -62,4 +62,4 @@ Setup is a one-off:
 ## Sanitisers
 - `ctest --preset asan` runs Debug with ASan and UBSan.
 - The `tsan` preset is for the search thread: drive it over UCI.
-- For a full search check, run `cmake-build-asan/maiolica bench` (slow, ~3 min). It must print the same signature as release.
+- For a full search check, run `cmake-build-asan/maiolica bench` (slow, ~3 min). It must print the same signature as release. For the same reason, `tests/uci_test.sh` against the asan build fails its `bench` session on the 20s watchdog; that one is expected.
