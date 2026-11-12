@@ -98,7 +98,7 @@ Zobrist: `pieceKeys[13][120]` (row `EMPTY` doubles as the EP-square key), `sideK
 
 ## Search (search.cpp)
 
-`searchPosition`: `clearForSearch` (zero history/killers, `currentAge++`, `ply = 0`, reset `nodes`/`selDepth`/fail-high stats; `stopped` is reset by the caller, before the thread starts), then depths 1..`info->depth` with a full window (±`ALPHABETA_BOUND` 30000), no aspiration. A stopped iteration is discarded; otherwise `getPVLine` fills `pvArray` and it sends `info depth … seldepth … score cp|mate … nodes … nps … hashfull … time … pv …`. `bestmove` starts as `firstLegalMove` (so stopping before depth 1 still plays something; `0000` if mated or stalemated), then takes `pvArray[0]`, with `pvArray[1]` as the ponder move. In `infinite` or `ponder` mode it then waits for `stopped`/`ponderhit` before sending `bestmove`.
+`searchPosition`: `clearForSearch` (zero history/killers, `currentAge++`, `ply = 0`, reset `nodes`/`selDepth`/fail-high stats; `stopped` is reset by the caller, before the thread starts), then depths 1..`info->depth` with a full window (±`ALPHABETA_BOUND` 30000), no aspiration. A stopped iteration is discarded; otherwise `getPVLine` fills `pvArray` and it sends `info depth … seldepth … score cp|mate … nodes … nps … hashfull … time … pv …`. `bestmove` is `pvArray[0]`, with `pvArray[1]` as the ponder move. If no iteration finished it falls back to `firstLegalMove` (`0000` if mated or stalemated); that runs after the search, because making and undoing a move can reorder the piece lists. In `infinite` or `ponder` mode it then waits for `stopped`/`ponderhit` before sending `bestmove`.
 
 `alphaBeta(alpha, beta, depth, board, info, table, nullMoveAllowed)`, negamax, in this order:
 1. `depth == 0` → `quiescence` (which counts the node).
