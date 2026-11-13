@@ -117,6 +117,8 @@ The routine:
 |---|---|---|---|---|
 | 2026-11-13 | `baseline-2026-11` | 4527030 | | 0 (by definition) |
 
+The baseline played itself under these conditions, to check the setup favours neither side: 2000 games came out at -2.3 ± 9.1 Elo (591 wins, 604 losses, 805 draws), every game ending normally. So a gap under about 9 Elo at this length is noise.
+
 ## Sanitisers
 - `ctest --preset asan` runs Debug with ASan and UBSan.
 - The `tsan` preset is for the search thread: drive it over UCI.
