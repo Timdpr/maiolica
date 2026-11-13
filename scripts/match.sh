@@ -41,6 +41,15 @@ fi
 [[ -f $BOOK ]] || { echo "no opening book at $BOOK (set BOOK=...)" >&2; exit 1; }
 git rev-parse --verify --quiet "$BASE_REF^{commit}" >/dev/null || { echo "unknown ref '$BASE_REF'" >&2; exit 1; }
 
+# a local branch only moves when it's pulled, so say so if its remote copy has gone on ahead
+NOTES=""
+git fetch --quiet 2>/dev/null || true
+UPSTREAM=$(git rev-parse --abbrev-ref "$BASE_REF@{upstream}" 2>/dev/null || true)
+if [[ -n $UPSTREAM ]]; then
+    BEHIND=$(git rev-list --count "$BASE_REF..$UPSTREAM")
+    ((BEHIND == 0)) || NOTES+="warning: $BASE_REF is $BEHIND commits behind $UPSTREAM. Pull it, or use $UPSTREAM as the base"$'\n'
+fi
+
 DEV_SHA=$(git rev-parse --short HEAD)$(git diff --quiet HEAD || echo +dirty)   # +dirty: uncommitted changes
 BASE_SHA=$(git rev-parse --short "$BASE_REF^{commit}")
 NAME=$(date +%Y%m%d-%H%M%S)-$DEV_SHA-vs-${BASE_REF//\//_}-$MODE
@@ -64,7 +73,8 @@ cp "$TMP/build/maiolica" "$OUT/base"
 { echo "dev:  $DEV_SHA"
   echo "base: $BASE_REF ($BASE_SHA)"
   echo "mode: $MODE ($DESC), tc: $TC, book: $BOOK"
-  echo "seed: $SEED"; } | tee "$OUT/info.txt"
+  echo "seed: $SEED"
+  printf '%s' "$NOTES"; } | tee "$OUT/info.txt"
 
 # book format is just the file extension (pgn or epd)
 # no resign or draw adjudication: on 790 of our own games the usual rules got 17-20 results wrong

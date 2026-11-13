@@ -79,6 +79,7 @@ The script builds the working tree ("dev") and the given ref ("base"). It plays 
 - **`elo`** plays a fixed number of games and reports the Elo difference with its error margin. Use it to measure a gap. Don't read the gap off an SPRT: because an SPRT stops the moment the score looks convincing, the Elo it shows at that point is biased. `GAMES=500 scripts/match.sh <ref> elo` changes the length. 2000 games take about 2 hours and give a margin of roughly ±9 Elo.
 - **Seed:** the openings are drawn from the book at random. The seed is printed and saved in `info.txt`, and `SEED=<n> scripts/match.sh ...` replays a match with the same openings in the same order.
 - **Terminations:** when the match finishes, the script counts how the games ended. Anything other than `normal` (a time forfeit, an illegal move, a crash, a disconnect) makes it exit non-zero, because that result wasn't decided on the board.
+- **A stale base:** `master` here is your local copy of the branch, which only moves when you pull. The script fetches first, and if the base branch is behind its remote copy it says so on screen and in `info.txt`. Using `origin/master` as the base avoids the question.
 - **No adjudication:** games are played out to mate or a draw by the rules. Ending them early on the engines' own scores (resigning at -6.00, calling a draw when both sides sit near 0.00) was simulated on 790 real games: it would have got 17 to 20 results wrong, for 5 to 12% fewer moves played.
 
 Setup is a one-off:
