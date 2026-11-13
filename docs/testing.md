@@ -67,7 +67,18 @@ scripts/ab.sh master HEAD 9 perft
 - **Cycles and wall time:** wobble by ~1–3% when the laptop is busy.
 - **Microbenchmarks:** `cmake --preset microbench && cmake --build --preset microbench && cmake-build-microbench/microbench` times movegen, make/undo, attacks and eval in isolation. They're good for iterating, but LTO inlines these functions into the real search, so only `ab.sh` decides.
 - **Profiling:** build the `profile` preset, then `sample` or Instruments on `maiolica bench`.
-- **PGO:** `scripts/pgo.sh` gives a profile-guided build in `cmake-build-pgo/` (~3–5% faster).
+
+### The fastest build (PGO)
+```sh
+scripts/pgo.sh      # ~10s; the engine is cmake-build-pgo/maiolica
+```
+Profile-guided optimisation (PGO) is a build in two passes. The first makes an engine that counts how often each branch and call is taken, and runs it on `bench` and the quick perft. The second compiles again with those counts, so the compiler lays out the code for the paths that are really used. **This is the build to play or analyse with:** point a GUI at `cmake-build-pgo/maiolica`.
+
+- **Gain** over the release preset (M1 Pro, Apple clang 17, minimum of 7 interleaved runs): bench −3.8% instructions and −3.5% cycles; perft −5.9% instructions and −10.8% cycles.
+- **Same search:** only the speed may change. The script ends by running `bench` and fails if the node count isn't the one in `tests/bench_signature.txt`.
+- **Run it again after changing the code.** The counts belong to the source they were collected from; a stale profile still builds, but fits the code less well.
+- **Clang only**, and it needs `llvm-profdata` (`xcrun llvm-profdata` on macOS; the script finds it, or set `PROFDATA`).
+- **Not for comparing versions.** `ctest`, `ab.sh`, `difftest.py` and `match.sh` all build the plain release preset, so two versions are always compared like for like. A speedup measured with `ab.sh` is a speedup of the release build; the PGO build usually keeps most of it, but measure if it matters.
 
 ## Strength
 ```sh
