@@ -50,6 +50,17 @@ if [[ -n $UPSTREAM ]]; then
     ((BEHIND == 0)) || NOTES+="warning: $BASE_REF is $BEHIND commits behind $UPSTREAM. Pull it, or use $UPSTREAM as the base"$'\n'
 fi
 
+# a match is only as fair as the machine is steady: say so if it's on battery, saving power,
+# or busy before we've even started (6 games at once leave 2 fast cores spare)
+if command -v pmset >/dev/null; then
+    POWER=$(pmset -g batt; pmset -g)
+    [[ $POWER != *"Battery Power"* ]] || NOTES+="warning: running on battery"$'\n'
+    [[ ! $POWER =~ lowpowermode\ +1 ]] || NOTES+="warning: low power mode is on"$'\n'
+fi
+LOAD=$(uptime | sed 's/.*load averages*: *//; s/[, ].*//')
+awk -v load="$LOAD" 'BEGIN {exit load > 2}' || NOTES+="warning: the machine was already busy (load $LOAD)"$'\n'
+AWAKE=$(command -v caffeinate || true)   # macOS: keeps the laptop from sleeping mid-match
+
 DEV_SHA=$(git rev-parse --short HEAD)$(git diff --quiet HEAD || echo +dirty)   # +dirty: uncommitted changes
 BASE_SHA=$(git rev-parse --short "$BASE_REF^{commit}")
 NAME=$(date +%Y%m%d-%H%M%S)-$DEV_SHA-vs-${BASE_REF//\//_}-$MODE
@@ -79,7 +90,7 @@ cp "$TMP/build/maiolica" "$OUT/base"
 # book format is just the file extension (pgn or epd)
 # no resign or draw adjudication: on 790 of our own games the usual rules got 17-20 results wrong
 STATUS=0
-"$FASTCHESS" \
+$AWAKE ${AWAKE:+-i} "$FASTCHESS" \
   -engine cmd="$OUT/dev" name=dev \
   -engine cmd="$OUT/base" name=base \
   -each tc="$TC" option.Hash=16 \
