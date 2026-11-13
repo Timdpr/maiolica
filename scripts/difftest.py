@@ -6,10 +6,11 @@
 # The bench signature is 9 positions on a fresh table; this is thousands of them, most with
 # a table carried through a whole game. 60 games is ~8,700 searches and takes ~6 minutes.
 # Exits non-zero on any mismatch.
-import os, random, re, shutil, subprocess, sys, time
+import os, random, re, shutil, subprocess, sys, threading, time
 
 USAGE = "usage: scripts/difftest.py A B [games]"
 SEED = 20261113  # fixed, so every run plays the same games
+TIMEOUT = 120    # seconds an engine gets to answer before it's taken to have hung
 
 # name, Hash in MB, go command, fresh table for every search?, every Nth position, first N games only
 MODES = [
@@ -43,24 +44,37 @@ def build(ref):
 
 class Engine:
     def __init__(self, path):
+        self.path = path
         self.p = subprocess.Popen([path], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, bufsize=1)
         self.cmd("uci")
         self.until("uciok")
 
     def cmd(self, s):
-        self.p.stdin.write(s + "\n")
-        self.p.stdin.flush()
+        try:
+            self.p.stdin.write(s + "\n")
+            self.p.stdin.flush()
+        except BrokenPipeError:
+            self.fail(f"before '{s}'")
 
-    # read lines up to & including the one starting with token
+    def fail(self, why):
+        sys.exit(f"FAILED: {self.path} crashed or hung ({why})")
+
+    # read lines up to & including the one starting with token. A hung engine is killed
+    # by the timer, which then reads the same as one that crashed: no more output
     def until(self, token):
         lines = []
-        while True:
-            line = self.p.stdout.readline()
-            if not line:
-                raise RuntimeError("engine died")
-            lines.append(line.strip())
-            if lines[-1].startswith(token):
-                return lines
+        timer = threading.Timer(TIMEOUT, self.p.kill)
+        timer.start()
+        try:
+            while True:
+                line = self.p.stdout.readline()
+                if not line:
+                    self.fail(f"waiting for '{token}'")
+                lines.append(line.strip())
+                if lines[-1].startswith(token):
+                    return lines
+        finally:
+            timer.cancel()
 
     # the legal moves, from 'perft 1'
     def legal(self, pos):
