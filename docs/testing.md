@@ -41,12 +41,12 @@ It is deterministic because the Zobrist keys come from a fixed-seed splitmix64. 
 
 ## Differential test
 ```sh
-scripts/difftest.py master .       # master vs the working tree: 60 games, ~8,700 searches, ~3.5 min
+scripts/difftest.py master .       # master vs the working tree: 60 games, ~8,500 searches, ~2.5 min
 scripts/difftest.py master . 10    # fewer games, for a quick look
 ```
 The bench signature is one number from 9 positions, each on an empty table. The differential test is the wider version of the same check: it runs the same searches through two builds over UCI and compares every `info` and `bestmove` line, leaving out only `time` and `nps`. Both arguments are git refs, or `.` for the working tree.
 
-It first makes its games: a few random opening moves, then the first build plays both sides at depth 4, with the odd random move thrown in. The random seed is fixed, so every run uses the same games. Each position is then searched by both builds at the same time, three ways:
+It first makes its games: a few random opening moves, then the first build plays both sides at depth 4, with the odd random move thrown in. Every fifth game starts from a quiet endgame instead, with the fifty-move count already at 90 to 99, because a game from the start position never gets near that rule. The random seed is fixed, so every run uses the same games. Each position is then searched by both builds at the same time, three ways:
 
 | Mode | What it adds over bench |
 |---|---|
@@ -56,7 +56,7 @@ It first makes its games: a few random opening moves, then the first build plays
 
 It prints the first few mismatches per mode and exits non-zero if there were any. An engine that crashes, or gives no answer for 2 minutes, fails it too. It only makes sense for a change that claims to leave search alone: once the bench signature moves, this fails too, as it should.
 
-CI runs it on every pull request, on Linux only: 10 games (~1,700 searches) through the pull request and through the commit it would merge into, in under 2 minutes alongside the other tests. A pull request that changes `tests/bench_signature.txt` has changed search on purpose, so there the job compares nothing and passes.
+CI runs it on every pull request, on Linux only: 10 games (~1,600 searches) through the pull request and through the commit it would merge into, in under 2 minutes alongside the other tests. A pull request that changes `tests/bench_signature.txt` has changed search on purpose, so there the job compares nothing and passes.
 
 ## Speed
 ```sh
