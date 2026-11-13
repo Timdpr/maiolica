@@ -70,6 +70,8 @@ check "checkmated: bestmove 0000" $'position fen 6k1/5ppp/8/8/8/8/5PPP/r5K1 w - 
 check "stalemate: bestmove 0000" $'position fen 7k/5Q2/6K1/8/8/8/8/8 b - - 0 1\ngo depth 3\n~0.3\nquit' '^bestmove 0000'
 check "root repetition still plays a move" $'position startpos moves g1f3 g8f6 f3g1 f6g8 g1f3 g8f6 f3g1 f6g8\ngo depth 4\n~0.5\nquit' \
     '^bestmove [a-h][1-8][a-h][1-8]'
+check "pv stops at a repetition" $'position fen 6k1/5p1p/n7/n7/8/8/rr3PPP/3Q2K1 w - - 0 1\ngo depth 9\n~0.5\nquit' \
+    '^info depth 9 .*score cp 0 .* pv d1d8' '^info depth 9 .* pv( [a-h][1-8][a-h][1-8]){9}'
 check "tiny clock still plays a legal move" $'position startpos\ngo wtime 30 btime 30\n~0.5\nquit' '^bestmove [a-h][1-8][a-h][1-8]'
 check "big increment is capped" $'debug on\nposition startpos\ngo wtime 500 btime 500 winc 5000 binc 5000\n~1\nquit' \
     'time budget 337 ms'
