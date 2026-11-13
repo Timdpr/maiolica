@@ -41,12 +41,12 @@ It is deterministic because the Zobrist keys come from a fixed-seed splitmix64. 
 
 ## Differential test
 ```sh
-scripts/difftest.py master .       # master vs the working tree: 60 games, ~8,700 searches, ~6 min
+scripts/difftest.py master .       # master vs the working tree: 60 games, ~8,700 searches, ~3.5 min
 scripts/difftest.py master . 10    # fewer games, for a quick look
 ```
 The bench signature is one number from 9 positions, each on an empty table. The differential test is the wider version of the same check: it runs the same searches through two builds over UCI and compares every `info` and `bestmove` line, leaving out only `time` and `nps`. Both arguments are git refs, or `.` for the working tree.
 
-It first makes its games: a few random opening moves, then the first build plays both sides at depth 4, with the odd random move thrown in. The random seed is fixed, so every run uses the same games. Each position is then searched by both builds, three ways:
+It first makes its games: a few random opening moves, then the first build plays both sides at depth 4, with the odd random move thrown in. The random seed is fixed, so every run uses the same games. Each position is then searched by both builds at the same time, three ways:
 
 | Mode | What it adds over bench |
 |---|---|

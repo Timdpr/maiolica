@@ -4,7 +4,7 @@
 #   scripts/difftest.py A B [games=60]
 # A and B are git refs, or '.' for the working tree. e.g. scripts/difftest.py master .
 # The bench signature is 9 positions on a fresh table; this is thousands of them, most with
-# a table carried through a whole game. 60 games is ~8,700 searches and takes ~6 minutes.
+# a table carried through a whole game. 60 games is ~8,700 searches and takes ~3.5 minutes.
 # Exits non-zero on any mismatch.
 import os, random, re, shutil, subprocess, sys, threading, time
 
@@ -82,13 +82,20 @@ class Engine:
         self.cmd("perft 1")
         return [l.split(":")[0] for l in self.until("Nodes searched") if re.match(r"^[a-h][1-8][a-h][1-8][qrbn]?: ", l)]
 
-    # one search: its info & bestmove lines, without the parts that depend on the clock
-    def search(self, pos, go, fresh):
+    # start a search...
+    def go(self, pos, go, fresh):
         if fresh:
             self.cmd("ucinewgame")
         self.cmd(pos)
         self.cmd(go)
+
+    # ...and wait for its info & bestmove lines, without the parts that depend on the clock
+    def result(self):
         return [re.sub(r" (time|nps) \d+", "", l) for l in self.until("bestmove") if l.startswith(("info depth", "bestmove"))]
+
+    def search(self, pos, go, fresh):
+        self.go(pos, go, fresh)
+        return self.result()
 
     def quit(self):
         self.cmd("quit")
@@ -144,7 +151,9 @@ def main():
                 e.cmd("ucinewgame")
             for i in range(0, len(g) + 1, step):
                 pos = "position startpos moves " + " ".join(g[:i])
-                outA, outB = a.search(pos, go, fresh), b.search(pos, go, fresh)
+                for e in (a, b):  # both search at once
+                    e.go(pos, go, fresh)
+                outA, outB = a.result(), b.result()
                 searches += 1
                 lines += len(outA)
                 if outA != outB:
