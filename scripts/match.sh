@@ -90,6 +90,10 @@ cp "$TMP/build/maiolica" "$OUT/base"
 
 # book format is just the file extension (pgn or epd)
 # no resign or draw adjudication: on 790 of our own games the usual rules got 17-20 results wrong
+# Ctrl-C: fastchess winds the match down, and what was played still gets written up
+# (it's asked for the score after every pair, so there's always a recent one to keep)
+STOPPED=""
+trap 'STOPPED=1' INT
 STATUS=0
 $AWAKE ${AWAKE:+-i} "$FASTCHESS" \
   -engine cmd="$OUT/dev" name=dev \
@@ -99,8 +103,9 @@ $AWAKE ${AWAKE:+-i} "$FASTCHESS" \
   -games 2 -repeat $LENGTH -concurrency "$CONCURRENCY" \
   -pgnout file="$OUT/games.pgn" \
   -config outname="$OUT/config.json" \
-  -recover \
-  2>&1 | tee "$OUT/log.txt" || STATUS=$?
+  -recover -ratinginterval 1 \
+  2>&1 | tee -i "$OUT/log.txt" || STATUS=$?
+trap - INT
 
 [[ -s $OUT/games.pgn ]] || { echo "no games were played" >&2; exit 1; }
 
@@ -115,6 +120,7 @@ gzip -f "$OUT/log.txt"   # it runs to tens of MB otherwise
 # anything but 'normal' (time forfeit, illegal move, crash, disconnect) means a result
 # that wasn't decided on the board
 ODD=$(grep -v '"normal"\]$' <<< "$TERMS" || true)
+[[ -z $STOPPED ]] || ODD=$(grep -v '"unterminated"\]$' <<< "$ODD" || true)   # the games Ctrl-C cut short
 
 # one row per match in the table of them all, written from result.txt
 README=$MATCHES/README.md
@@ -143,6 +149,7 @@ Elo is dev minus base. An SPRT's Elo is only a rough guide, since it stops early
 |---|---|---|---|---|---|---|---|---|---|---|
 EOF
 SCORE=$(awk -F'[:,]' '/^Games:/ {printf "%d | %d-%d-%d", $2, $4, $6, $8}' "$OUT/result.txt")
+SCORE=${SCORE:-0 | 0-0-0}   # stopped before fastchess had a score to show
 ELO=$(awk '/^Elo:/ {printf "%+.1f ± %.1f", $2, $4}' "$OUT/result.txt")
 LLR=$(awk '/^LLR:/ {print $2}' "$OUT/result.txt")
 case $(grep -o 'H[01] was accepted' "$OUT/result.txt" || true) in
@@ -150,6 +157,7 @@ case $(grep -o 'H[01] was accepted' "$OUT/result.txt" || true) in
   H0*) VERDICT="failed (LLR $LLR)" ;;
   *)   VERDICT=$([[ $MODE == elo ]] && echo "-" || echo "unfinished (LLR $LLR)") ;;
 esac
+[[ -z $STOPPED ]] || VERDICT="stopped early${LLR:+ (LLR $LLR)}"
 [[ -z $ODD ]] || VERDICT="$VERDICT, but not every game ended normally"
 [[ -z $(tail -c 1 "$README") ]] || echo >> "$README"   # the last row might lack its newline
 echo "| ${NAME:0:4}-${NAME:4:2}-${NAME:6:2} | ${WHAT:-} | \`$DEV_SHA\` | \`$BASE_SHA\` | $MODE$BOUNDS | $TC, Hash 16 | $SCORE | $ELO | $VERDICT | \`$NAME\` |" >> "$README"
@@ -159,4 +167,5 @@ if [[ -n $ODD ]]; then
     echo "not every game ended normally: look in $OUT/games.pgn" >&2
     exit 1
 fi
+[[ -z $STOPPED ]] || exit 130
 exit $STATUS
