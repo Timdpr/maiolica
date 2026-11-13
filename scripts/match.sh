@@ -85,6 +85,7 @@ cp "$TMP/build/maiolica" "$OUT/base"
   echo "base: $BASE_REF ($BASE_SHA)"
   echo "mode: $MODE ($DESC), tc: $TC, book: $BOOK"
   echo "seed: $SEED"
+  echo "fastchess: $("$FASTCHESS" --version | sed 's/^fastchess //')"
   printf '%s' "$NOTES"; } | tee "$OUT/info.txt"
 
 # book format is just the file extension (pgn or epd)

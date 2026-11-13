@@ -84,7 +84,7 @@ The script builds the working tree ("dev") and the given ref ("base"). It plays 
 - **No adjudication:** games are played out to mate or a draw by the rules. Ending them early on the engines' own scores (resigning at -6.00, calling a draw when both sides sit near 0.00) was simulated on 790 real games: it would have got 17 to 20 results wrong, for 5 to 12% fewer moves played.
 
 Setup is a one-off:
-- Build fastchess in `external/fastchess`: `git clone --depth 1 https://github.com/Disservin/fastchess external/fastchess && make -C external/fastchess -j`.
+- Build fastchess in `external/fastchess`, at the commit the results so far were played with (alpha 1.8.3): `git clone https://github.com/Disservin/fastchess external/fastchess && git -C external/fastchess checkout 2a2aa4e && make -C external/fastchess -j`.
 - Unzip the book from official-stockfish/books into `books/`.
 
 ### Where results go
@@ -92,7 +92,7 @@ Every match gets a folder in `matches/`, named `<date>-<time>-<dev commit>-vs-<b
 
 | File | What it is |
 |---|---|
-| `info.txt` | what was compared, the conditions and the seed |
+| `info.txt` | what was compared, the conditions, the seed, the fastchess version and any warnings |
 | `result.txt` | fastchess's final score, Elo and SPRT verdict, and how the games ended |
 | `games.pgn` | every game, with each move's score, depth and time |
 | `config.json` | fastchess's full settings |
