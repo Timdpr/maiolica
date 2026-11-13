@@ -23,7 +23,7 @@ Maiolica speaks [UCI](https://www.shredderchess.com/download/div/uci.zip), so it
 - **`depth`** is clamped to 1–62. With no limits at all, it searches to depth 62.
 - **`nodes`** stops within 2048 nodes of the limit (after `ponderhit`, if pondering).
 - **`infinite`** and **`ponder`** never send `bestmove` until `stop` (or `ponderhit`, then the budget runs out), even if the search finishes first.
-- **`bestmove`** is always a legal move. If the search stops before depth 1 completes, it's the first legal move; with no legal moves it's `0000`. It adds `ponder <move>` when the PV has a second move.
+- **`bestmove`** is always a legal move. If the search stops before depth 1 completes, it's the first legal move; with no legal moves it's `0000`. It adds `ponder <move>` when the hash table has a legal reply to it.
 
 ## Options
 
@@ -39,6 +39,7 @@ Maiolica speaks [UCI](https://www.shredderchess.com/download/div/uci.zip), so it
 
 `info depth D seldepth S score cp X|mate M nodes N nps P hashfull H time T pv …`, once per completed iteration.
 - `mate M` is in moves, negative when getting mated.
+- `pv` ends with the move that repeats a position or reaches the fifty-move limit; the search scores that as a draw.
 - `hashfull` is sampled from the first 1000 entries.
 - Every line is written in one go under a mutex, so the input and search threads never interleave.
 

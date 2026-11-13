@@ -317,6 +317,7 @@ void perftTest(int depth, Board& board);
 TimeMS getTimeMS();
 
 // search.cpp
+[[nodiscard]] int isRepetition(const Board& board);
 void searchPosition(Board& board, SearchInfo& info, HashTable& table);
 
 // pvtable.cpp

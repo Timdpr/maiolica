@@ -16,7 +16,7 @@ Each kind of claim has its own tool. Use the one that matches what a change clai
 
 ## Protocol
 - **`tests/uci_test.sh <engine>`** pipes scripted sessions into the engine. A `~N` line sleeps N seconds, so commands can arrive mid-search. Each session has a 20s watchdog, and a crash, hang or non-zero exit fails the test.
-  - It covers the handshake, the normal game flow, stop/infinite/ponder ordering, mate and null bestmoves, clock edge cases, messy input and the dev commands.
+  - It covers the handshake, the normal game flow, stop/infinite/ponder ordering, mate and null bestmoves, a pv that ends at a repetition, clock edge cases, messy input and the dev commands.
   - Run it against the `tsan` build to check the threading: `TSAN_OPTIONS="halt_on_error=1 exitcode=66" tests/uci_test.sh cmake-build-tsan/maiolica`.
 - **`tests/fen_tests.cpp`** checks that every test and bench FEN parses, that malformed FENs are refused without touching memory out of bounds, and that clocks, castling rights and en passant squares are cleaned up.
 - **Real games:** every `scripts/match.sh` run counts the PGN `Termination` tags when it finishes, and fails if any game ended by time forfeit, illegal move, crash or disconnect.
