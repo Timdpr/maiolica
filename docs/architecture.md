@@ -98,7 +98,7 @@ Zobrist: `pieceKeys[13][120]` (row `EMPTY` doubles as the EP-square key), `sideK
 
 ## Search (search.cpp)
 
-`searchPosition`: `clearForSearch` (zero history/killers, `currentAge++`, `ply = 0`, reset `nodes`/`selDepth`/fail-high stats; `stopped` is reset by the caller, before the thread starts), then depths 1..`info.depth` with a full window (±`ALPHABETA_BOUND` 30000), no aspiration. A stopped iteration is discarded; otherwise `getPVLine` fills `pvArray` and it sends `info depth … seldepth … score cp|mate … nodes … nps … hashfull … time … pv …`. `bestmove` is `pvArray[0]`, with `pvArray[1]` as the ponder move. If no iteration finished it falls back to `firstLegalMove` (`0000` if mated or stalemated); that runs after the search, because making and undoing a move can reorder the piece lists. In `infinite` or `ponder` mode it then waits for `stopped`/`ponderhit` before sending `bestmove`.
+`searchPosition`: `clearForSearch` (zero history/killers, `currentAge++`, `ply = 0`, reset `nodes`/`selDepth`/fail-high stats; `stopped` is reset by the caller, before the thread starts), then depths 1..`info.depth` with a full window (±`ALPHABETA_BOUND` 30000), no aspiration. A stopped iteration is discarded; otherwise `getPVLine` fills `pvArray` and it sends `info depth … seldepth … score cp|mate … nodes … nps … hashfull … time … pv …`. `bestmove` is `pvArray[0]`, with `pvArray[1]` as the ponder move (which may lie past the end of the printed PV). If no iteration finished it falls back to `firstLegalMove` (`0000` if mated or stalemated); that runs after the search, because making and undoing a move can reorder the piece lists. In `infinite` or `ponder` mode it then waits for `stopped`/`ponderhit` before sending `bestmove`.
 
 `alphaBeta(alpha, beta, depth, board, info, table, nullMoveAllowed)`, negamax, in this order:
 1. `depth == 0` → `quiescence` (which counts the node).
@@ -123,7 +123,7 @@ Mate scores: `IS_MATE` = 30000 − 64. Anything beyond it is printed as `score m
 - Flags: `HF_ALPHA` (upper bound), `HF_BETA` (lower bound), `HF_EXACT`. Probe needs `entry.depth >= depth`; ALPHA hits only if `score <= alpha` (returns alpha), BETA only if `score >= beta` (returns beta).
 - Replace if the slot is empty (key 0), `age < currentAge`, or `entry.depth <= depth`. Age is bumped per search, reset to 0 by `clearHashTable` (`ucinewgame`, bench).
 - Mate scores are stored relative to the node (`±ply` on store, reversed on probe).
-- `getPVLine` walks `probePVTable` moves from the root, checking each with `moveExists`, making it, up to `depth` moves; then undoes back to `ply == 0`.
+- `getPVLine` walks `probePVTable` moves from the root, checking each with `moveExists`, making it, up to `depth` moves; then undoes back to `ply == 0`. The PV it reports ends with the first move that repeats a position or reaches the fifty-move limit: the search scores that as a draw and looks no further, so later entries belong to other lines. The walk itself still carries on to `depth`, because making and undoing moves reorders the piece lists, and a shorter walk would change later searches.
 
 ## Evaluation (evaluate.cpp)
 

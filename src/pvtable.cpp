@@ -2,12 +2,15 @@
 
 HashTable hashTable;
 
-/// Populate Board's pvArray
+/// Populate Board's pvArray with the table's line, ending it with NO_MOVE.
+/// Returns how many of those moves are the pv, which stops at a draw
 int getPVLine(const int depth, Board& board, const HashTable& table) {
     ASSERT(depth < MAX_DEPTH && depth >= 1)
 
     int move = probePVTable(board, table);
     int count = 0;
+    int pvMoves = 0;
+    bool drawn = false;
 
     // 'loop through board's pvArray until given depth, as long as legal moves are being found'
     while (move != NO_MOVE && count < depth) {
@@ -17,15 +20,22 @@ int getPVLine(const int depth, Board& board, const HashTable& table) {
         } else {
             break;
         }
+        // the search calls a repetition a draw & looks no further, so the pv ends with this move.
+        // We keep walking, as all this making & undoing reorders the piece lists: stop early and later searches change
+        if (!drawn) {
+            pvMoves = count;
+            drawn = isRepetition(board) || board.fiftyMove >= 100;
+        }
         move = probePVTable(board, table);
     }
+    board.pvArray[count] = NO_MOVE;
 
     // Take the moves back!!!!11!!1!
     while (board.ply > 0) {
         undoMove(board);
     }
 
-    return count;
+    return pvMoves;
 }
 
 /// Loop through every entry in the table, setting each pos key and move to zero

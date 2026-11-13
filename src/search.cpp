@@ -29,7 +29,7 @@ static void pickNextMove(int moveNum, MoveList& moveList) {
     moveList.moves[bestMoveNum] = tempMove;
 }
 
-static int isRepetition(const Board& board) {
+int isRepetition(const Board& board) {
     // start at current ply minus how long since the fifty move rule was reset, and look at hash keys
     for (int i = std::max(0, board.historyPly - board.fiftyMove); i < board.historyPly-1; ++i) { // the fen's clock can predate our history // todo: quicker way to do this in yt comments?
         ASSERT(i >= 0 && i < MAX_GAME_MOVES)
@@ -300,7 +300,7 @@ void searchPosition(Board& board, SearchInfo& info, HashTable& table) {
         int pvMoves = getPVLine(currentDepth, board, table);
         if (pvMoves > 0) {
             bestMove = board.pvArray[0];
-            ponderMove = pvMoves > 1 ? board.pvArray[1] : NO_MOVE;
+            ponderMove = board.pvArray[1]; // NO_MOVE if the table had no reply. Can be past the end of the pv
         }
 
         std::string pv;
