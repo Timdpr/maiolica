@@ -6,6 +6,11 @@ on:
   pull_request:
   workflow_dispatch: # adds a 'Run workflow' button on the Actions tab
 
+# a new push to a PR cancels the run for the push before it. Anything else gets a group of its own
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: true
+
 jobs:
   test:
     strategy:
@@ -14,8 +19,24 @@ jobs:
         os: [ubuntu-latest, macos-latest, windows-latest] # gcc, apple clang and mingw gcc
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # windows has to be told to use ninja & g++, or cmake picks visual studio
       - run: cmake --preset release ${{ runner.os == 'Windows' && '-G Ninja -DCMAKE_CXX_COMPILER=g++' || '' }}
       - run: cmake --build --preset release -j 4
       - run: ctest --preset release
+
+  # Did search change? Runs the same searches through the PR and its base, and compares the output.
+  # A PR that changes search on purpose updates the bench signature, and then there's nothing to compare
+  difftest:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 2 # we get the PR merged into its base, so HEAD^1 is the base
+      - run: |
+          if git diff --quiet HEAD^1 HEAD -- tests/bench_signature.txt; then
+            scripts/difftest.py HEAD^1 HEAD 10
+          else
+            echo "::notice::tests/bench_signature.txt changed, so search changed on purpose: differential test skipped"
+          fi
