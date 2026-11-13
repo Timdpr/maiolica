@@ -73,7 +73,7 @@ scripts/match.sh master gain     # SPRT, elo0=0 elo1=10: does it gain?
 scripts/match.sh master nonreg   # SPRT, elo0=-10 elo1=0: doesn't lose (simplifications, bug fixes)
 scripts/match.sh <ref> elo       # 2000 games, no SPRT: how big is the gap?
 ```
-The script builds the working tree ("dev") and the given ref ("base"). It plays 8+0.08 games (8 seconds each, plus 0.08 a move) with Hash 16, from `books/8moves_v3.pgn`, in pairs with colours swapped, 6 at a time. Results land in `matches/<date>-<ref>/`.
+The script builds the working tree ("dev") and the given ref ("base"). It plays 8+0.08 games (8 seconds each, plus 0.08 a move) with Hash 16, from `books/8moves_v3.pgn`, in pairs with colours swapped, 6 at a time.
 
 - **`gain` and `nonreg`** are SPRTs (sequential probability ratio tests): the match goes on only until the result is statistically clear either way, then stops. That answers "is it better?" in the fewest games. It uses the logistic model with α = β = 0.05, so it gives the wrong answer about 1 time in 20.
 - **`elo`** plays a fixed number of games and reports the Elo difference with its error margin. Use it to measure a gap. Don't read the gap off an SPRT: because an SPRT stops the moment the score looks convincing, the Elo it shows at that point is biased. `GAMES=500 scripts/match.sh <ref> elo` changes the length. 2000 games take about 2 hours and give a margin of roughly ±9 Elo.
@@ -84,6 +84,20 @@ The script builds the working tree ("dev") and the given ref ("base"). It plays 
 Setup is a one-off:
 - Build fastchess in `external/fastchess`: `git clone --depth 1 https://github.com/Disservin/fastchess external/fastchess && make -C external/fastchess -j`.
 - Unzip the book from official-stockfish/books into `books/`.
+
+### Where results go
+Every match gets a folder in `matches/`, named `<date>-<time>-<dev commit>-vs-<base ref>-<mode>` (the commit gets `+dirty` if there were uncommitted changes). `matches/`, fastchess and the book are always the main checkout's, so the script works the same from a git worktree and all results end up in one place.
+
+| File | What it is |
+|---|---|
+| `info.txt` | what was compared, the conditions and the seed |
+| `result.txt` | fastchess's final score, Elo and SPRT verdict, and how the games ended |
+| `games.pgn` | every game, with each move's score, depth and time |
+| `config.json` | fastchess's full settings |
+| `log.txt.gz` | fastchess's running output, compressed |
+| `dev`, `base` | the two binaries that played |
+
+Each match also adds a row to the table in `matches/README.md` (the file is created if it's missing): date, description, both commits, mode, time control, games, wins-losses-draws, Elo, verdict and folder. `WHAT="null move tweak" scripts/match.sh master gain` fills in the description. The folder is gitignored, so these are local records.
 
 ## Baseline
 The baseline is a fixed version of the engine that later versions are measured against. It is the git tag **`baseline-2026-11`** (bench signature `4527030`).
