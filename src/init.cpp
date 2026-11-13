@@ -13,11 +13,6 @@ static U64 rand64() {
 int sq120ToSq64[BRD_SQ_NUM];
 int sq64ToSq120[64];
 
-/// All 1s
-U64 setMask[64];
-/// All 0s
-U64 clearMask[64];
-
 // Initialised with random numbers
 U64 pieceKeys[13][120]; // [pieces][squares]
 U64 sideKey;
@@ -33,7 +28,7 @@ U64 whitePassedMask[64]; // does the indexed white pawn have a 'clear run' to pr
 U64 blackPassedMask[64]; // does the indexed black pawn have a 'clear run' to promotion?
 U64 isolatedPawnMask[64]; // is the indexed pawn 'isolated'?
 
-void initEvalMasks() {
+static void initEvalMasks() {
     for (int square = 0; square < 8; ++square) {
         fileBitMask[square] = U64(0);
         rankBitMask[square] = U64(0);
@@ -101,7 +96,7 @@ void initEvalMasks() {
 }
 
 /// Initialise arrays of rank and file indexes
-void initFilesRanksBoard() {
+static void initFilesRanksBoard() {
     for (int i = 0; i < BRD_SQ_NUM; ++i) {
         filesBoard[i] = OFFBOARD;
         ranksBoard[i] = OFFBOARD;
@@ -116,7 +111,7 @@ void initFilesRanksBoard() {
 }
 
 /// Initialise hash keys with random numbers
-void initHashKeys() {
+static void initHashKeys() {
     for (auto & pieceKey : pieceKeys) {
         for (auto & j : pieceKey) {
             j = RAND_64;
@@ -128,18 +123,7 @@ void initHashKeys() {
     }
 }
 
-void initBitMasks() {
-    for (int i = 0; i < 64; i++) {
-        setMask[i] = U64(0);
-        clearMask[i] = U64(0);
-    }
-    for (int i = 0; i < 64; i++) {
-        setMask[i] |= U64(1) << i; // shift 1 into every position
-        clearMask[i] = ~setMask[i]; // bitwise complement: clearMask is the inverse of setMask!
-    }
-}
-
-void initSquare120To64() {
+static void initSquare120To64() {
     for (int &i : sq120ToSq64) {
         i = 65; // initialise with impossible values
     }
@@ -162,7 +146,6 @@ void initSquare120To64() {
 /// Initialise everything!
 void initAll() {
     initSquare120To64();
-    initBitMasks();
     initHashKeys();
     initFilesRanksBoard();
     initEvalMasks();

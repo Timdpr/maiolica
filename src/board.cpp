@@ -1,8 +1,9 @@
 #include "defs.h"
 #include <cstdio>
 
-/// Lots of cross-checking of most elements of the board!
+/// Lots of cross-checking of most elements of the board! (only in debug builds, where ASSERT does something)
 int checkBoard(const Board& board) {
+#ifdef DEBUG
     // Check piece lists match
     for (int piece = wP; piece <= bK; ++piece) {
         for (int pieceNum = 0; pieceNum < board.pieceCounts[piece]; ++pieceNum) {
@@ -42,24 +43,24 @@ int checkBoard(const Board& board) {
     expectedPawns[BLACK] = board.pawns[BLACK];
     expectedPawns[BOTH] = board.pawns[BOTH];
 
-    int pawnCount = COUNT(expectedPawns[WHITE]);
+    int pawnCount = countBits(expectedPawns[WHITE]);
     ASSERT(pawnCount == board.pieceCounts[wP])
-    pawnCount = COUNT(expectedPawns[BLACK]);
+    pawnCount = countBits(expectedPawns[BLACK]);
     ASSERT(pawnCount == board.pieceCounts[bP])
-    pawnCount = COUNT(expectedPawns[BOTH]);
+    pawnCount = countBits(expectedPawns[BOTH]);
     ASSERT(pawnCount == board.pieceCounts[wP] + board.pieceCounts[bP])
 
     // Check bitboard squares
     while (expectedPawns[WHITE]) {
-        int square64 = POP(&expectedPawns[WHITE]);
+        int square64 = popBit(&expectedPawns[WHITE]);
         ASSERT(board.pieces[INDEX_64_TO_120(square64)] == wP)
     }
     while (expectedPawns[BLACK]) {
-        int square64 = POP(&expectedPawns[BLACK]);
+        int square64 = popBit(&expectedPawns[BLACK]);
         ASSERT(board.pieces[INDEX_64_TO_120(square64)] == bP)
     }
     while (expectedPawns[BOTH]) {
-        int square64 = POP(&expectedPawns[BOTH]);
+        int square64 = popBit(&expectedPawns[BOTH]);
         ASSERT( (board.pieces[INDEX_64_TO_120(square64)] == bP) || (board.pieces[INDEX_64_TO_120(square64)] == wP) )
     }
 
@@ -77,7 +78,7 @@ int checkBoard(const Board& board) {
 
     ASSERT(board.pieces[board.kingSq[WHITE]] == wK)
     ASSERT(board.pieces[board.kingSq[BLACK]] == bK)
-
+#endif
     return true;
 }
 
@@ -314,7 +315,7 @@ void printBoard(const Board& board) {
             (board.castlingPerms & bK_CA) ? 'k' : '-',
             (board.castlingPerms & bQ_CA) ? 'q' : '-'
     );
-    std::printf("position key: %llX\n", board.positionKey);
+    std::printf("position key: %llX\n", (unsigned long long)board.positionKey);
 }
 
 void mirrorBoard(Board& board) {

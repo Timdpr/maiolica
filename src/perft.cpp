@@ -1,7 +1,7 @@
 #include "defs.h"
 #include <cstdio>
 
-long leafNodes;
+long long leafNodes;
 
 void perft(int depth, Board& board) {
     ASSERT(checkBoard(board))
@@ -11,11 +11,11 @@ void perft(int depth, Board& board) {
         return;
     }
 
-    MoveList moveList[1];
+    MoveList moveList;
     generateAllMoves(board, moveList);
 
-    for (int moveNum = 0; moveNum < moveList->count; ++moveNum) {
-        if (!makeMove(board, moveList->moves[moveNum].move)) {
+    for (int moveNum = 0; moveNum < moveList.count; ++moveNum) {
+        if (!makeMove(board, moveList.moves[moveNum].move)) {
             continue;
         }
         perft(depth-1, board);
@@ -30,23 +30,23 @@ void perftTest(int depth, Board& board) {
     leafNodes = 0;
     TimeMS start = getTimeMS();
 
-    MoveList moveList[1];
+    MoveList moveList;
     generateAllMoves(board, moveList);
 
-    for (int moveNum = 0; moveNum < moveList->count; ++moveNum) {
-        int move = moveList->moves[moveNum].move;
+    for (int moveNum = 0; moveNum < moveList.count; ++moveNum) {
+        int move = moveList.moves[moveNum].move;
 
         if (!makeMove(board, move)) {
             continue;
         }
 
-        long cumNodes = leafNodes;
+        long long cumNodes = leafNodes;
         perft(depth - 1, board);
 
         undoMove(board);
-        long oldNodes = leafNodes - cumNodes;
-        printf("%s: %ld\n", printMove(move), oldNodes);
+        long long oldNodes = leafNodes - cumNodes;
+        printf("%s: %lld\n", printMove(move), oldNodes);
     }
 
-    printf("\nNodes searched: %ld (%lld ms)\n", leafNodes, (long long)(getTimeMS() - start));
+    printf("\nNodes searched: %lld (%lld ms)\n", leafNodes, (long long)(getTimeMS() - start));
 }

@@ -55,7 +55,8 @@ static void onSearchLine(const char *line) {
 
     std::istringstream in(line);
     std::string token, score, pv;
-    long depth = 0, nodes = 0, time = 0;
+    long depth = 0, time = 0;
+    long long nodes = 0;
     while (in >> token) {
         if (token == "depth") in >> depth;
         else if (token == "nodes") in >> nodes;
@@ -127,11 +128,11 @@ static int parseAnyMove(const std::string& text, Board& board) {
     for (char c : text) {
         if (!std::strchr("+#!?", c)) san += c;
     }
-    MoveList moveList[1];
+    MoveList moveList;
     generateAllMoves(board, moveList);
     int found = NO_MOVE;
-    for (int moveNum = 0; moveNum < moveList->count; ++moveNum) {
-        int move = moveList->moves[moveNum].move;
+    for (int moveNum = 0; moveNum < moveList.count; ++moveNum) {
+        int move = moveList.moves[moveNum].move;
         if (!sanMatches(san, move, board) || !makeMove(board, move)) continue;
         undoMove(board);
         if (found != NO_MOVE) return NO_MOVE; // ambiguous
@@ -149,11 +150,11 @@ static bool playMove(Board& board, const int move) {
 
 /// The result if the game's over (mate, stalemate, fifty moves, threefold, bare minor pieces), otherwise nullptr
 static const char *gameResult(Board& board) {
-    MoveList moveList[1];
+    MoveList moveList;
     generateAllMoves(board, moveList);
     bool canMove = false;
-    for (int moveNum = 0; moveNum < moveList->count && !canMove; ++moveNum) {
-        if (makeMove(board, moveList->moves[moveNum].move)) {
+    for (int moveNum = 0; moveNum < moveList.count && !canMove; ++moveNum) {
+        if (makeMove(board, moveList.moves[moveNum].move)) {
             undoMove(board);
             canMove = true;
         }
@@ -190,7 +191,7 @@ static int think(Board& board, const int moveTime, const int depth) {
     info.stopTime = info.startTime + moveTime;
     info.timeSet = moveTime > 0;
     searchingSide = board.side;
-    searchPosition(board, &info, hashTable); // on this thread: there's nothing else to listen to
+    searchPosition(board, info, hashTable); // on this thread: there's nothing else to listen to
     std::printf("\n");
     return parseAnyMove(engineMove, board);
 }

@@ -13,7 +13,7 @@ enum Tier { SMOKE, QUICK, FULL };
 #define POS5 "rnbq1k1r/pp1Pbppp/2p5/8/2B5/8/PPP1NnPP/RNBQK2R w KQ - 1 8"
 #define POS6 "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10"
 
-static const struct { const char *name, *fen; int depth; long expected; Tier tier; } cases[] = {
+static const struct { const char *name, *fen; int depth; long long expected; Tier tier; } cases[] = {
     // smoke: small enough for debug/sanitiser builds, where ASSERT(checkBoard) runs at every node
     {"startpos", START_FEN, 4, 197281, SMOKE},
     {"kiwipete", KIWIPETE, 3, 97862, SMOKE},
@@ -72,7 +72,7 @@ int main(int argc, char *argv[]) {
         const bool ok = leafNodes == c.expected;
         failures += !ok;
         totalNodes += leafNodes;
-        std::printf("%-4s %-21s d%d %11ld (expected %11ld) %6lld ms\n", ok ? "ok" : "FAIL",
+        std::printf("%-4s %-21s d%d %11lld (expected %11lld) %6lld ms\n", ok ? "ok" : "FAIL",
                     c.name, c.depth, leafNodes, c.expected, (long long)(getTimeMS() - t));
     }
     TimeMS elapsed = getTimeMS() - start + 1;

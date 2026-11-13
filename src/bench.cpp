@@ -28,7 +28,7 @@ void bench() {
         parseFen(pos.fen, board);
         info.depth = pos.depth;
         info.startTime = getTimeMS();
-        searchPosition(board, &info, hashTable);
+        searchPosition(board, info, hashTable);
         totalNodes += info.nodes;
     }
 

@@ -29,14 +29,14 @@ static std::vector<Board>& boards() {
 static void generateMoves(benchmark::State& state) {
     MoveList list;
     for (auto _ : state)
-        for (auto& board : boards()) { generateAllMoves(board, &list); benchmark::DoNotOptimize(list); }
+        for (auto& board : boards()) { generateAllMoves(board, list); benchmark::DoNotOptimize(list); }
 }
 BENCHMARK(generateMoves);
 
 static void generateCaptures(benchmark::State& state) {
     MoveList list;
     for (auto _ : state)
-        for (auto& board : boards()) { generateAllCaptureMoves(board, &list); benchmark::DoNotOptimize(list); }
+        for (auto& board : boards()) { generateAllCaptureMoves(board, list); benchmark::DoNotOptimize(list); }
 }
 BENCHMARK(generateCaptures);
 
@@ -45,7 +45,7 @@ static void makeUndo(benchmark::State& state) {
     MoveList list;
     for (auto _ : state)
         for (auto& board : boards()) {
-            generateAllMoves(board, &list);
+            generateAllMoves(board, list);
             for (int i = 0; i < list.count; ++i)
                 if (makeMove(board, list.moves[i].move)) undoMove(board);
         }
