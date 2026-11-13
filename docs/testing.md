@@ -56,6 +56,8 @@ It first makes its games: a few random opening moves, then the first build plays
 
 It prints the first few mismatches per mode and exits non-zero if there were any. An engine that crashes, or gives no answer for 2 minutes, fails it too. It only makes sense for a change that claims to leave search alone: once the bench signature moves, this fails too, as it should.
 
+CI runs it on every pull request, on Linux only: 10 games (~1,700 searches) through the pull request and through the commit it would merge into, in under 2 minutes alongside the other tests. A pull request that changes `tests/bench_signature.txt` has changed search on purpose, so there the job compares nothing and passes.
+
 ## Speed
 ```sh
 scripts/ab.sh HEAD . 9          # last commit vs working tree, 9 interleaved runs of bench

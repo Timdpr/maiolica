@@ -19,3 +19,19 @@ jobs:
       - run: cmake --preset release ${{ runner.os == 'Windows' && '-G Ninja -DCMAKE_CXX_COMPILER=g++' || '' }}
       - run: cmake --build --preset release -j 4
       - run: ctest --preset release
+
+  # Did search change? Runs the same searches through the PR and its base, and compares the output.
+  # A PR that changes search on purpose updates the bench signature, and then there's nothing to compare
+  difftest:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2 # we get the PR merged into its base, so HEAD^1 is the base
+      - run: |
+          if git diff --quiet HEAD^1 HEAD -- tests/bench_signature.txt; then
+            scripts/difftest.py HEAD^1 HEAD 10
+          else
+            echo "::notice::tests/bench_signature.txt changed, so search changed on purpose: differential test skipped"
+          fi
