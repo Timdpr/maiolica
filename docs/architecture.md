@@ -40,7 +40,7 @@ Build/presets in `CMakeLists.txt`/`CMakePresets.json` (release, native, profile,
 - `pieceList[13][10]` + `pieceCounts[13]`: squares of each piece type. Removal is swap-with-last (`clearPiece`), so **list order depends on move history and feeds generation order**. Initial order comes from `updateMaterialLists` scanning squares 0..119. `pieceIndex[120]` holds each occupied square's slot in its list, so `clearPiece` and `movePiece` find a piece without searching; entries for empty squares are stale and never read.
 - `kingSq[2]`; `material[2]` (sum of `pieceValues`, **king's 50000 included**); `bigPieces[2]` (non-pawns, king included); `majorPieces[2]` (R, Q **and K** per `data.cpp`, despite the defs.h comment); `minorPieces[2]` (N, B).
 - `side`, `enPasSq` (`NO_SQ` if none), `fiftyMove` (half-moves, from the FEN's halfmove clock), `castlingPerms` (4 bits: `wK_CA`=1, `wQ_CA`=2, `bK_CA`=4, `bQ_CA`=8).
-- `ply` = depth from search root (reset by `clearForSearch`, and after each move in `parsePosition`); `historyPly` = index into `history[MAX_GAME_MOVES=2048]` of `Undo {move, castlingPerms, enPasSq, fiftyMove, positionKey}`.
+- `ply` = depth from search root (reset by `clearForSearch`, and after each move in `parsePosition`); `historyPly` = index into `history[MAX_GAME_MOVES=2048]` of `Undo {move, castlingPerms, enPasSq, fiftyMove, positionKey, inCheck}`. The first five are saved by `makeMove` for the move played from that position; `inCheck` belongs to the position itself (see `isInCheck` below).
 - `positionKey`: Zobrist key, kept incrementally.
 - **Search state lives in `Board` too:** `pvArray[MAX_DEPTH]`, `searchHistory[13][120]` (piece × to-square), `searchKillers[2][MAX_DEPTH]` (by ply). `Board` is big (57KB, mostly `history`) and copied with `memcpy` for the search thread, so it must stay trivially copyable.
 
@@ -91,6 +91,11 @@ Scores (set at generation; `alphaBeta` then sets the TT move to 2,000,000):
 - Capture → `clearPiece(to)`, fifty = 0. Pawn move → fifty = 0; a double push always sets `enPasSq` and hashes it, capturable or not, so the same position can get two keys (a strength issue, left for an SPRT).
 - Moves the piece, swaps in the promoted piece, updates `kingSq`, flips side and `HASH_SIDE`.
 - **Legality:** if the mover's king is now attacked, `undoMove` and return false. Every caller must handle the false.
+  - King moves (castling included), en passant, and any move played while in check get the full `isSquareAttacked` on the king.
+  - Every other move can only expose the king by leaving a line it shared with it, so `kingExposed` looks along that one line from the king (`lineStep` gives the direction from the difference between the two squares) for an enemy slider.
+  - An illegal move is still made and then undone, not refused up front: making and undoing a capture moves the captured piece to the end of its piece list, and generation order depends on that.
+
+`isInCheck(board)` answers "is the side to move in check?" once per position: the answer is kept in `history[historyPly].inCheck`, which `makeMove`, `makeNullMove` and `resetBoard` set to `CHECK_UNKNOWN` for the position they create. `makeMove` and `alphaBeta` (for the check extension) both ask it. Anything else that changes the position without going through those must reset it.
 
 `undoMove` reverses it incrementally (re-hashing, not restoring the key from `history`; the stored key is only read by `isRepetition`). `makeNullMove`/`undoNullMove` flip side, clear EP (hashed), bump `ply`/`historyPly`; fifty and castling are untouched.
 
@@ -104,7 +109,7 @@ Zobrist: `pieceKeys[13][120]` (row `EMPTY` doubles as the EP-square key), `sideK
 1. `depth == 0` → `quiescence` (which counts the node).
 2. `checkUp` when `(nodes & 2047) == 0`; `nodes++`.
 3. Repetition or `fiftyMove >= 100` → 0 (only at `ply > 0`, so the root always searches its moves). `ply > MAX_DEPTH-1` → eval.
-4. In check → `depth++` (before the TT probe, so stored depths include the extension).
+4. In check (`isInCheck`) → `depth++` (before the TT probe, so stored depths include the extension).
 5. `probeHashEntry`: a hit returns its score; the TT move is returned even when too shallow.
 6. Null move if allowed, not in check, `ply > 0`, `bigPieces[side] > 1` (king counts, so ≥1 real piece) and `depth >= 4`: search `depth-4` (R=3) with window (−beta, −beta+1) and null disabled; `score >= beta` and not a mate score → return beta (not stored in the TT).
 7. Generate, give the TT move 2,000,000, loop with `pickNextMove`. PVS: the first move with a full window; once alpha has been raised, null window then re-search if `alpha < score < beta`.

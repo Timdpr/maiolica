@@ -22,11 +22,11 @@ Each kind of claim has its own tool. Use the one that matches what a change clai
 - **Real games:** every `scripts/match.sh` run counts the PGN `Termination` tags when it finishes, and fails if any game ended by time forfeit, illegal move, crash or disconnect.
 
 ## Perft
-`tests/perft_tests.cpp` covers the six CPW positions (plus mirrored pos4) and Peter Ellis Jones' tricky positions (en passant pins, castling through check, promotions, stalemate). Counts come from [CPW Perft Results](https://www.chessprogramming.org/Perft_Results). Never add a count that hasn't been published or cross-checked with another engine.
+`tests/perft_tests.cpp` covers the six CPW positions (plus mirrored pos4) and Peter Ellis Jones' tricky positions (en passant pins, castling through check, promotions, stalemate). Counts come from [CPW Perft Results](https://www.chessprogramming.org/Perft_Results). Seven more positions are the engine's own, aimed at `makeMove`'s legality test: a pinned piece on each of the king's eight lines (with either side to move), en passant along, off and across a pin, a promotion by a pinned pawn, and two squares that are far apart but not in line. Their counts were checked against a second, separately written move generator. Never add a count that hasn't been published or cross-checked with another engine.
 
 | Tier | Where it runs | Time (M1 Pro) |
 |---|---|---|
-| `smoke` | debug and asan presets, where `ASSERT(checkBoard)` runs at every node | 0.2s release, 17s asan |
+| `smoke` | debug and asan presets, where `ASSERT(checkBoard)` runs at every node | 0.2s release, 25s asan |
 | `quick` | release preset and CI | ~1.7s |
 | `full` | `ctest --preset full` | ~20s |
 

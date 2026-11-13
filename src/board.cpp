@@ -286,6 +286,7 @@ void resetBoard(Board& board) {
 
     board.ply = 0;
     board.historyPly = 0;
+    board.history[0].inCheck = CHECK_UNKNOWN;
 
     board.castlingPerms = 0;
 

@@ -21,6 +21,55 @@ const int castlePermArray[120] = {
         15, 15, 15, 15, 15, 15, 15, 15, 15, 15
 };
 
+/// The step that takes you from one square towards another on the same rank, file or diagonal,
+/// indexed by the difference between the squares + 77. 0 if they don't share a line
+static int lineStep[155];
+
+void initLineSteps() {
+    for (int step : { 1, 9, 10, 11 }) {
+        for (int distance = 1; distance <= 7; ++distance) {
+            lineStep[77 + step * distance] = step;
+            lineStep[77 - step * distance] = -step;
+        }
+    }
+    // the board is 10 wide, so a few far-apart pairs that aren't on a line get a step too
+    // (d1 & g7 differ by 63, the same as h1 & a8). Following one just finds nothing
+}
+
+/// Is the side to move in check? Worked out the first time it's asked of a position, then remembered
+int isInCheck(Board& board) {
+    int& inCheck = board.history[board.historyPly].inCheck;
+    if (inCheck == CHECK_UNKNOWN) {
+        inCheck = isSquareAttacked(board.kingSq[board.side], board.side^1, board);
+    }
+    ASSERT(inCheck == isSquareAttacked(board.kingSq[board.side], board.side^1, board))
+    return inCheck;
+}
+
+/// Has a piece leaving the 'from' square opened a line to the given side's king?
+/// The whole legality test for a move, as long as the king wasn't in check before it,
+/// didn't move itself, and the move wasn't en passant (which empties two squares)
+static int kingExposed(const int from, const int side, const Board& board) {
+    int kingSquare = board.kingSq[side];
+    int step = lineStep[from - kingSquare + 77];
+    if (step == 0) { // not on a line with the king, so nothing was opened
+        return false;
+    }
+    // look along the line from the king until we hit something
+    int square = kingSquare + step;
+    while (board.pieces[square] == EMPTY) {
+        square += step;
+    }
+    int piece = board.pieces[square];
+    if (piece == OFFBOARD || pieceColours[piece] == side) {
+        return false;
+    }
+    if (step == 1 || step == -1 || step == 10 || step == -10) {
+        return IS_ROOK_OR_QUEEN(piece);
+    }
+    return IS_BISHOP_OR_QUEEN(piece);
+}
+
 /// Clear the piece on the given square from the given board (& update other relevant fields)
 static void clearPiece(const int square, Board& board) {
     ASSERT(squareOnBoard(square))
@@ -131,6 +180,10 @@ int makeMove(Board& board, int move) {
     ASSERT(sideValid(side))
     ASSERT(pieceValid(board.pieces[from]))
 
+    // Most moves can only leave our king in check by uncovering it. The others get the full test at the end:
+    // king moves (castling too), en passant, and anything played while in check. Ask before the board changes!
+    int fullTest = IS_KING(board.pieces[from]) || (move & MFLAG_EN_PASSANT) || isInCheck(board);
+
     // Update history at current ply
     board.history[board.historyPly].positionKey = board.positionKey; // store hashkey
 
@@ -182,6 +235,7 @@ int makeMove(Board& board, int move) {
     // update ply counters
     board.historyPly++;
     board.ply++;
+    board.history[board.historyPly].inCheck = CHECK_UNKNOWN; // a new position, so nobody has asked yet
 
     // do we need to set a new en passant square?
     if (piecePawn[board.pieces[from]]) { // if piece is a pawn
@@ -220,7 +274,10 @@ int makeMove(Board& board, int move) {
     ASSERT(checkBoard(board))
 
     // If the king is attacked by the new side to move, take back the move and return false
-    if (isSquareAttacked(board.kingSq[side], board.side, board)) {
+    // (taking back, rather than never making it, as a capture made & undone reorders the piece lists)
+    int kingAttacked = fullTest ? isSquareAttacked(board.kingSq[side], board.side, board) : kingExposed(from, side, board);
+    ASSERT(kingAttacked == isSquareAttacked(board.kingSq[side], board.side, board))
+    if (kingAttacked) {
         undoMove(board);
         return false;
     }
@@ -315,6 +372,7 @@ void makeNullMove(Board& board) {
 
     board.side ^= 1;
     board.historyPly++;
+    board.history[board.historyPly].inCheck = CHECK_UNKNOWN;
     HASH_SIDE;
 
     ASSERT(checkBoard(board))

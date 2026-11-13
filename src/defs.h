@@ -108,6 +108,7 @@ struct Undo {
     int enPasSq;
     int fiftyMove;
     U64 positionKey;
+    int inCheck; // is the side to move in check here? CHECK_UNKNOWN until isInCheck is asked
 };
 
 /// Representation of a board position
@@ -214,6 +215,8 @@ constexpr int MFLAG_PROMOTION = 0xF00000;
 
 constexpr int NO_MOVE = 0;
 
+constexpr int CHECK_UNKNOWN = -1;
+
 /* -- GLOBAL -- */  // TODO: Consider making these non-global...
 
 extern int sq120ToSq64[BRD_SQ_NUM];
@@ -304,6 +307,8 @@ void generateAllCaptureMoves(const Board& board, MoveList& moveList);
 void initMVVLVA();
 
 // makemove.cpp
+void initLineSteps();
+int isInCheck(Board& board);
 [[nodiscard]] int makeMove(Board& board, int move);
 void undoMove(Board& board);
 void makeNullMove(Board& board);
