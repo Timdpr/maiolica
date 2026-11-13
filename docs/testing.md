@@ -31,7 +31,7 @@ Three questions, three tools. Use the one that matches what a change claims.
 ## Bench signature
 `./maiolica bench` searches 9 fixed positions to fixed depths, each on a fresh board with a cleared 16MB table, and prints the total node count.
 
-It is deterministic because the Zobrist keys come from a fixed-seed splitmix64. It's identical in Release, Debug and ASan builds, and should be identical across platforms; CI checks Linux and macOS.
+It is deterministic because the Zobrist keys come from a fixed-seed splitmix64. It's identical in Release, Debug and ASan builds, and should be identical across platforms; CI checks Linux (gcc), macOS (Apple clang) and Windows (MinGW gcc).
 
 - **Refactor or speedup:** the count must not change. If it does, the change altered search: find out why before going on.
 - **Intentional search or eval change:** update `tests/bench_signature.txt` and add `Bench: N` to the commit message.
