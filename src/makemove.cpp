@@ -47,17 +47,13 @@ static void clearPiece(const int square, Board& board) {
     }
 
     // Now remove piece from piece list...
-    int removedPieceNumber = -1;
-    for (int i = 0; i < board.pieceCounts[piece]; ++i) { // (for as many pieces of this type exist)
-        if (board.pieceList[piece][i] == square) { // loop through all of this type of piece, and if the square number matches...
-            removedPieceNumber = i; // save the piece number
-            break;
-        }
-    }
-    ASSERT(removedPieceNumber != -1)
+    int removedPieceNumber = board.pieceIndex[square]; // no need to search, we know where it is
+    ASSERT(board.pieceList[piece][removedPieceNumber] == square)
     board.pieceCounts[piece]--; // decrement count of this type of piece
     // Tricky! Move the last piece in the array to the place where the removed piece was:
-    board.pieceList[piece][removedPieceNumber] = board.pieceList[piece][board.pieceCounts[piece]];
+    int lastSquare = board.pieceList[piece][board.pieceCounts[piece]];
+    board.pieceList[piece][removedPieceNumber] = lastSquare;
+    board.pieceIndex[lastSquare] = removedPieceNumber; // ...and remember its new place
     /* e.g.:
      *   [wP][0] = 32
      *   [wP][1] = 45
@@ -91,6 +87,7 @@ static void addPiece(const int square, Board& board, const int piece) {
     }
     board.material[colour] += pieceValues[piece]; // update material value
     // Add piece to piece list at the end of the array by using the piece count as the index, then increment the piece count:
+    board.pieceIndex[square] = board.pieceCounts[piece];
     board.pieceList[piece][board.pieceCounts[piece]++] = square;
 }
 
@@ -100,9 +97,6 @@ static void movePiece(const int from, const int to, Board& board) {
 
     int piece = board.pieces[from];
     int colour = pieceColours[piece];
-#ifdef DEBUG
-    int removedPieceNumber = false; // Preprocesser: for checking that we find a piece, when in debug mode
-#endif
 
     HASH_PIECE(piece, from);
     board.pieces[from] = EMPTY;
@@ -117,16 +111,10 @@ static void movePiece(const int from, const int to, Board& board) {
         SET_BIT(board.pawns[BOTH], INDEX_120_TO_64(to));
     }
 
-    for (int i = 0; i < board.pieceCounts[piece]; ++i) { // loop through this type of piece in the piece list...
-        if (board.pieceList[piece][i] == from) { // ...and if a piece's square number matches our 'from' square...
-            board.pieceList[piece][i] = to; // ...then set it to our 'to' square!
-#ifdef DEBUG
-            removedPieceNumber = true; // set this so we can check if a piece was found when in debug mode
-#endif
-            break;
-        }
-    }
-    ASSERT(removedPieceNumber)
+    int pieceNumber = board.pieceIndex[from]; // the piece keeps its place in the piece list...
+    ASSERT(board.pieceList[piece][pieceNumber] == from)
+    board.pieceList[piece][pieceNumber] = to; // ...and just gets our 'to' square!
+    board.pieceIndex[to] = pieceNumber;
 }
 
 // returns false if the side making the move is in check after the move

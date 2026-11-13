@@ -136,6 +136,7 @@ struct Board {
     Undo history[MAX_GAME_MOVES]; // holds game state (via 'Undo' struct) at each ply
 
     int pieceList[13][10]; // 13 types of pieces, and at most 10 of each
+    int pieceIndex[BRD_SQ_NUM]; // where the piece on a square sits in its pieceList, so we never have to search for it
 
     int pvArray[MAX_DEPTH];
 
