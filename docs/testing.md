@@ -127,6 +127,7 @@ The routine:
 | Date | Version | Bench | Games | Elo vs baseline |
 |---|---|---|---|---|
 | 2026-11-13 | `baseline-2026-11` | 4527030 | | 0 (by definition) |
+| 2026-11-14 | `969b6f5` (piece-list index, cheap legality test) | 4527030 | 2000 | +15.7 ± 10.3 (631 wins, 541 losses, 828 draws) |
 
 The baseline played itself under these conditions, to check the setup favours neither side: 2000 games came out at -2.3 ± 9.1 Elo (591 wins, 604 losses, 805 draws), every game ending normally. So a gap under about 9 Elo at this length is noise.
 
