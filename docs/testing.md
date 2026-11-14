@@ -22,11 +22,11 @@ Each kind of claim has its own tool. Use the one that matches what a change clai
 - **Real games:** every `scripts/match.sh` run counts the PGN `Termination` tags when it finishes, and fails if any game ended by time forfeit, illegal move, crash or disconnect.
 
 ## Perft
-`tests/perft_tests.cpp` covers the six CPW positions (plus mirrored pos4) and Peter Ellis Jones' tricky positions (en passant pins, castling through check, promotions, stalemate). Counts come from [CPW Perft Results](https://www.chessprogramming.org/Perft_Results). Never add a count that hasn't been published or cross-checked with another engine.
+`tests/perft_tests.cpp` covers the six CPW positions (plus mirrored pos4) and Peter Ellis Jones' tricky positions (en passant pins, castling through check, promotions, stalemate). Counts come from [CPW Perft Results](https://www.chessprogramming.org/Perft_Results). Seven more positions are the engine's own, aimed at `makeMove`'s legality test: a pinned piece on each of the king's eight lines (with either side to move), en passant along, off and across a pin, a promotion by a pinned pawn, and two squares that are far apart but not in line. Their counts were checked against a second, separately written move generator. Never add a count that hasn't been published or cross-checked with another engine.
 
 | Tier | Where it runs | Time (M1 Pro) |
 |---|---|---|
-| `smoke` | debug and asan presets, where `ASSERT(checkBoard)` runs at every node | 0.2s release, 17s asan |
+| `smoke` | debug and asan presets, where `ASSERT(checkBoard)` runs at every node | 0.2s release, 25s asan |
 | `quick` | release preset and CI | ~1.7s |
 | `full` | `ctest --preset full` | ~20s |
 
@@ -67,7 +67,18 @@ scripts/ab.sh master HEAD 9 perft
 - **Cycles and wall time:** wobble by ~1–3% when the laptop is busy.
 - **Microbenchmarks:** `cmake --preset microbench && cmake --build --preset microbench && cmake-build-microbench/microbench` times movegen, make/undo, attacks and eval in isolation. They're good for iterating, but LTO inlines these functions into the real search, so only `ab.sh` decides.
 - **Profiling:** build the `profile` preset, then `sample` or Instruments on `maiolica bench`.
-- **PGO:** `scripts/pgo.sh` gives a profile-guided build in `cmake-build-pgo/` (~3–5% faster).
+
+### The fastest build (PGO)
+```sh
+scripts/pgo.sh      # ~10s; the engine is cmake-build-pgo/maiolica
+```
+Profile-guided optimisation (PGO) is a build in two passes. The first makes an engine that counts how often each branch and call is taken, and runs it on `bench` and the quick perft. The second compiles again with those counts, so the compiler lays out the code for the paths that are really used. **This is the build to play or analyse with:** point a GUI at `cmake-build-pgo/maiolica`.
+
+- **Gain** over the release preset (M1 Pro, Apple clang 17, minimum of 7 interleaved runs): bench −3.8% instructions and −3.5% cycles; perft −5.9% instructions and −10.8% cycles.
+- **Same search:** only the speed may change. The script ends by running `bench` and fails if the node count isn't the one in `tests/bench_signature.txt`.
+- **Run it again after changing the code.** The counts belong to the source they were collected from; a stale profile still builds, but fits the code less well.
+- **Clang only**, and it needs `llvm-profdata` (`xcrun llvm-profdata` on macOS; the script finds it, or set `PROFDATA`).
+- **Not for comparing versions.** `ctest`, `ab.sh`, `difftest.py` and `match.sh` all build the plain release preset, so two versions are always compared like for like. A speedup measured with `ab.sh` is a speedup of the release build; the PGO build usually keeps most of it, but measure if it matters.
 
 ## Strength
 ```sh
@@ -116,6 +127,7 @@ The routine:
 | Date | Version | Bench | Games | Elo vs baseline |
 |---|---|---|---|---|
 | 2026-11-13 | `baseline-2026-11` | 4527030 | | 0 (by definition) |
+| 2026-11-14 | `969b6f5` (piece-list index, cheap legality test) | 4527030 | 2000 | +15.7 ± 10.3 (631 wins, 541 losses, 828 draws) |
 
 The baseline played itself under these conditions, to check the setup favours neither side: 2000 games came out at -2.3 ± 9.1 Elo (591 wins, 604 losses, 805 draws), every game ending normally. So a gap under about 9 Elo at this length is noise.
 

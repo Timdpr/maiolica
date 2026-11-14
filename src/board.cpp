@@ -9,6 +9,7 @@ int checkBoard(const Board& board) {
         for (int pieceNum = 0; pieceNum < board.pieceCounts[piece]; ++pieceNum) {
             int square120 = board.pieceList[piece][pieceNum];
             ASSERT(board.pieces[square120] == piece)
+            ASSERT(board.pieceIndex[square120] == pieceNum)
         }
     }
 
@@ -94,8 +95,9 @@ void updateMaterialLists(Board& board) {
             if (majorPieces[piece] == true) board.majorPieces[colour]++;
             // Overall material score
             board.material[colour] += pieceValues[piece];
-            // Square index of each piece
+            // Square index of each piece, & where to find it in the list
             board.pieceList[piece][board.pieceCounts[piece]] = square120;
+            board.pieceIndex[square120] = board.pieceCounts[piece];
             // How many of each type of piece
             board.pieceCounts[piece]++;
             // King locations
@@ -284,6 +286,7 @@ void resetBoard(Board& board) {
 
     board.ply = 0;
     board.historyPly = 0;
+    board.history[0].inCheck = CHECK_UNKNOWN;
 
     board.castlingPerms = 0;
 

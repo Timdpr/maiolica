@@ -150,4 +150,5 @@ void initAll() {
     initFilesRanksBoard();
     initEvalMasks();
     initMVVLVA();
+    initLineSteps();
 }

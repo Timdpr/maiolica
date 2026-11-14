@@ -48,7 +48,7 @@ if(MAIOLICA_PGO STREQUAL "generate")
     target_compile_options(maiolica_core PUBLIC -fprofile-instr-generate)
     target_link_options(maiolica_core PUBLIC -fprofile-instr-generate)
 elseif(MAIOLICA_PGO)
-    target_compile_options(maiolica_core PUBLIC -fprofile-instr-use=${MAIOLICA_PGO} -Wno-profile-instr-out-of-date)
+    target_compile_options(maiolica_core PUBLIC -fprofile-instr-use=${MAIOLICA_PGO} -Wno-profile-instr-out-of-date -Wno-profile-instr-unprofiled)
 endif()
 
 add_executable(maiolica src/main.cpp)

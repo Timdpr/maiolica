@@ -21,6 +21,55 @@ const int castlePermArray[120] = {
         15, 15, 15, 15, 15, 15, 15, 15, 15, 15
 };
 
+/// The step that takes you from one square towards another on the same rank, file or diagonal,
+/// indexed by the difference between the squares + 77. 0 if they don't share a line
+static int lineStep[155];
+
+void initLineSteps() {
+    for (int step : { 1, 9, 10, 11 }) {
+        for (int distance = 1; distance <= 7; ++distance) {
+            lineStep[77 + step * distance] = step;
+            lineStep[77 - step * distance] = -step;
+        }
+    }
+    // the board is 10 wide, so a few far-apart pairs that aren't on a line get a step too
+    // (d1 & g7 differ by 63, the same as h1 & a8). Following one just finds nothing
+}
+
+/// Is the side to move in check? Worked out the first time it's asked of a position, then remembered
+int isInCheck(Board& board) {
+    int& inCheck = board.history[board.historyPly].inCheck;
+    if (inCheck == CHECK_UNKNOWN) {
+        inCheck = isSquareAttacked(board.kingSq[board.side], board.side^1, board);
+    }
+    ASSERT(inCheck == isSquareAttacked(board.kingSq[board.side], board.side^1, board))
+    return inCheck;
+}
+
+/// Has a piece leaving the 'from' square opened a line to the given side's king?
+/// The whole legality test for a move, as long as the king wasn't in check before it,
+/// didn't move itself, and the move wasn't en passant (which empties two squares)
+static int kingExposed(const int from, const int side, const Board& board) {
+    int kingSquare = board.kingSq[side];
+    int step = lineStep[from - kingSquare + 77];
+    if (step == 0) { // not on a line with the king, so nothing was opened
+        return false;
+    }
+    // look along the line from the king until we hit something
+    int square = kingSquare + step;
+    while (board.pieces[square] == EMPTY) {
+        square += step;
+    }
+    int piece = board.pieces[square];
+    if (piece == OFFBOARD || pieceColours[piece] == side) {
+        return false;
+    }
+    if (step == 1 || step == -1 || step == 10 || step == -10) {
+        return IS_ROOK_OR_QUEEN(piece);
+    }
+    return IS_BISHOP_OR_QUEEN(piece);
+}
+
 /// Clear the piece on the given square from the given board (& update other relevant fields)
 static void clearPiece(const int square, Board& board) {
     ASSERT(squareOnBoard(square))
@@ -47,17 +96,13 @@ static void clearPiece(const int square, Board& board) {
     }
 
     // Now remove piece from piece list...
-    int removedPieceNumber = -1;
-    for (int i = 0; i < board.pieceCounts[piece]; ++i) { // (for as many pieces of this type exist)
-        if (board.pieceList[piece][i] == square) { // loop through all of this type of piece, and if the square number matches...
-            removedPieceNumber = i; // save the piece number
-            break;
-        }
-    }
-    ASSERT(removedPieceNumber != -1)
+    int removedPieceNumber = board.pieceIndex[square]; // no need to search, we know where it is
+    ASSERT(board.pieceList[piece][removedPieceNumber] == square)
     board.pieceCounts[piece]--; // decrement count of this type of piece
     // Tricky! Move the last piece in the array to the place where the removed piece was:
-    board.pieceList[piece][removedPieceNumber] = board.pieceList[piece][board.pieceCounts[piece]];
+    int lastSquare = board.pieceList[piece][board.pieceCounts[piece]];
+    board.pieceList[piece][removedPieceNumber] = lastSquare;
+    board.pieceIndex[lastSquare] = removedPieceNumber; // ...and remember its new place
     /* e.g.:
      *   [wP][0] = 32
      *   [wP][1] = 45
@@ -91,6 +136,7 @@ static void addPiece(const int square, Board& board, const int piece) {
     }
     board.material[colour] += pieceValues[piece]; // update material value
     // Add piece to piece list at the end of the array by using the piece count as the index, then increment the piece count:
+    board.pieceIndex[square] = board.pieceCounts[piece];
     board.pieceList[piece][board.pieceCounts[piece]++] = square;
 }
 
@@ -100,9 +146,6 @@ static void movePiece(const int from, const int to, Board& board) {
 
     int piece = board.pieces[from];
     int colour = pieceColours[piece];
-#ifdef DEBUG
-    int removedPieceNumber = false; // Preprocesser: for checking that we find a piece, when in debug mode
-#endif
 
     HASH_PIECE(piece, from);
     board.pieces[from] = EMPTY;
@@ -117,16 +160,10 @@ static void movePiece(const int from, const int to, Board& board) {
         SET_BIT(board.pawns[BOTH], INDEX_120_TO_64(to));
     }
 
-    for (int i = 0; i < board.pieceCounts[piece]; ++i) { // loop through this type of piece in the piece list...
-        if (board.pieceList[piece][i] == from) { // ...and if a piece's square number matches our 'from' square...
-            board.pieceList[piece][i] = to; // ...then set it to our 'to' square!
-#ifdef DEBUG
-            removedPieceNumber = true; // set this so we can check if a piece was found when in debug mode
-#endif
-            break;
-        }
-    }
-    ASSERT(removedPieceNumber)
+    int pieceNumber = board.pieceIndex[from]; // the piece keeps its place in the piece list...
+    ASSERT(board.pieceList[piece][pieceNumber] == from)
+    board.pieceList[piece][pieceNumber] = to; // ...and just gets our 'to' square!
+    board.pieceIndex[to] = pieceNumber;
 }
 
 // returns false if the side making the move is in check after the move
@@ -142,6 +179,10 @@ int makeMove(Board& board, int move) {
     ASSERT(squareOnBoard(to))
     ASSERT(sideValid(side))
     ASSERT(pieceValid(board.pieces[from]))
+
+    // Most moves can only leave our king in check by uncovering it. The others get the full test at the end:
+    // king moves (castling too), en passant, and anything played while in check. Ask before the board changes!
+    int fullTest = IS_KING(board.pieces[from]) || (move & MFLAG_EN_PASSANT) || isInCheck(board);
 
     // Update history at current ply
     board.history[board.historyPly].positionKey = board.positionKey; // store hashkey
@@ -194,6 +235,7 @@ int makeMove(Board& board, int move) {
     // update ply counters
     board.historyPly++;
     board.ply++;
+    board.history[board.historyPly].inCheck = CHECK_UNKNOWN; // a new position, so nobody has asked yet
 
     // do we need to set a new en passant square?
     if (piecePawn[board.pieces[from]]) { // if piece is a pawn
@@ -232,7 +274,10 @@ int makeMove(Board& board, int move) {
     ASSERT(checkBoard(board))
 
     // If the king is attacked by the new side to move, take back the move and return false
-    if (isSquareAttacked(board.kingSq[side], board.side, board)) {
+    // (taking back, rather than never making it, as a capture made & undone reorders the piece lists)
+    int kingAttacked = fullTest ? isSquareAttacked(board.kingSq[side], board.side, board) : kingExposed(from, side, board);
+    ASSERT(kingAttacked == isSquareAttacked(board.kingSq[side], board.side, board))
+    if (kingAttacked) {
         undoMove(board);
         return false;
     }
@@ -327,6 +372,7 @@ void makeNullMove(Board& board) {
 
     board.side ^= 1;
     board.historyPly++;
+    board.history[board.historyPly].inCheck = CHECK_UNKNOWN;
     HASH_SIDE;
 
     ASSERT(checkBoard(board))
