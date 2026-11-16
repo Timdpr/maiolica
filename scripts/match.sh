@@ -8,8 +8,10 @@
 # An SPRT has no fixed length: a change worth about 0 Elo needs ~2,650 games on average and can
 # take far more. CAP=<games> ends it there if it hasn't decided. Pick one before you start (or
 # decide not to): docs/testing.md has the lengths to expect and what a cap costs.
+# NODES=<n> swaps the clock for a fixed number of nodes a move: a quick screen that comes out the same
+# however busy the machine is, but is blind to speed & time management. It doesn't replace the timed test.
 # env overrides: FASTCHESS, BOOK, MATCHES, CONCURRENCY, SEED (same seed, same openings), GAMES (elo only),
-#                CAP (gain & nonreg only)
+#                CAP (gain & nonreg only), NODES (in place of a time control)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -26,6 +28,14 @@ SEED=${SEED:-$(( (RANDOM << 15) | RANDOM ))}   # picks the openings; recorded so
 GAMES=${GAMES:-2000}
 CAP=${CAP:-}   # gain & nonreg: give up waiting for a verdict after this many games
 [[ -z $CAP || $CAP =~ ^[1-9][0-9]*$ ]] || { echo "CAP must be a number of games, got '$CAP'" >&2; exit 1; }
+NODES=${NODES:-}   # every move searches this many nodes, & there is no clock
+[[ -z $NODES || $NODES =~ ^[1-9][0-9]*$ ]] || { echo "NODES must be a number of nodes a move, got '$NODES'" >&2; exit 1; }
+[[ -z $NODES || $# -lt 3 ]] || { echo "NODES takes the place of the time control: give one or the other" >&2; exit 1; }
+if [[ -n $NODES ]]; then
+    LIMIT="nodes=$NODES" LIMIT_NAME=limit LIMIT_DESC="$NODES nodes a move"
+else
+    LIMIT="tc=$TC" LIMIT_NAME=tc LIMIT_DESC=$TC
+fi
 
 case $MODE in
   gain)   SPRT="elo0=0 elo1=10"  BOUNDS=" [0, 10]" ;;    # does the change actually gain?
@@ -61,18 +71,21 @@ fi
 
 # a match is only as fair as the machine is steady: say so if it's on battery, saving power,
 # or busy before we've even started (6 games at once leave 2 fast cores spare)
-if command -v pmset >/dev/null; then
+# (none of that touches a fixed-node game: the same nodes get searched, just more slowly)
+if [[ -n $NODES ]]; then
+    NOTES+="fixed nodes: a screen, blind to speed & time management. The timed test still decides"$'\n'
+elif command -v pmset >/dev/null; then
     POWER=$(pmset -g batt; pmset -g)
     [[ $POWER != *"Battery Power"* ]] || NOTES+="warning: running on battery"$'\n'
     [[ ! $POWER =~ lowpowermode\ +1 ]] || NOTES+="warning: low power mode is on"$'\n'
 fi
 LOAD=$(uptime | sed 's/.*load averages*: *//; s/[, ].*//')
-awk -v load="$LOAD" 'BEGIN {exit load > 2}' || NOTES+="warning: the machine was already busy (load $LOAD)"$'\n'
+[[ -n $NODES ]] || awk -v load="$LOAD" 'BEGIN {exit load > 2}' || NOTES+="warning: the machine was already busy (load $LOAD)"$'\n'
 AWAKE=$(command -v caffeinate || true)   # macOS: keeps the laptop from sleeping mid-match
 
 DEV_SHA=$(git rev-parse --short HEAD)$(git diff --quiet HEAD || echo +dirty)   # +dirty: uncommitted changes
 BASE_SHA=$(git rev-parse --short "$BASE_REF^{commit}")
-NAME=$(date +%Y%m%d-%H%M%S)-$DEV_SHA-vs-${BASE_REF//\//_}-$MODE
+NAME=$(date +%Y%m%d-%H%M%S)-$DEV_SHA-vs-${BASE_REF//\//_}-$MODE${NODES:+-nodes}
 OUT=$MATCHES/$NAME
 mkdir -p "$OUT"
 
@@ -92,7 +105,7 @@ cp "$TMP/build/maiolica" "$OUT/base"
 # record what we're comparing, so the folder makes sense later
 { echo "dev:  $DEV_SHA"
   echo "base: $BASE_REF ($BASE_SHA)"
-  echo "mode: $MODE ($DESC), tc: $TC, book: $BOOK"
+  echo "mode: $MODE ($DESC), $LIMIT_NAME: $LIMIT_DESC, book: $BOOK"
   echo "seed: $SEED"
   [[ -z ${CAPNOTE:-} ]] || echo "$CAPNOTE"
   echo "fastchess: $("$FASTCHESS" --version | sed 's/^fastchess //')"
@@ -108,7 +121,7 @@ STATUS=0
 $AWAKE ${AWAKE:+-i} "$FASTCHESS" \
   -engine cmd="$OUT/dev" name=dev \
   -engine cmd="$OUT/base" name=base \
-  -each tc="$TC" option.Hash=16 \
+  -each "$LIMIT" option.Hash=16 \
   -openings file="$BOOK" format="${BOOK##*.}" order=random -srand "$SEED" \
   -games 2 -repeat $LENGTH -concurrency "$CONCURRENCY" \
   -pgnout file="$OUT/games.pgn" \
@@ -173,7 +186,7 @@ esac
 [[ -z $STOPPED ]] || VERDICT="stopped early${LLR:+ (LLR $LLR)}"
 [[ -z $ODD ]] || VERDICT="$VERDICT, but not every game ended normally"
 [[ -z $(tail -c 1 "$README") ]] || echo >> "$README"   # the last row might lack its newline
-echo "| ${NAME:0:4}-${NAME:4:2}-${NAME:6:2} | ${WHAT:-} | \`$DEV_SHA\` | \`$BASE_SHA\` | $MODE$BOUNDS | $TC, Hash 16 | $SCORE | $ELO | $VERDICT | \`$NAME\` |" >> "$README"
+echo "| ${NAME:0:4}-${NAME:4:2}-${NAME:6:2} | ${WHAT:-} | \`$DEV_SHA\` | \`$BASE_SHA\` | $MODE$BOUNDS | $LIMIT_DESC, Hash 16 | $SCORE | $ELO | $VERDICT | \`$NAME\` |" >> "$README"
 echo "results are in $OUT"
 
 if [[ -n $ODD ]]; then

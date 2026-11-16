@@ -90,12 +90,14 @@ scripts/match.sh master gain     # SPRT, elo0=0 elo1=10: does it gain?
 scripts/match.sh master nonreg   # SPRT, elo0=-10 elo1=0: doesn't lose (simplifications, bug fixes)
 scripts/match.sh <ref> elo       # 2000 games, no SPRT: how big is the gap?
 CAP=2000 scripts/match.sh master nonreg   # the same SPRT, but stop at 2000 games if it still hasn't decided
+NODES=30000 scripts/match.sh master nonreg   # a quick first look, with no clock: every move searches 30,000 nodes
 ```
 The script builds the working tree ("dev") and the given ref ("base"). It plays 8+0.08 games (8 seconds each, plus 0.08 a move) with Hash 16, from `books/8moves_v3.pgn`, in pairs with colours swapped, 6 at a time.
 
 - **`gain` and `nonreg`** are SPRTs (sequential probability ratio tests): the match goes on only until the result is statistically clear either way, then stops. That answers "is it better?" in the fewest games. It uses the logistic model with α = β = 0.05, so it gives the wrong answer about 1 time in 20.
 - **`elo`** plays a fixed number of games and reports the Elo difference with its error margin. Use it to measure a gap. Don't read the gap off an SPRT: because an SPRT stops the moment the score looks convincing, the Elo it shows at that point is biased. `GAMES=500 scripts/match.sh <ref> elo` changes the length. 2000 games take about 2 hours and give a margin of roughly ±9 Elo.
 - **`CAP=<games>`** puts an upper limit on a `gain` or `nonreg` run. Decide on one before starting: see "How long an SPRT takes" below. Without one the script says so in `info.txt`.
+- **`NODES=<n>`** takes the clock away and gives every move the same number of nodes instead. It is a quick first look, not a verdict: see "A quick look at fixed nodes" below.
 - **Seed:** the openings are drawn from the book at random. The seed is printed and saved in `info.txt`, and `SEED=<n> scripts/match.sh ...` replays a match with the same openings in the same order.
 - **Terminations:** when the match finishes, the script counts how the games ended. Anything other than `normal` (a time forfeit, an illegal move, a crash, a disconnect) makes it exit non-zero, because that result wasn't decided on the board.
 - **A stale base:** `master` here is your local copy of the branch, which only moves when you pull. The script fetches first, and if the base branch is behind its remote copy it says so on screen and in `info.txt`. Using `origin/master` as the base avoids the question.
@@ -124,6 +126,25 @@ So before starting one, ask what the run is for and what it is likely to cost, a
 - **Set the cap before the match starts.** Stopping a run because of the score it happens to show is how a test gets bent.
 - **2,000 games is the natural cap**: by then the Elo figure is good to about ±9, and twice as many games only brings that to about ±7.
 - **A baseline match is never capped or cut short.** It is `elo` mode, which has a fixed length already.
+
+### A quick look at fixed nodes
+`NODES=30000 scripts/match.sh master nonreg` plays the same kind of match with no clock: each move searches 30,000 nodes (positions) and then has to answer. A run takes a minute or two, where a timed SPRT takes hours.
+
+- **What it is for:** finding out early that a change is broken or clearly worse, before a timed match is spent on it.
+- **What it can't see:** anything about speed or time management, since both sides get the same nodes however long they take over them. It can't see the size of the table either, which never fills at this depth. A gain at 30,000 nodes (about depth 6) needn't be the same size in a real game (about depth 9). So a change still has to pass the timed test to go in.
+- **The machine's load doesn't matter.** The same 200 games played on a quiet machine and on one with every core busy came out identical, move for move. The battery, low-power and busy warnings are left out of `info.txt` for these runs, and `CONCURRENCY` can go up to the number of cores.
+- **Checked against three results already known from timed matches** (Nov 2026, 30,000 nodes, 3,000 games each):
+
+  | Change | Timed SPRTs at 8+0.08 | Fixed nodes |
+  |---|---|---|
+  | King's endgame table in use (`6cacedd`) | passed, +82 to +98 Elo | +71.0 ± 8.1 |
+  | Pawnless-draw check fixed (`d23669b`) | passed, +14 to +25 | +7.6 ± 2.6 |
+  | En passant square only when capturable (`0c91a9d`) | level, -0.5 ± 7.6 | +1.2 ± 5.8 |
+
+  The order and the signs agree; the gains come out smaller. 10,000 nodes gave the same picture (+67, +5, +0.5).
+- **It is still an SPRT, so it is wrong about 1 time in 20.** As `nonreg` runs, the two gains passed in 200 to 300 games, and failed when old and new were swapped. The level change passed three times and failed once. When a run fails a change you have reason to think is harmless, run it again before believing it: it costs a minute.
+- **The margins look small because the games come in pairs.** With no clock, two engines that differ only slightly play the same game twice with colours swapped unless the change comes into it, and those pairs cancel out exactly.
+- The engine checks the limit every 2,048 nodes, so a count below that behaves like 2,048.
 
 Setup is a one-off:
 - Build fastchess in `external/fastchess`, at the commit the results so far were played with (alpha 1.8.3): `git clone https://github.com/Disservin/fastchess external/fastchess && git -C external/fastchess checkout 2a2aa4e && make -C external/fastchess -j`.
