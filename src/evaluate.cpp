@@ -103,7 +103,7 @@ static int materialDraw(const Board& board) {
 
 /// Evaluate a board position! @return a score (in 100ths of a pawn)
 int evalPosition(const Board& board) {
-    if (board.pieceCounts[wP] && !board.pieceCounts[bP] && materialDraw(board) == true) {
+    if (!board.pieceCounts[wP] && !board.pieceCounts[bP] && materialDraw(board) == true) {
         return 0;
     }
 
