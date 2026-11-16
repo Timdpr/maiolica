@@ -102,7 +102,8 @@ The script builds the working tree ("dev") and the given ref ("base"). It plays 
 - **Terminations:** when the match finishes, the script counts how the games ended. Anything other than `normal` (a time forfeit, an illegal move, a crash, a disconnect) makes it exit non-zero, because that result wasn't decided on the board.
 - **A stale base:** `master` here is your local copy of the branch, which only moves when you pull. The script fetches first, and if the base branch is behind its remote copy it says so on screen and in `info.txt`. Using `origin/master` as the base avoids the question.
 - **A steady machine:** the laptop is kept awake for the length of the match. If it was on battery, in low power mode or already busy when the match started, a warning goes on screen and into `info.txt`, since any of those can skew a result.
-- **Stopping early:** Ctrl-C ends a match cleanly. The games played so far are still written up, and the row in the table says `stopped early`. A run that reaches its `CAP` says `capped at N games`, with the LLR it had got to.
+- **Pausing:** Ctrl-C pauses a match. Every finished game is kept; the few in progress are dropped. The row in the table says `paused at N games`, and the script prints the command that carries on: `RESUME=<folder> scripts/match.sh`. That takes no other arguments, since the engines, openings, settings and score so far are read back from the folder. The dropped games are played again from their openings, and the match runs to the length it was started with, so a paused match is not a shortened one. Checked with a 200-game fixed-node match paused twice: it ended with the same games as the one played straight through. `games.pgn` can hold one game twice, if it finished at the moment of the pause; the score counts it once.
+- **A cap:** a run that reaches its `CAP` says `capped at N games`, with the LLR it had got to.
 - **No adjudication:** games are played out to mate or a draw by the rules. Ending them early on the engines' own scores (resigning at -6.00, calling a draw when both sides sit near 0.00) was simulated on 790 real games: it would have got 17 to 20 results wrong, for 5 to 12% fewer moves played.
 
 ### How long an SPRT takes, and when to cap it
@@ -155,10 +156,10 @@ Every match gets a folder in `matches/`, named `<date>-<time>-<dev commit>-vs-<b
 
 | File | What it is |
 |---|---|
-| `info.txt` | what was compared, the conditions, the seed, the fastchess version and any warnings |
+| `info.txt` | what was compared, the conditions, the seed, the fastchess version, any warnings, and when it was paused and resumed |
 | `result.txt` | fastchess's final score, Elo and SPRT verdict, and how the games ended |
 | `games.pgn` | every game, with each move's score, depth and time |
-| `config.json` | fastchess's full settings |
+| `config.json` | fastchess's full settings and the score so far, which is what a resumed match starts from |
 | `log.txt.gz` | fastchess's running output, compressed |
 | `dev`, `base` | the two binaries that played |
 
