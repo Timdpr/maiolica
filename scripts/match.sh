@@ -5,7 +5,11 @@
 # games instead, to measure the gap: an SPRT's own Elo figure is biased by stopping early.
 # Results go to matches/<date>-<time>-<dev sha>-vs-<base ref>-<mode>/, and a row is added to
 # the table in matches/README.md. WHAT="..." fills in that row's description.
-# env overrides: FASTCHESS, BOOK, MATCHES, CONCURRENCY, SEED (same seed, same openings), GAMES (elo only)
+# An SPRT has no fixed length: a change worth about 0 Elo needs ~2,650 games on average and can
+# take far more. CAP=<games> ends it there if it hasn't decided. Pick one before you start (or
+# decide not to): docs/testing.md has the lengths to expect and what a cap costs.
+# env overrides: FASTCHESS, BOOK, MATCHES, CONCURRENCY, SEED (same seed, same openings), GAMES (elo only),
+#                CAP (gain & nonreg only)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -20,6 +24,8 @@ MATCHES=${MATCHES:-$MAIN/matches}
 CONCURRENCY=${CONCURRENCY:-6}   # M1 Pro has 8 P-cores; leave a bit of headroom
 SEED=${SEED:-$(( (RANDOM << 15) | RANDOM ))}   # picks the openings; recorded so a match can be repeated
 GAMES=${GAMES:-2000}
+CAP=${CAP:-}   # gain & nonreg: give up waiting for a verdict after this many games
+[[ -z $CAP || $CAP =~ ^[1-9][0-9]*$ ]] || { echo "CAP must be a number of games, got '$CAP'" >&2; exit 1; }
 
 case $MODE in
   gain)   SPRT="elo0=0 elo1=10"  BOUNDS=" [0, 10]" ;;    # does the change actually gain?
@@ -33,8 +39,11 @@ if [[ $MODE == elo ]]; then
     LENGTH="-rounds $(( (GAMES + 1) / 2 ))"
     DESC="$GAMES games, no SPRT"
 else
-    LENGTH="-rounds 10000 -sprt $SPRT alpha=0.05 beta=0.05 model=logistic"
-    DESC=$SPRT
+    LENGTH="-rounds $(( (${CAP:-20000} + 1) / 2 )) -sprt $SPRT alpha=0.05 beta=0.05 model=logistic"
+    DESC="$SPRT, ${CAP:+capped at $CAP games}"
+    DESC=${DESC%, }
+    # said every time, so that going without a cap is a choice and not an oversight
+    [[ -n $CAP ]] || CAPNOTE="cap:  none. A change worth ~0 Elo runs ~2,650 games (about 3 hours) & can go on much longer: see CAP in docs/testing.md"
 fi
 
 [[ -x $FASTCHESS ]] || { echo "no fastchess at $FASTCHESS (set FASTCHESS=...)" >&2; exit 1; }
@@ -85,6 +94,7 @@ cp "$TMP/build/maiolica" "$OUT/base"
   echo "base: $BASE_REF ($BASE_SHA)"
   echo "mode: $MODE ($DESC), tc: $TC, book: $BOOK"
   echo "seed: $SEED"
+  [[ -z ${CAPNOTE:-} ]] || echo "$CAPNOTE"
   echo "fastchess: $("$FASTCHESS" --version | sed 's/^fastchess //')"
   printf '%s' "$NOTES"; } | tee "$OUT/info.txt"
 
@@ -140,7 +150,7 @@ Local records of engine-vs-engine matches (this folder is gitignored). One folde
 | `log.txt.gz` | fastchess's running output (compressed) |
 | `dev`, `base` | The two binaries that played |
 
-Modes: `nonreg` asks "is dev no weaker than base?", `gain` asks "is dev stronger?" (both SPRTs, which stop as soon as the answer is clear), and `elo` plays a fixed number of games to measure the gap.
+Modes: `nonreg` asks "is dev no weaker than base?", `gain` asks "is dev stronger?" (both SPRTs, which stop as soon as the answer is clear), and `elo` plays a fixed number of games to measure the gap. An SPRT started with `CAP=<games>` stops there if the answer still isn't clear, and its verdict reads `capped`.
 
 ## Results
 Elo is dev minus base. An SPRT's Elo is only a rough guide, since it stops early.
@@ -157,6 +167,8 @@ case $(grep -o 'H[01] was accepted' "$OUT/result.txt" || true) in
   H0*) VERDICT="failed (LLR $LLR)" ;;
   *)   VERDICT=$([[ $MODE == elo ]] && echo "-" || echo "unfinished (LLR $LLR)") ;;
 esac
+# ran out of games before the SPRT made up its mind. LLR above 0 leans towards a pass, below 0 towards a fail
+[[ $MODE == elo || -z $CAP || -n $STOPPED || $VERDICT != unfinished* ]] || VERDICT="capped at $CAP games (LLR $LLR)"
 [[ -z $STOPPED ]] || VERDICT="stopped early${LLR:+ (LLR $LLR)}"
 [[ -z $ODD ]] || VERDICT="$VERDICT, but not every game ended normally"
 [[ -z $(tail -c 1 "$README") ]] || echo >> "$README"   # the last row might lack its newline
