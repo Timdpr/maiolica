@@ -149,7 +149,7 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
     }
 
     // increase depth if we are in check!
-    int inCheck = isSquareAttacked(board.kingSq[board.side], board.side^1, board); // are we in check?
+    int inCheck = isInCheck(board); // are we in check? (makeMove wants to know too, so it's remembered)
     if (inCheck == true) {
         depth++;
     }

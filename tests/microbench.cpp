@@ -52,7 +52,7 @@ static void makeUndo(benchmark::State& state) {
 }
 BENCHMARK(makeUndo);
 
-/// Is each side's king in check? (the legality test inside makeMove is the same call)
+/// Is each side's king in check? (makeMove makes the same call for king moves, en passant & moves out of check)
 static void squareAttacked(benchmark::State& state) {
     for (auto _ : state)
         for (auto& board : boards()) {

@@ -108,6 +108,7 @@ struct Undo {
     int enPasSq;
     int fiftyMove;
     U64 positionKey;
+    int inCheck; // is the side to move in check here? CHECK_UNKNOWN until isInCheck is asked
 };
 
 /// Representation of a board position
@@ -136,6 +137,7 @@ struct Board {
     Undo history[MAX_GAME_MOVES]; // holds game state (via 'Undo' struct) at each ply
 
     int pieceList[13][10]; // 13 types of pieces, and at most 10 of each
+    int pieceIndex[BRD_SQ_NUM]; // where the piece on a square sits in its pieceList, so we never have to search for it
 
     int pvArray[MAX_DEPTH];
 
@@ -212,6 +214,8 @@ constexpr int MFLAG_CAPTURING = 0x7C000;
 constexpr int MFLAG_PROMOTION = 0xF00000;
 
 constexpr int NO_MOVE = 0;
+
+constexpr int CHECK_UNKNOWN = -1;
 
 /* -- GLOBAL -- */  // TODO: Consider making these non-global...
 
@@ -303,6 +307,8 @@ void generateAllCaptureMoves(const Board& board, MoveList& moveList);
 void initMVVLVA();
 
 // makemove.cpp
+void initLineSteps();
+int isInCheck(Board& board);
 [[nodiscard]] int makeMove(Board& board, int move);
 void undoMove(Board& board);
 void makeNullMove(Board& board);
