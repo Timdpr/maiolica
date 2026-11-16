@@ -164,6 +164,8 @@ int main() {
             {"4k3/8/8/p7/8/8/7P/4K3 w - - 0 1", "h2h4", "4k3/8/8/p7/7P/8/8/4K3 b - - 0 1", NO_SQ}, // a5 isn't beside h4
             {"4k3/8/8/8/n7/8/1P6/4K3 w - - 0 1", "b2b4", "4k3/8/8/8/nP6/8/8/4K3 b - - 0 1", NO_SQ}, // a knight can't take
             {"4k3/8/8/8/P7/8/1P6/4K3 w - - 0 1", "b2b4", "4k3/8/8/8/PP6/8/8/4K3 b - - 0 1", NO_SQ}, // nor can our own pawn
+            // the d4 pawn is pinned to its king, so it can't take. We don't look that far: the square is set anyway
+            {"8/8/8/8/k2p3R/8/4P3/4K3 w - - 0 1", "e2e4", "8/8/8/8/k2pP2R/8/8/4K3 b - e3 0 1", E3},
         };
         for (const auto& push : pushes) {
             Board board{}, fromFen{};
