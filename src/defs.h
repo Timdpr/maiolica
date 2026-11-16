@@ -20,7 +20,7 @@ std::abort();}
 #define ASSERT(n)
 #endif
 
-constexpr const char *NAME = "Maiolica 1.0";
+constexpr const char *NAME = "Maiolica 1.1";
 constexpr int BRD_SQ_NUM = 120; // number of squares on the main, 'mailbox representation' board
 constexpr int MAX_GAME_MOVES = 2048;
 constexpr int MAX_POSITION_MOVES = 256;
