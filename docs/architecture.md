@@ -27,7 +27,7 @@ C++20 UCI engine. Single-threaded search, 10x12 mailbox board, pawn-only bitboar
 | `src/console.cpp` | `./maiolica console` & `replay`: the terminal board (ansi/unicode, or plain), a game against the engine, san move input, pgn replay, game result detection. Self-contained; it borrows the search's output through `lineHandler` and runs nothing during uci |
 | `src/bench.cpp` | `bench()`: 9 fixed FENs at fixed depths, fresh `Board`/`SearchInfo`, 16MB TT cleared per position. Total nodes is the **bench signature** |
 | `tests/perft_tests.cpp` | Perft regression, tiers `smoke` (17 cases, debug/sanitiser-sized), `quick` (19, default, ~1s), `full` (8, ~20s); ctest `perft_<tier>` |
-| `tests/search_tests.cpp` | A short search of five positions (~200k nodes) for debug and sanitiser builds, where the `ASSERT`s in `makeMove`, `isInCheck` and `checkBoard` run inside it; ctest `search` |
+| `tests/search_tests.cpp` | A short search of five positions (~200k nodes) for debug and sanitiser builds, where the `ASSERT`s in `makeMove`, `isInCheck` and `checkBoard` run inside it, plus a check that `probePonderMove` refuses a table move that isn't legal; ctest `search` |
 | `tests/eval_tests.cpp` | Eval checks: colour symmetry, the pawnless draw, the king's two tables; ctest `eval` |
 | `tests/bench_signature.txt` | Expected node total; ctest `bench_signature` greps `Nodes searched  : N` from `maiolica bench` |
 | `tests/microbench.cpp` | Optional Google Benchmark (`MAIOLICA_MICROBENCH=ON`, `microbench` preset): movegen, captures, make/undo, `isSquareAttacked`, eval. Indicative only; bench/perft decide |
