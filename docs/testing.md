@@ -12,9 +12,11 @@ Each kind of claim has its own tool. Use the one that matches what a change clai
 | "It's N Elo stronger than the baseline" | a fixed-length match | `scripts/match.sh <baseline-tag> elo` |
 | "The protocol still works" | scripted sessions behave | `ctest` (`uci`, `fen`) |
 
-`ctest --preset release` runs perft smoke and quick, `fen`, `search`, `uci`, `replay`, `console`, `console_typo` (a mistyped move is refused, not guessed at) and the bench signature (~15s). `replay` plays `tests/replay_test.pgn` (both castles, promotions, underpromotion, disambiguation, en passant, annotation codes like `$1`, a FEN start) through the san reader. The debug and asan presets run perft smoke, `fen` and `search`.
+`ctest --preset release` runs perft smoke and quick, `fen`, `search`, `eval`, `uci`, `replay`, `console`, `console_typo` (a mistyped move is refused, not guessed at) and the bench signature (~15s). `replay` plays `tests/replay_test.pgn` (both castles, promotions, underpromotion, disambiguation, en passant, annotation codes like `$1`, a FEN start) through the san reader. The debug and asan presets run perft smoke, `fen`, `search` and `eval`.
 
 `search` (`tests/search_tests.cpp`) searches five positions a few plies deep, about 200,000 nodes. It is there for the debug and asan presets: perft never makes a null move, and bench is too slow for those builds. In a debug build every `makeMove` in it checks the short legality test against the full one, `isInCheck` checks its remembered answer against a fresh one, and `checkBoard` checks the piece lists. A failed `ASSERT` aborts, which fails the test. In any build it fails if the search made no null-move cutoffs, so it can't quietly stop covering them.
+
+`eval` (`tests/eval_tests.cpp`) checks that a position scores the same as its colour-flipped twin (22 positions: pawns for both sides, one side and neither), that the pawnless-draw shortcut fires only with no pawns on the board, and that the king prefers the middle in an ending and home in a middlegame. The bench signature can't do this job: a change that breaks one of these just gives a new number.
 
 ## Protocol
 - **`tests/uci_test.sh <engine>`** pipes scripted sessions into the engine. A `~N` line sleeps N seconds, so commands can arrive mid-search. Each session has a 20s watchdog, and a crash, hang or non-zero exit fails the test.
@@ -158,6 +160,6 @@ The routine:
 The baseline played itself under these conditions, to check the setup favours neither side: 2000 games came out at -2.3 ± 9.1 Elo (591 wins, 604 losses, 805 draws), every game ending normally. So a gap under about 9 Elo at this length is noise.
 
 ## Sanitisers
-- `ctest --preset asan` runs Debug with ASan and UBSan: perft smoke, `fen` and `search`, with every `ASSERT` on (~40s). CI runs it on Linux, on every pull request and every push to master.
+- `ctest --preset asan` runs Debug with ASan and UBSan: perft smoke, `fen`, `search` and `eval`, with every `ASSERT` on (~40s). CI runs it on Linux, on every pull request and every push to master.
 - The `tsan` preset is for the search thread: drive it over UCI.
 - For a full search check, run `cmake-build-asan/maiolica bench` (slow, ~3 min). It must print the same signature as release. For the same reason, `tests/uci_test.sh` against the asan build fails its `bench` session on the 20s watchdog; that one is expected.

@@ -77,6 +77,12 @@ target_link_libraries(search_tests PRIVATE maiolica_core)
 add_test(NAME search COMMAND search_tests)
 set_tests_properties(search PROPERTIES LABELS "smoke;quick")
 
+# eval: colour symmetry, the pawnless draw and the king's two tables
+add_executable(eval_tests tests/eval_tests.cpp)
+target_link_libraries(eval_tests PRIVATE maiolica_core)
+add_test(NAME eval COMMAND eval_tests)
+set_tests_properties(eval PROPERTIES LABELS "smoke;quick")
+
 add_test(NAME uci COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/uci_test.sh $<TARGET_FILE:maiolica>)
 set_tests_properties(uci PROPERTIES LABELS quick)
 
