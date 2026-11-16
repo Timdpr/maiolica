@@ -134,6 +134,6 @@ The routine:
 The baseline played itself under these conditions, to check the setup favours neither side: 2000 games came out at -2.3 ± 9.1 Elo (591 wins, 604 losses, 805 draws), every game ending normally. So a gap under about 9 Elo at this length is noise.
 
 ## Sanitisers
-- `ctest --preset asan` runs Debug with ASan and UBSan.
+- `ctest --preset asan` runs Debug with ASan and UBSan: perft smoke, `fen` and `search`, with every `ASSERT` on (~40s). CI runs it on Linux, on every pull request and every push to master.
 - The `tsan` preset is for the search thread: drive it over UCI.
 - For a full search check, run `cmake-build-asan/maiolica bench` (slow, ~3 min). It must print the same signature as release. For the same reason, `tests/uci_test.sh` against the asan build fails its `bench` session on the 20s watchdog; that one is expected.
