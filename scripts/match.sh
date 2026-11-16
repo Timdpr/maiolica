@@ -168,7 +168,8 @@ case $(grep -o 'H[01] was accepted' "$OUT/result.txt" || true) in
   *)   VERDICT=$([[ $MODE == elo ]] && echo "-" || echo "unfinished (LLR $LLR)") ;;
 esac
 # ran out of games before the SPRT made up its mind. LLR above 0 leans towards a pass, below 0 towards a fail
-[[ $MODE == elo || -z $CAP || -n $STOPPED || $VERDICT != unfinished* ]] || VERDICT="capped at $CAP games (LLR $LLR)"
+# (fewer games than the cap means fastchess gave up for some other reason: that stays 'unfinished')
+[[ $MODE == elo || -z $CAP || -n $STOPPED || $VERDICT != unfinished* ]] || (( ${SCORE%% *} < CAP )) || VERDICT="capped at $CAP games (LLR $LLR)"
 [[ -z $STOPPED ]] || VERDICT="stopped early${LLR:+ (LLR $LLR)}"
 [[ -z $ODD ]] || VERDICT="$VERDICT, but not every game ended normally"
 [[ -z $(tail -c 1 "$README") ]] || echo >> "$README"   # the last row might lack its newline
