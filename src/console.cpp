@@ -141,7 +141,7 @@ static int parseAnyMove(const std::string& text, Board& board) {
     return found;
 }
 
-/// Play a move for real, keeping room in history for the search
+/// Play a move for real, keeping room in history for the search (the same room as parsePosition, & none of it spare)
 static bool playMove(Board& board, const int move) {
     if (move == NO_MOVE || board.historyPly >= MAX_GAME_MOVES - MAX_DEPTH - 1 || !makeMove(board, move)) return false;
     board.ply = 0;

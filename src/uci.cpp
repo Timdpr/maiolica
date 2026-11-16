@@ -134,7 +134,9 @@ static void parsePosition(std::istringstream& in) {
         return;
     }
     while (in >> token) { // play the moves, stopping at the first bad one
-        if (parsed.historyPly >= MAX_GAME_MOVES - MAX_DEPTH - 1) { // leave room in history for the search
+        // leave room in history for the search: MAX_DEPTH moves, plus a slot for the in-check value of the
+        // position after the last of them. That uses the very last entry, so there's nothing spare
+        if (parsed.historyPly >= MAX_GAME_MOVES - MAX_DEPTH - 1) {
             sendLine("info string game too long, ignoring moves from %s", token.c_str());
             break;
         }
