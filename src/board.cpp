@@ -226,11 +226,14 @@ int parseFen(const char *fen, Board& board) {
         file = fen[0] - 'a'; // set file and rank ints with ASCII trick
         rank = fen[1] - '1';
 
-        // only keep it if it's empty and just behind a pawn that double pushed: rank 6 with white to move, 3 with black
+        // only keep it if it's empty and just behind a pawn that double pushed: rank 6 with white to move, 3 with black.
+        // And only if one of our pawns stands beside that pawn to take it, which is makeMove's rule too
         if (file >= FILE_A && file <= FILE_H && rank == ((board.side == WHITE) ? RANK_6 : RANK_3)) {
             int sq = FILE_RANK_TO_SQUARE_INDEX(file, rank);
             int pushedSq = (board.side == WHITE) ? sq - 10 : sq + 10;
-            if (board.pieces[sq] == EMPTY && board.pieces[pushedSq] == ((board.side == WHITE) ? bP : wP)) {
+            int ourPawn = (board.side == WHITE) ? wP : bP;
+            if (board.pieces[sq] == EMPTY && board.pieces[pushedSq] == ((board.side == WHITE) ? bP : wP)
+                    && (board.pieces[pushedSq-1] == ourPawn || board.pieces[pushedSq+1] == ourPawn)) {
                 board.enPasSq = sq; // set square
             }
         }

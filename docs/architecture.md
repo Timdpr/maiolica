@@ -27,8 +27,9 @@ C++20 UCI engine. Single-threaded search, 10x12 mailbox board, pawn-only bitboar
 | `src/console.cpp` | `./maiolica console` & `replay`: the terminal board (ansi/unicode, or plain), a game against the engine, san move input, pgn replay, game result detection. Self-contained; it borrows the search's output through `lineHandler` and runs nothing during uci |
 | `src/bench.cpp` | `bench()`: 9 fixed FENs at fixed depths, fresh `Board`/`SearchInfo`, 16MB TT cleared per position. Total nodes is the **bench signature** |
 | `tests/perft_tests.cpp` | Perft regression, tiers `smoke` (17 cases, debug/sanitiser-sized), `quick` (19, default, ~1s), `full` (8, ~20s); ctest `perft_<tier>` |
-| `tests/search_tests.cpp` | A short search of five positions (~200k nodes) for debug and sanitiser builds, where the `ASSERT`s in `makeMove`, `isInCheck` and `checkBoard` run inside it; ctest `search` |
-| `tests/bench_signature.txt` | Expected node total (currently `4527030`); ctest `bench_signature` greps `Nodes searched  : N` from `maiolica bench` |
+| `tests/search_tests.cpp` | A short search of five positions (~200k nodes) for debug and sanitiser builds, where the `ASSERT`s in `makeMove`, `isInCheck` and `checkBoard` run inside it, plus a check that `probePonderMove` refuses a table move that isn't legal; ctest `search` |
+| `tests/eval_tests.cpp` | Eval checks: colour symmetry, the pawnless draw, the king's two tables; ctest `eval` |
+| `tests/bench_signature.txt` | Expected node total; ctest `bench_signature` greps `Nodes searched  : N` from `maiolica bench` |
 | `tests/microbench.cpp` | Optional Google Benchmark (`MAIOLICA_MICROBENCH=ON`, `microbench` preset): movegen, captures, make/undo, `isSquareAttacked`, eval. Indicative only; bench/perft decide |
 
 Build/presets in `CMakeLists.txt`/`CMakePresets.json` (release, native, profile, debug, asan, tsan, microbench); `scripts/ab.sh`, `pgo.sh`, `match.sh`, `demo.sh`.
@@ -43,7 +44,7 @@ Build/presets in `CMakeLists.txt`/`CMakePresets.json` (release, native, profile,
 - `side`, `enPasSq` (`NO_SQ` if none), `fiftyMove` (half-moves, from the FEN's halfmove clock), `castlingPerms` (4 bits: `wK_CA`=1, `wQ_CA`=2, `bK_CA`=4, `bQ_CA`=8).
 - `ply` = depth from search root (reset by `clearForSearch`, and after each move in `parsePosition`); `historyPly` = index into `history[MAX_GAME_MOVES=2048]` of `Undo {move, castlingPerms, enPasSq, fiftyMove, positionKey, inCheck}`. The first five are saved by `makeMove` for the move played from that position; `inCheck` belongs to the position itself (see `isInCheck` below).
 - `positionKey`: Zobrist key, kept incrementally.
-- **Search state lives in `Board` too:** `pvArray[MAX_DEPTH]`, `searchHistory[13][120]` (piece × to-square), `searchKillers[2][MAX_DEPTH]` (by ply). `Board` is big (57KB, mostly `history`) and copied with `memcpy` for the search thread, so it must stay trivially copyable.
+- **Search state lives in `Board` too:** `searchHistory[13][120]` (piece × to-square), `searchKillers[2][MAX_DEPTH]` (by ply). `Board` is big (74KB, mostly `history`) and copied with `memcpy` for the search thread and for the PV walk, so it must stay trivially copyable.
 
 ## Move encoding (defs.h)
 
@@ -89,7 +90,7 @@ Scores (set at generation; `alphaBeta` then sets the TT move to 2,000,000):
 `makeMove` saves the key, move, fifty, EP and castling into `history[historyPly]`, then incrementally updates everything through `clearPiece`/`addPiece`/`movePiece` (key via `HASH_PIECE`, material, big/major/minor counts, pawn bitboards, piece lists):
 - EP removes the pawn behind `to`; castling moves the rook first (switch on `to`).
 - Hashes out EP and castling, applies `castlingPerms &= castlePermArray[from] & [to]`, hashes castling back in.
-- Capture → `clearPiece(to)`, fifty = 0. Pawn move → fifty = 0; a double push always sets `enPasSq` and hashes it, capturable or not, so the same position can get two keys (a strength issue, left for an SPRT).
+- Capture → `clearPiece(to)`, fifty = 0. Pawn move → fifty = 0; a double push sets `enPasSq` and hashes it only when an enemy pawn stands beside the pushed pawn, so a square nobody can use doesn't give the same position a second key. `parseFen` applies the same rule. The pawn beside may be pinned: that isn't checked.
 - Moves the piece, swaps in the promoted piece, updates `kingSq`, flips side and `HASH_SIDE`.
 - **Legality:** if the mover's king is now attacked, `undoMove` and return false. Every caller must handle the false.
   - King moves (castling included), en passant, and any move played while in check get the full `isSquareAttacked` on the king.
@@ -104,7 +105,7 @@ Zobrist: `pieceKeys[13][120]` (row `EMPTY` doubles as the EP-square key), `sideK
 
 ## Search (search.cpp)
 
-`searchPosition`: `clearForSearch` (zero history/killers, `currentAge++`, `ply = 0`, reset `nodes`/`selDepth`/fail-high stats; `stopped` is reset by the caller, before the thread starts), then depths 1..`info.depth` with a full window (±`ALPHABETA_BOUND` 30000), no aspiration. A stopped iteration is discarded; otherwise `getPVLine` fills `pvArray` and it sends `info depth … seldepth … score cp|mate … nodes … nps … hashfull … time … pv …`. `bestmove` is `pvArray[0]`, with `pvArray[1]` as the ponder move (which may lie past the end of the printed PV). If no iteration finished it falls back to `firstLegalMove` (`0000` if mated or stalemated); that runs after the search, because making and undoing a move can reorder the piece lists. In `infinite` or `ponder` mode it then waits for `stopped`/`ponderhit` before sending `bestmove`.
+`searchPosition`: `clearForSearch` (zero history/killers, `currentAge++`, `ply = 0`, reset `nodes`/`selDepth`/fail-high stats; `stopped` is reset by the caller, before the thread starts), then depths 1..`info.depth` with a full window (±`ALPHABETA_BOUND` 30000), no aspiration. A stopped iteration is discarded; otherwise `getPVLine` fills a local `pvArray` and it sends `info depth … seldepth … score cp|mate … nodes … nps … hashfull … time … pv …`. `bestmove` is `pvArray[0]`, with `pvArray[1]` as the ponder move. When the PV is one move long (the table had no reply, or the move repeats a position), `probePonderMove` asks the table for a legal reply to it, on a copy of the board. If no iteration finished it falls back to `firstLegalMove` (`0000` if mated or stalemated); that runs after the search, because making and undoing a move can reorder the piece lists. In `infinite` or `ponder` mode it then waits for `stopped`/`ponderhit` before sending `bestmove`.
 
 `alphaBeta(alpha, beta, depth, board, info, table, nullMoveAllowed)`, negamax, in this order:
 1. `depth == 0` → `quiescence` (which counts the node).
@@ -129,7 +130,7 @@ Mate scores: `IS_MATE` = 30000 − 64. Anything beyond it is printed as `score m
 - Flags: `HF_ALPHA` (upper bound), `HF_BETA` (lower bound), `HF_EXACT`. Probe needs `entry.depth >= depth`; ALPHA hits only if `score <= alpha` (returns alpha), BETA only if `score >= beta` (returns beta).
 - Replace if the slot is empty (key 0), `age < currentAge`, or `entry.depth <= depth`. Age is bumped per search, reset to 0 by `clearHashTable` (`ucinewgame`, bench).
 - Mate scores are stored relative to the node (`±ply` on store, reversed on probe).
-- `getPVLine` walks `probePVTable` moves from the root, checking each with `moveExists`, making it, up to `depth` moves; then undoes back to `ply == 0`. The PV it reports ends with the first move that repeats a position or reaches the fifty-move limit: the search scores that as a draw and looks no further, so later entries belong to other lines. The walk itself still carries on to `depth`, because making and undoing moves reorders the piece lists, and a shorter walk would change later searches.
+- `getPVLine` copies the board and walks `probePVTable` moves from the root on the copy, checking each with `moveExists` and making it, up to `depth` moves. It stops after the first move that repeats a position or reaches the fifty-move limit: the search scores that as a draw and looks no further, so later entries belong to other lines. The search's own board is `const` here. Making and undoing moves reorders the piece lists, so a walk on that board would change later searches by how far it went.
 
 ## Evaluation (evaluate.cpp)
 
@@ -137,12 +138,8 @@ White-relative score, negated for black at the end. Tables are a1-first from whi
 - Material difference (kings cancel) + PSTs for P, N, B, R (no queen table).
 - Pawns: isolated −10 (`isolatedPawnMask`: adjacent files); passed bonus `pawnPassed[rank]` {0,5,10,20,35,60,100,200} (`whitePassedMask`/`blackPassedMask`: own and adjacent files ahead; black uses `7 - rank`).
 - Rook open/semi-open file +10/+5, queen +5/+3 (`fileBitMask` vs `pawns[BOTH]`/own pawns).
-- King: `kingEndgame` if the *opponent's* `material <= ENDGAME_MATERIAL` (R + 2N + 2P = 1400), else `kingOpening`. Bishop pair +30.
-- `materialDraw` (from Sjeng): returns 0 for drawish minor/rook-only material.
-
-Known issues, left as they are until a fix passes an SPRT (they change play):
-- **Pawnless draws:** the `materialDraw` gate reads `pieceCounts[wP] && !pieceCounts[bP]` (meant to be `!wP && !bP`), so it fires only when white has pawns and black has none. This makes eval colour-asymmetric.
-- **Endgame king:** `material` includes the king's 50000, so the 1400 threshold is never met and `kingEndgame` is never used.
+- King: `kingEndgame` if the *opponent's* `material <= ENDGAME_MATERIAL` (R + 2N + 2P = 1400, plus the king's 50000, since `material` counts the king), else `kingOpening`. Bishop pair +30.
+- `materialDraw` (from Sjeng): with no pawns on the board, returns 0 for drawish minor/rook-only material.
 
 ## Threading and UCI (uci.cpp)
 

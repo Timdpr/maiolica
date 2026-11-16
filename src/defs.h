@@ -139,8 +139,6 @@ struct Board {
     int pieceList[13][10]; // 13 types of pieces, and at most 10 of each
     int pieceIndex[BRD_SQ_NUM]; // where the piece on a square sits in its pieceList, so we never have to search for it
 
-    int pvArray[MAX_DEPTH];
-
     int searchHistory[13][BRD_SQ_NUM]; // indexed by piece type and board square
     int searchKillers[2][MAX_DEPTH]; // indexed by 2 killer moves, by depth
 };
@@ -328,7 +326,8 @@ void searchPosition(Board& board, SearchInfo& info, HashTable& table);
 
 // pvtable.cpp
 void clearHashTable(HashTable& table);
-int getPVLine(int depth, Board& board, const HashTable& table);
+int getPVLine(int depth, const Board& board, const HashTable& table, int *pvArray);
+int probePonderMove(const Board& board, int move, const HashTable& table);
 void initHashTable(HashTable& table, int MB);
 void storeHashEntry(Board& board, HashTable& table, int move, int score, int flags, int depth);
 [[nodiscard]] int probeHashEntry(Board& board, HashTable& table, int *move, int *score, int alpha, int beta, int depth);

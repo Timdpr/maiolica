@@ -12,6 +12,22 @@ static const struct { const char *name, *fen; int depth; } cases[] = {
     {"rook-ending", "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1", 7},
 };
 
+// The ponder reply comes straight out of the table, where an entry can be stale or belong to another position.
+// So plant one that isn't a move in the position (it must be refused), then one that is (it must come back)
+static bool ponderReplyIsChecked() {
+    Board board{};
+    parseFen(START_FEN, board);
+    const int e4 = parseMove("e2e4", board);
+    Board next = board;
+    if (!makeMove(next, e4)) return false;
+    clearHashTable(hashTable);
+    storeHashEntry(next, hashTable, e4, 0, HF_EXACT, 1); // white's move, in a position where it's black to play
+    const bool refused = probePonderMove(board, e4, hashTable) == NO_MOVE;
+    const int e5 = parseMove("e7e5", next);
+    storeHashEntry(next, hashTable, e5, 0, HF_EXACT, 1);
+    return refused && e5 != NO_MOVE && probePonderMove(board, e4, hashTable) == e5;
+}
+
 int main() {
     initAll();
     initHashTable(hashTable, 16);
@@ -32,10 +48,12 @@ int main() {
         std::printf("%-11s d%d %7lld nodes %4d null-move cutoffs %5lld ms\n",
                     c.name, c.depth, info.nodes, info.nullCut, (long long)(getTimeMS() - info.startTime));
     }
+    const bool ponderOk = ponderReplyIsChecked();
     free(hashTable.hTable);
 
     // a failed ASSERT aborts, so getting here is most of the test. But make sure null moves were part of it
     const bool ok = nullCuts > 0;
     std::printf("%lld nodes, %d null-move cutoffs: %s\n", totalNodes, nullCuts, ok ? "ok" : "FAIL, no null moves were searched");
-    return ok ? 0 : 1;
+    if (!ponderOk) std::printf("FAIL, the ponder reply from the table isn't checked against the position\n");
+    return ok && ponderOk ? 0 : 1;
 }

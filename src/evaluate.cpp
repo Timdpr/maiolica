@@ -76,8 +76,8 @@ const int kingOpening[64] = {
         -70 , -70 , -70 , -70 , -70 , -70 , -70 , -70
 };
 
-/// Material score threshold to determine when we have moved into the endgame
-#define ENDGAME_MATERIAL (1 * pieceValues[wR] + 2 * pieceValues[wN] + 2 * pieceValues[wP])
+/// Material score threshold to determine when we have moved into the endgame (the king is counted in 'material', so it's in here too)
+#define ENDGAME_MATERIAL (1 * pieceValues[wR] + 2 * pieceValues[wN] + 2 * pieceValues[wP] + pieceValues[wK])
 
 /// based on sjeng
 static int materialDraw(const Board& board) {
@@ -103,7 +103,7 @@ static int materialDraw(const Board& board) {
 
 /// Evaluate a board position! @return a score (in 100ths of a pawn)
 int evalPosition(const Board& board) {
-    if (board.pieceCounts[wP] && !board.pieceCounts[bP] && materialDraw(board) == true) {
+    if (!board.pieceCounts[wP] && !board.pieceCounts[bP] && materialDraw(board) == true) {
         return 0;
     }
 

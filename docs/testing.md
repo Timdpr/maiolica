@@ -12,9 +12,11 @@ Each kind of claim has its own tool. Use the one that matches what a change clai
 | "It's N Elo stronger than the baseline" | a fixed-length match | `scripts/match.sh <baseline-tag> elo` |
 | "The protocol still works" | scripted sessions behave | `ctest` (`uci`, `fen`) |
 
-`ctest --preset release` runs perft smoke and quick, `fen`, `search`, `uci`, `replay`, `console`, `console_typo` (a mistyped move is refused, not guessed at) and the bench signature (~15s). `replay` plays `tests/replay_test.pgn` (both castles, promotions, underpromotion, disambiguation, en passant, annotation codes like `$1`, a FEN start) through the san reader. The debug and asan presets run perft smoke, `fen` and `search`.
+`ctest --preset release` runs perft smoke and quick, `fen`, `search`, `eval`, `uci`, `replay`, `console`, `console_typo` (a mistyped move is refused, not guessed at) and the bench signature (~15s). `replay` plays `tests/replay_test.pgn` (both castles, promotions, underpromotion, disambiguation, en passant, annotation codes like `$1`, a FEN start) through the san reader. The debug and asan presets run perft smoke, `fen`, `search` and `eval`.
 
-`search` (`tests/search_tests.cpp`) searches five positions a few plies deep, about 200,000 nodes. It is there for the debug and asan presets: perft never makes a null move, and bench is too slow for those builds. In a debug build every `makeMove` in it checks the short legality test against the full one, `isInCheck` checks its remembered answer against a fresh one, and `checkBoard` checks the piece lists. A failed `ASSERT` aborts, which fails the test. In any build it fails if the search made no null-move cutoffs, so it can't quietly stop covering them.
+`search` (`tests/search_tests.cpp`) searches five positions a few plies deep, about 200,000 nodes. It is there for the debug and asan presets: perft never makes a null move, and bench is too slow for those builds. In a debug build every `makeMove` in it checks the short legality test against the full one, `isInCheck` checks its remembered answer against a fresh one, and `checkBoard` checks the piece lists. A failed `ASSERT` aborts, which fails the test. In any build it fails if the search made no null-move cutoffs, so it can't quietly stop covering them. It also plants a table entry whose move isn't legal in the position, and checks that `probePonderMove` won't offer it as the ponder move.
+
+`eval` (`tests/eval_tests.cpp`) checks that a position scores the same as its colour-flipped twin (22 positions: pawns for both sides, one side and neither), that the pawnless-draw shortcut fires only with no pawns on the board, and that the king prefers the middle in an ending and home in a middlegame. The bench signature can't do this job: a change that breaks one of these just gives a new number.
 
 ## Protocol
 - **`tests/uci_test.sh <engine>`** pipes scripted sessions into the engine. A `~N` line sleeps N seconds, so commands can arrive mid-search. Each session has a 20s watchdog, and a crash, hang or non-zero exit fails the test.
@@ -87,17 +89,41 @@ Profile-guided optimisation (PGO) is a build in two passes. The first makes an e
 scripts/match.sh master gain     # SPRT, elo0=0 elo1=10: does it gain?
 scripts/match.sh master nonreg   # SPRT, elo0=-10 elo1=0: doesn't lose (simplifications, bug fixes)
 scripts/match.sh <ref> elo       # 2000 games, no SPRT: how big is the gap?
+CAP=2000 scripts/match.sh master nonreg   # the same SPRT, but stop at 2000 games if it still hasn't decided
 ```
 The script builds the working tree ("dev") and the given ref ("base"). It plays 8+0.08 games (8 seconds each, plus 0.08 a move) with Hash 16, from `books/8moves_v3.pgn`, in pairs with colours swapped, 6 at a time.
 
 - **`gain` and `nonreg`** are SPRTs (sequential probability ratio tests): the match goes on only until the result is statistically clear either way, then stops. That answers "is it better?" in the fewest games. It uses the logistic model with α = β = 0.05, so it gives the wrong answer about 1 time in 20.
 - **`elo`** plays a fixed number of games and reports the Elo difference with its error margin. Use it to measure a gap. Don't read the gap off an SPRT: because an SPRT stops the moment the score looks convincing, the Elo it shows at that point is biased. `GAMES=500 scripts/match.sh <ref> elo` changes the length. 2000 games take about 2 hours and give a margin of roughly ±9 Elo.
+- **`CAP=<games>`** puts an upper limit on a `gain` or `nonreg` run. Decide on one before starting: see "How long an SPRT takes" below. Without one the script says so in `info.txt`.
 - **Seed:** the openings are drawn from the book at random. The seed is printed and saved in `info.txt`, and `SEED=<n> scripts/match.sh ...` replays a match with the same openings in the same order.
 - **Terminations:** when the match finishes, the script counts how the games ended. Anything other than `normal` (a time forfeit, an illegal move, a crash, a disconnect) makes it exit non-zero, because that result wasn't decided on the board.
 - **A stale base:** `master` here is your local copy of the branch, which only moves when you pull. The script fetches first, and if the base branch is behind its remote copy it says so on screen and in `info.txt`. Using `origin/master` as the base avoids the question.
 - **A steady machine:** the laptop is kept awake for the length of the match. If it was on battery, in low power mode or already busy when the match started, a warning goes on screen and into `info.txt`, since any of those can skew a result.
-- **Stopping early:** Ctrl-C ends a match cleanly. The games played so far are still written up, and the row in the table says `stopped early`.
+- **Stopping early:** Ctrl-C ends a match cleanly. The games played so far are still written up, and the row in the table says `stopped early`. A run that reaches its `CAP` says `capped at N games`, with the LLR it had got to.
 - **No adjudication:** games are played out to mate or a draw by the rules. Ending them early on the engines' own scores (resigning at -6.00, calling a draw when both sides sit near 0.00) was simulated on 790 real games: it would have got 17 to 20 results wrong, for 5 to 12% fewer moves played.
+
+### How long an SPRT takes, and when to cap it
+An SPRT has no fixed length. It is quick when the change is clearly on one side of its two bounds, and slow when the truth lies between them. Expected lengths at our usual 16 games a minute, worked out from the spread of scores in our own games (estimates, not promises: a single run can take half or twice as long):
+
+| What the change is really worth | `nonreg` [-10, 0] | `gain` [0, 10] |
+|---|---|---|
+| -10 Elo | fails after ~2,650 games (2.8h) | fails after ~900 (0.9h) |
+| -5 | a coin flip after ~3,900 (4.1h) | fails after ~1,300 (1.4h) |
+| 0 | passes after ~2,650 (2.8h) | fails after ~2,650 (2.8h) |
+| +5 | passes after ~1,300 (1.4h) | a coin flip after ~3,900 (4.1h) |
+| +10 | passes after ~900 (0.9h) | passes after ~2,650 (2.8h) |
+| +20 | passes after ~500 (0.6h) | passes after ~900 (0.9h) |
+
+So before starting one, ask what the run is for and what it is likely to cost, and choose a cap (or choose to go without):
+
+- **`nonreg` decides whether a change stays in**, so by default it runs to its verdict. A cap is reasonable when there is other evidence that the change can't cost strength, such as a fix whose effect on the search has been checked directly. If the cap is reached, read the LLR in the verdict: above 0 means the score is nearer the pass bound than the fail bound.
+- **A cap makes the test less sure.** At 2,000 games, judged by the sign of the LLR, a change that is really 10 Elo weaker gets through about 15% of the time, against 5% for a run to the verdict. A harmless change is wrongly flagged about as often. A shorter cap costs more.
+- **`gain` after a `nonreg` pass decides nothing**: the change stays either way, and the run only upgrades "not weaker" to "stronger". It is cheap when `nonreg` passed in under about 700 games, which is what a change worth +15 or more does. Otherwise skip it, or cap it at 2,000 games and report the Elo with its margin, not a pass or fail.
+- **A new feature has to pass `gain` to go in**, so there the run is the decision, and a cap is a way of saying "not worth more games than this".
+- **Set the cap before the match starts.** Stopping a run because of the score it happens to show is how a test gets bent.
+- **2,000 games is the natural cap**: by then the Elo figure is good to about ±9, and twice as many games only brings that to about ±7.
+- **A baseline match is never capped or cut short.** It is `elo` mode, which has a fixed length already.
 
 Setup is a one-off:
 - Build fastchess in `external/fastchess`, at the commit the results so far were played with (alpha 1.8.3): `git clone https://github.com/Disservin/fastchess external/fastchess && git -C external/fastchess checkout 2a2aa4e && make -C external/fastchess -j`.
@@ -134,6 +160,6 @@ The routine:
 The baseline played itself under these conditions, to check the setup favours neither side: 2000 games came out at -2.3 ± 9.1 Elo (591 wins, 604 losses, 805 draws), every game ending normally. So a gap under about 9 Elo at this length is noise.
 
 ## Sanitisers
-- `ctest --preset asan` runs Debug with ASan and UBSan: perft smoke, `fen` and `search`, with every `ASSERT` on (~40s). CI runs it on Linux, on every pull request and every push to master.
+- `ctest --preset asan` runs Debug with ASan and UBSan: perft smoke, `fen`, `search` and `eval`, with every `ASSERT` on (~40s). CI runs it on Linux, on every pull request and every push to master.
 - The `tsan` preset is for the search thread: drive it over UCI.
 - For a full search check, run `cmake-build-asan/maiolica bench` (slow, ~3 min). It must print the same signature as release. For the same reason, `tests/uci_test.sh` against the asan build fails its `bench` session on the 20s watchdog; that one is expected.
