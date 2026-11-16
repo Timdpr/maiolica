@@ -25,7 +25,7 @@ static const struct { const char *name, *fen; int depth; long long expected; Tie
     {"self-stalemate", "K1k5/8/P7/8/8/8/8/8 w - - 0 1", 6, 2217, SMOKE},
     {"double-check", "8/8/2k5/5q2/5n2/8/5K2/8 b - - 0 1", 4, 23527, SMOKE},
     // pins: makeMove only looks along the line a piece left, so here's a pinned piece on each of the king's 8 lines.
-    // These seven are our own positions; the counts were checked against a second, separately written move generator
+    // These nine are our own positions; the counts were checked against a second, separately written move generator
     {"pins-white-to-move", PINS " w - - 0 1", 3, 21212, SMOKE},
     {"pins-black-to-move", PINS " b - - 0 1", 3, 40577, SMOKE},
     {"ep-along-a-pin", "1b2k3/8/8/3pP3/8/8/7K/8 w - d6 0 1", 5, 25828, SMOKE},
@@ -33,6 +33,8 @@ static const struct { const char *name, *fen; int depth; long long expected; Tie
     {"ep-uncovers-a-diagonal", "b3k3/8/8/3pP3/8/8/8/7K w - d6 0 1", 5, 10676, SMOKE}, // can't arise in a game, but a FEN can ask
     {"promote-while-pinned", "5r1b/6P1/8/8/3K4/8/8/k7 w - - 0 1", 4, 40889, SMOKE},
     {"far-apart-not-in-line", "7k/6N1/8/8/b7/8/2P5/3K4 w - - 0 1", 4, 7836, SMOKE}, // d1 & g7: see initLineSteps
+    {"long-pins", "r6b/N5N1/8/8/4k3/8/8/K5Nr w - - 0 1", 3, 734, SMOKE}, // from 7 squares away: along a rank, a file & a diagonal
+    {"long-pins-mirrored", "b6r/1N5N/8/8/3k4/8/8/rN5K w - - 0 1", 3, 734, SMOKE}, // & along the other diagonal
 
     // quick: the default release run, about a second
     {"startpos", START_FEN, 5, 4865609, QUICK},

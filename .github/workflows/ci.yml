@@ -25,6 +25,15 @@ jobs:
       - run: cmake --build --preset release -j 4
       - run: ctest --preset release
 
+  # The debug build with ASan & UBSan, where every ASSERT is on: perft smoke, the fen test and a short search
+  asan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: cmake --preset asan
+      - run: cmake --build --preset asan -j 4
+      - run: ctest --preset asan
+
   # Did search change? Runs the same searches through the PR and its base, and compares the output.
   # A PR that changes search on purpose updates the bench signature, and then there's nothing to compare
   difftest:
