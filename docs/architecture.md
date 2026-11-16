@@ -28,7 +28,7 @@ C++20 UCI engine. Single-threaded search, 10x12 mailbox board, pawn-only bitboar
 | `src/bench.cpp` | `bench()`: 9 fixed FENs at fixed depths, fresh `Board`/`SearchInfo`, 16MB TT cleared per position. Total nodes is the **bench signature** |
 | `tests/perft_tests.cpp` | Perft regression, tiers `smoke` (17 cases, debug/sanitiser-sized), `quick` (19, default, ~1s), `full` (8, ~20s); ctest `perft_<tier>` |
 | `tests/search_tests.cpp` | A short search of five positions (~200k nodes) for debug and sanitiser builds, where the `ASSERT`s in `makeMove`, `isInCheck` and `checkBoard` run inside it; ctest `search` |
-| `tests/bench_signature.txt` | Expected node total (currently `4527030`); ctest `bench_signature` greps `Nodes searched  : N` from `maiolica bench` |
+| `tests/bench_signature.txt` | Expected node total; ctest `bench_signature` greps `Nodes searched  : N` from `maiolica bench` |
 | `tests/microbench.cpp` | Optional Google Benchmark (`MAIOLICA_MICROBENCH=ON`, `microbench` preset): movegen, captures, make/undo, `isSquareAttacked`, eval. Indicative only; bench/perft decide |
 
 Build/presets in `CMakeLists.txt`/`CMakePresets.json` (release, native, profile, debug, asan, tsan, microbench); `scripts/ab.sh`, `pgo.sh`, `match.sh`, `demo.sh`.
@@ -137,12 +137,8 @@ White-relative score, negated for black at the end. Tables are a1-first from whi
 - Material difference (kings cancel) + PSTs for P, N, B, R (no queen table).
 - Pawns: isolated −10 (`isolatedPawnMask`: adjacent files); passed bonus `pawnPassed[rank]` {0,5,10,20,35,60,100,200} (`whitePassedMask`/`blackPassedMask`: own and adjacent files ahead; black uses `7 - rank`).
 - Rook open/semi-open file +10/+5, queen +5/+3 (`fileBitMask` vs `pawns[BOTH]`/own pawns).
-- King: `kingEndgame` if the *opponent's* `material <= ENDGAME_MATERIAL` (R + 2N + 2P = 1400), else `kingOpening`. Bishop pair +30.
-- `materialDraw` (from Sjeng): returns 0 for drawish minor/rook-only material.
-
-Known issues, left as they are until a fix passes an SPRT (they change play):
-- **Pawnless draws:** the `materialDraw` gate reads `pieceCounts[wP] && !pieceCounts[bP]` (meant to be `!wP && !bP`), so it fires only when white has pawns and black has none. This makes eval colour-asymmetric.
-- **Endgame king:** `material` includes the king's 50000, so the 1400 threshold is never met and `kingEndgame` is never used.
+- King: `kingEndgame` if the *opponent's* `material <= ENDGAME_MATERIAL` (R + 2N + 2P = 1400, plus the king's 50000, since `material` counts the king), else `kingOpening`. Bishop pair +30.
+- `materialDraw` (from Sjeng): with no pawns on the board, returns 0 for drawish minor/rook-only material.
 
 ## Threading and UCI (uci.cpp)
 
