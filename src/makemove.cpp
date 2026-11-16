@@ -240,7 +240,10 @@ int makeMove(Board& board, int move) {
     // do we need to set a new en passant square?
     if (piecePawn[board.pieces[from]]) { // if piece is a pawn
         board.fiftyMove = 0; // reset fifty move counter
-        if (move & MFLAG_PAWN_START) { // if move was pawn start
+        // if move was pawn start, with an enemy pawn beside where we land that could take en passant.
+        // (No such pawn, no square: the same position would get two hash keys otherwise)
+        int enemyPawn = (side == WHITE) ? bP : wP;
+        if ((move & MFLAG_PAWN_START) && (board.pieces[to-1] == enemyPawn || board.pieces[to+1] == enemyPawn)) {
             if (side == WHITE) {
                 board.enPasSq = from+10; // set en passant square
                 ASSERT(ranksBoard[board.enPasSq] == RANK_3)

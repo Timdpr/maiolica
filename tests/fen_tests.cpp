@@ -128,10 +128,45 @@ int main() {
         CHECK(parseFen(fen, board) == 0 && board.enPasSq == NO_SQ, fen)
         CHECK(parseFen("rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1", clean) == 0
               && clean.positionKey == board.positionKey, fen)
-        fen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1";
+        fen = "rnbqkbnr/ppp1pppp/8/8/3pP3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 3"; // the d4 pawn can take
         CHECK(parseFen(fen, board) == 0 && board.enPasSq == E3, fen)
+        fen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 1";  // a real double push, but nothing can take
+        CHECK(parseFen(fen, board) == 0 && board.enPasSq == NO_SQ, fen)
+        CHECK(parseFen("rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1", clean) == 0
+              && clean.positionKey == board.positionKey, fen)
         fen = "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq e";       // truncated ep
         CHECK(parseFen(fen, board) == 0 && board.enPasSq == NO_SQ, fen)
+    }
+
+    // a double push sets the en passant square only when a pawn stands beside it to take,
+    // and either way the position has the key its FEN would give it
+    {
+        struct { const char *before, *move, *after; int enPasSq; } pushes[] = {
+            {START_FEN, "e2e4", "rnbqkbnr/pppppppp/8/8/4P3/8/PPPP1PPP/RNBQKBNR b KQkq - 0 1", NO_SQ},
+            {"rnbqkbnr/ppp1pppp/8/8/3p4/8/PPPPPPPP/RNBQKBNR w KQkq - 0 3", "e2e4",
+             "rnbqkbnr/ppp1pppp/8/8/3pP3/8/PPPP1PPP/RNBQKBNR b KQkq e3 0 3", E3},      // taker on the left
+            {"rnbqkbnr/ppp1pppp/8/8/3p4/8/PPPPPPPP/RNBQKBNR w KQkq - 0 3", "c2c4",
+             "rnbqkbnr/ppp1pppp/8/8/2Pp4/8/PP1PPPPP/RNBQKBNR b KQkq c3 0 3", C3},      // taker on the right
+            {"rnbqkbnr/pppp1ppp/8/4P3/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2", "d7d5",
+             "rnbqkbnr/ppp2ppp/8/3pP3/8/8/PPPP1PPP/RNBQKBNR w KQkq d6 0 3", D6},       // and for black
+            {"rnbqkbnr/pppp1ppp/8/4P3/8/8/PPPP1PPP/RNBQKBNR b KQkq - 0 2", "a7a5",
+             "rnbqkbnr/1ppp1ppp/8/p3P3/8/8/PPPP1PPP/RNBQKBNR w KQkq - 0 3", NO_SQ},
+            {"4k3/8/8/8/1p6/8/P7/4K3 w - - 0 1", "a2a4", "4k3/8/8/8/Pp6/8/8/4K3 b - a3 0 1", A3}, // on the edge
+            {"4k3/8/8/p7/8/8/7P/4K3 w - - 0 1", "h2h4", "4k3/8/8/p7/7P/8/8/4K3 b - - 0 1", NO_SQ}, // a5 isn't beside h4
+            {"4k3/8/8/8/n7/8/1P6/4K3 w - - 0 1", "b2b4", "4k3/8/8/8/nP6/8/8/4K3 b - - 0 1", NO_SQ}, // a knight can't take
+            {"4k3/8/8/8/P7/8/1P6/4K3 w - - 0 1", "b2b4", "4k3/8/8/8/PP6/8/8/4K3 b - - 0 1", NO_SQ}, // nor can our own pawn
+        };
+        for (const auto& push : pushes) {
+            Board board{}, fromFen{};
+            int parsed = parseFen(push.before, board);
+            int move = parseMove(push.move, board);
+            CHECK(parsed == 0 && move != NO_MOVE && makeMove(board, move), push.after)
+            CHECK(board.enPasSq == push.enPasSq, push.after)
+            CHECK(parseFen(push.after, fromFen) == 0 && fromFen.enPasSq == push.enPasSq
+                  && fromFen.positionKey == board.positionKey, push.after)
+            undoMove(board);
+            CHECK(board.enPasSq == NO_SQ && board.positionKey == generatePositionKey(board), push.before)
+        }
     }
 
     std::printf("%d failure(s)\n", failures);

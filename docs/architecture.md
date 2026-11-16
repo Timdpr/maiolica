@@ -88,7 +88,7 @@ Scores (set at generation; `alphaBeta` then sets the TT move to 2,000,000):
 `makeMove` saves the key, move, fifty, EP and castling into `history[historyPly]`, then incrementally updates everything through `clearPiece`/`addPiece`/`movePiece` (key via `HASH_PIECE`, material, big/major/minor counts, pawn bitboards, piece lists):
 - EP removes the pawn behind `to`; castling moves the rook first (switch on `to`).
 - Hashes out EP and castling, applies `castlingPerms &= castlePermArray[from] & [to]`, hashes castling back in.
-- Capture → `clearPiece(to)`, fifty = 0. Pawn move → fifty = 0; a double push always sets `enPasSq` and hashes it, capturable or not, so the same position can get two keys (a strength issue, left for an SPRT).
+- Capture → `clearPiece(to)`, fifty = 0. Pawn move → fifty = 0; a double push sets `enPasSq` and hashes it only when an enemy pawn stands beside the pushed pawn, so a square nobody can use doesn't give the same position a second key. `parseFen` applies the same rule. The pawn beside may be pinned: that isn't checked.
 - Moves the piece, swaps in the promoted piece, updates `kingSq`, flips side and `HASH_SIDE`.
 - **Legality:** if the mover's king is now attacked, `undoMove` and return false. Every caller must handle the false.
   - King moves (castling included), en passant, and any move played while in check get the full `isSquareAttacked` on the king.
