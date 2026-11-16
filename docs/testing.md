@@ -12,7 +12,9 @@ Each kind of claim has its own tool. Use the one that matches what a change clai
 | "It's N Elo stronger than the baseline" | a fixed-length match | `scripts/match.sh <baseline-tag> elo` |
 | "The protocol still works" | scripted sessions behave | `ctest` (`uci`, `fen`) |
 
-`ctest --preset release` runs perft smoke and quick, `fen`, `uci`, `replay`, `console`, `console_typo` (a mistyped move is refused, not guessed at) and the bench signature (~15s). `replay` plays `tests/replay_test.pgn` (both castles, promotions, underpromotion, disambiguation, en passant, annotation codes like `$1`, a FEN start) through the san reader. The debug and asan presets run perft smoke and `fen`.
+`ctest --preset release` runs perft smoke and quick, `fen`, `search`, `uci`, `replay`, `console`, `console_typo` (a mistyped move is refused, not guessed at) and the bench signature (~15s). `replay` plays `tests/replay_test.pgn` (both castles, promotions, underpromotion, disambiguation, en passant, annotation codes like `$1`, a FEN start) through the san reader. The debug and asan presets run perft smoke, `fen` and `search`.
+
+`search` (`tests/search_tests.cpp`) searches five positions a few plies deep, about 214,000 nodes. It is there for the debug and asan presets: perft never makes a null move, and bench is too slow for those builds. In a debug build every `makeMove` in it checks the short legality test against the full one, `isInCheck` checks its remembered answer against a fresh one, and `checkBoard` checks the piece lists. A failed `ASSERT` aborts, which fails the test. In any build it fails if the search made no null-move cutoffs, so it can't quietly stop covering them.
 
 ## Protocol
 - **`tests/uci_test.sh <engine>`** pipes scripted sessions into the engine. A `~N` line sleeps N seconds, so commands can arrive mid-search. Each session has a 20s watchdog, and a crash, hang or non-zero exit fails the test.
