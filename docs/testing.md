@@ -181,6 +181,46 @@ The routine:
 
 The baseline played itself under these conditions, to check the setup favours neither side: 2000 games came out at -2.3 ± 9.1 Elo (591 wins, 604 losses, 805 draws), every game ending normally. So a gap under about 9 Elo at this length is noise.
 
+## Against other engines
+Everything above measures the engine against an older copy of itself, which says how much it has gained and overstates what that gain is worth against anyone else. `scripts/outside.sh` gives a rough outside figure: it plays the working tree against other engines whose ratings are published.
+
+```sh
+scripts/outside.sh                      # 300 games against each engine in external/engines/list.txt (~2 hours for six)
+GAMES=20 scripts/outside.sh             # a short trial, e.g. to see whether a new opponent loses on time
+RESUME=<folder> scripts/outside.sh      # carry on after a Ctrl-C
+```
+
+- **Conditions** are the baseline's: 8+0.08, Hash 16, `books/8moves_v3.pgn`, 6 games at once, no adjudication, one thread, no opening books or tablebases of the engines' own.
+- **One match per opponent**, each from the same openings. Ctrl-C pauses and `RESUME=` carries on, as for `match.sh`.
+- **The figure** is a performance rating: the rating at which our total score against these opponents, at their published ratings, would be exactly the expected one. `result.txt` also shows each opponent separately, and how many games weren't decided on the board and who lost them.
+- **The ratings** are from the [CCRL Blitz list](https://computerchess.org.uk/ccrl/404/), the best-known public list of engine ratings. CCRL plays at 2 minutes plus 1 second a move, on its own hardware, with 128 or 256MB tables and a general opening book; we play much faster, on a different machine, with a small table. Engines gain different amounts from extra time, so read the result as "roughly X on that scale, give or take 40", not as a rating. Only CCRL testing a release gives the real number.
+
+### The opponents
+C and C++ engines that build with the system compiler and speak UCI. They are a ladder, not a pool chosen around today's strength, so the same engines stay useful as the engine improves. Sources go in `external/engines/src/`, binaries in `external/engines/bin/`, and `external/engines/list.txt` has a line for each: name, rating, binary. All of that is gitignored.
+
+| Engine | CCRL Blitz, 14 Nov 2026 | Source, at the tag CCRL rated | Built with |
+|---|---|---|---|
+| Stash 12.0 | 1882 | `github.com/mhouppin/stash-bot`, `v12` | `make CC=cc EXT_OFLAGS="-Wno-error -w"` |
+| BBC 1.2 | 1945 | `github.com/maksimKorzh/bbc`, `1.2` | `cc -Ofast` on `src/bbc_1.2.c`, through a wrapper file that includes the system headers and then has `#define time bbc_time` before including the source: macOS declares `time()` where the engine has a global of that name |
+| Stash 14.0 | 2058 | the same, `v14` | as Stash 12.0, in `src/` |
+| CeeChess 1.3.2 | 2171 | `github.com/bctboi23/CeeChess`, `v1.3.2` | `cc -O3` on the `.c` files its makefile lists |
+| Supernova 2.1.4 | 2259 | `github.com/MichaeltheCoder7/Supernova`, `v2.1.4` | `cc -std=c99 -O3 src/*.c -lpthread` in `Linux/` |
+| Cinnamon 2.4 | 2326 | `github.com/gekomad/Cinnamon`, `v2.4` | `make cinnamon64-ARM COMP=clang++ LIBS=-lpthread` in `src/` |
+
+Higher rungs for later, from the same list: Stash 17.0 (2296), CeeChess 1.4 (2362), Halogen 6 (2410), Stash 19.0 (2472).
+
+### Results
+| Date | Version | Games | Score | Performance |
+|---|---|---|---|---|
+| 2026-11-16 | 1.1 (`7bf997a`, bench 3938564) | 1800 | 39.5% (551 wins, 929 losses, 320 draws) | about 2020 (± 16 from luck alone) |
+
+Opponent by opponent: 64.8% against Stash 12.0, 58.0% against BBC 1.2, 48.2% against Stash 14.0, 30.8% against CeeChess 1.3.2, 17.5% against Supernova 2.1.4 and 17.7% against Cinnamon 2.4. Taken one at a time they put the engine between 1988 and 2059. The engine lost no game on time and drew no warnings from fastchess. BBC lost 10 games on time and Stash 14.0 one; leaving those out moves the figure by about 2.
+
+What the game records showed:
+- **Raw speed is not the gap.** On one middlegame position for one second, the engine searched 8.9 million nodes a second, level with Stash 12.0 and 2.5 to 4 times the others. It reached depth 9 from 8.4 million nodes; Cinnamon reached depth 14 from 1.0 million. The stronger engines get 2 to 5 plies deeper per move by searching fewer, better-chosen positions.
+- **A third of the losses turn on one move:** in 307 of 929, the engine's own score fell by 1.5 pawns or more in a single move from a position it thought was level or better. That is a tactic just past where it stopped looking.
+- **About a fifth of the clock goes unused** at this speed. The time for a move is a thirtieth of the clock, plus the increment, less `Move Overhead` (50 ms). So the clock settles near 30 × 50 ms and never drops below it: the lowest it reached in any of 1,800 games was 1.34 seconds, and it usually ended with 2.3 of its 8 seconds left. At 0.17 seconds a move, 50 ms is a large share; at slow time controls it is nothing. Most of the opponents keep a similar reserve.
+
 ## Sanitisers
 - `ctest --preset asan` runs Debug with ASan and UBSan: perft smoke, `fen`, `search` and `eval`, with every `ASSERT` on (~40s). CI runs it on Linux, on every pull request and every push to master.
 - The `tsan` preset is for the search thread: drive it over UCI.
