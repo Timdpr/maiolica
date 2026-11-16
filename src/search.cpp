@@ -297,16 +297,17 @@ void searchPosition(Board& board, SearchInfo& info, HashTable& table) {
         if (info.stopped) { // Because we may have stopped partway through alphaBeta, we break here so the previous results are returned
             break;
         }
-        int pvMoves = getPVLine(currentDepth, board, table);
+        int pvArray[MAX_DEPTH];
+        int pvMoves = getPVLine(currentDepth, board, table, pvArray);
         if (pvMoves > 0) {
-            bestMove = board.pvArray[0];
-            ponderMove = board.pvArray[1]; // NO_MOVE if the table had no reply. Can be past the end of the pv
+            bestMove = pvArray[0];
+            ponderMove = pvArray[1]; // NO_MOVE if the pv is just the one move
         }
 
         std::string pv;
         for (int pvNum = 0; pvNum < pvMoves; ++pvNum) {
             pv += ' ';
-            pv += printMove(board.pvArray[pvNum]);
+            pv += printMove(pvArray[pvNum]);
         }
         TimeMS time = getTimeMS() - info.startTime;
         sendLine("info depth %d seldepth %d score %s nodes %lld nps %lld hashfull %d time %lld pv%s",
@@ -317,6 +318,11 @@ void searchPosition(Board& board, SearchInfo& info, HashTable& table) {
     // can reorder the piece lists, and doing that before the search would change it
     if (bestMove == NO_MOVE) {
         bestMove = firstLegalMove(board);
+    }
+
+    // a pv of one move leaves nothing to ponder on, so ask the table for a reply
+    if (bestMove != NO_MOVE && ponderMove == NO_MOVE) {
+        ponderMove = probePonderMove(board, bestMove, table);
     }
 
     // 'go infinite' & pondering mustn't send bestmove until the gui says so

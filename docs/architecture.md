@@ -42,7 +42,7 @@ Build/presets in `CMakeLists.txt`/`CMakePresets.json` (release, native, profile,
 - `side`, `enPasSq` (`NO_SQ` if none), `fiftyMove` (half-moves, from the FEN's halfmove clock), `castlingPerms` (4 bits: `wK_CA`=1, `wQ_CA`=2, `bK_CA`=4, `bQ_CA`=8).
 - `ply` = depth from search root (reset by `clearForSearch`, and after each move in `parsePosition`); `historyPly` = index into `history[MAX_GAME_MOVES=2048]` of `Undo {move, castlingPerms, enPasSq, fiftyMove, positionKey, inCheck}`. The first five are saved by `makeMove` for the move played from that position; `inCheck` belongs to the position itself (see `isInCheck` below).
 - `positionKey`: Zobrist key, kept incrementally.
-- **Search state lives in `Board` too:** `pvArray[MAX_DEPTH]`, `searchHistory[13][120]` (piece × to-square), `searchKillers[2][MAX_DEPTH]` (by ply). `Board` is big (57KB, mostly `history`) and copied with `memcpy` for the search thread, so it must stay trivially copyable.
+- **Search state lives in `Board` too:** `searchHistory[13][120]` (piece × to-square), `searchKillers[2][MAX_DEPTH]` (by ply). `Board` is big (74KB, mostly `history`) and copied with `memcpy` for the search thread and for the PV walk, so it must stay trivially copyable.
 
 ## Move encoding (defs.h)
 
@@ -103,7 +103,7 @@ Zobrist: `pieceKeys[13][120]` (row `EMPTY` doubles as the EP-square key), `sideK
 
 ## Search (search.cpp)
 
-`searchPosition`: `clearForSearch` (zero history/killers, `currentAge++`, `ply = 0`, reset `nodes`/`selDepth`/fail-high stats; `stopped` is reset by the caller, before the thread starts), then depths 1..`info.depth` with a full window (±`ALPHABETA_BOUND` 30000), no aspiration. A stopped iteration is discarded; otherwise `getPVLine` fills `pvArray` and it sends `info depth … seldepth … score cp|mate … nodes … nps … hashfull … time … pv …`. `bestmove` is `pvArray[0]`, with `pvArray[1]` as the ponder move (which may lie past the end of the printed PV). If no iteration finished it falls back to `firstLegalMove` (`0000` if mated or stalemated); that runs after the search, because making and undoing a move can reorder the piece lists. In `infinite` or `ponder` mode it then waits for `stopped`/`ponderhit` before sending `bestmove`.
+`searchPosition`: `clearForSearch` (zero history/killers, `currentAge++`, `ply = 0`, reset `nodes`/`selDepth`/fail-high stats; `stopped` is reset by the caller, before the thread starts), then depths 1..`info.depth` with a full window (±`ALPHABETA_BOUND` 30000), no aspiration. A stopped iteration is discarded; otherwise `getPVLine` fills a local `pvArray` and it sends `info depth … seldepth … score cp|mate … nodes … nps … hashfull … time … pv …`. `bestmove` is `pvArray[0]`, with `pvArray[1]` as the ponder move. When the PV is one move long (the table had no reply, or the move repeats a position), `probePonderMove` asks the table for a legal reply to it, on a copy of the board. If no iteration finished it falls back to `firstLegalMove` (`0000` if mated or stalemated); that runs after the search, because making and undoing a move can reorder the piece lists. In `infinite` or `ponder` mode it then waits for `stopped`/`ponderhit` before sending `bestmove`.
 
 `alphaBeta(alpha, beta, depth, board, info, table, nullMoveAllowed)`, negamax, in this order:
 1. `depth == 0` → `quiescence` (which counts the node).
@@ -128,7 +128,7 @@ Mate scores: `IS_MATE` = 30000 − 64. Anything beyond it is printed as `score m
 - Flags: `HF_ALPHA` (upper bound), `HF_BETA` (lower bound), `HF_EXACT`. Probe needs `entry.depth >= depth`; ALPHA hits only if `score <= alpha` (returns alpha), BETA only if `score >= beta` (returns beta).
 - Replace if the slot is empty (key 0), `age < currentAge`, or `entry.depth <= depth`. Age is bumped per search, reset to 0 by `clearHashTable` (`ucinewgame`, bench).
 - Mate scores are stored relative to the node (`±ply` on store, reversed on probe).
-- `getPVLine` walks `probePVTable` moves from the root, checking each with `moveExists`, making it, up to `depth` moves; then undoes back to `ply == 0`. The PV it reports ends with the first move that repeats a position or reaches the fifty-move limit: the search scores that as a draw and looks no further, so later entries belong to other lines. The walk itself still carries on to `depth`, because making and undoing moves reorders the piece lists, and a shorter walk would change later searches.
+- `getPVLine` copies the board and walks `probePVTable` moves from the root on the copy, checking each with `moveExists` and making it, up to `depth` moves. It stops after the first move that repeats a position or reaches the fifty-move limit: the search scores that as a draw and looks no further, so later entries belong to other lines. The search's own board is `const` here. Making and undoing moves reorders the piece lists, so a walk on that board would change later searches by how far it went.
 
 ## Evaluation (evaluate.cpp)
 

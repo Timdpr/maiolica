@@ -2,40 +2,44 @@
 
 HashTable hashTable;
 
-/// Populate Board's pvArray with the table's line, ending it with NO_MOVE.
-/// Returns how many of those moves are the pv, which stops at a draw
-int getPVLine(const int depth, Board& board, const HashTable& table) {
+/// Fill pvArray with the table's line from this position, ending it with NO_MOVE. Returns its length.
+/// It walks a copy: making & undoing moves on the search's own board reorders its piece lists,
+/// and then how far the line went would change what gets searched next
+int getPVLine(const int depth, const Board& board, const HashTable& table, int *pvArray) {
     ASSERT(depth < MAX_DEPTH && depth >= 1)
 
-    int move = probePVTable(board, table);
+    Board walk = board;
+    int move = probePVTable(walk, table);
     int count = 0;
-    int pvMoves = 0;
-    bool drawn = false;
 
-    // 'loop through board's pvArray until given depth, as long as legal moves are being found'
+    // 'loop through the table's moves until given depth, as long as legal moves are being found'
     while (move != NO_MOVE && count < depth) {
         ASSERT(count < MAX_DEPTH)
-        if (moveExists(board, move) && makeMove(board, move)) { // it's legal, so it gets made
-            board.pvArray[count++] = move; // populate pvArray with move
+        if (moveExists(walk, move) && makeMove(walk, move)) { // it's legal, so it gets made
+            pvArray[count++] = move; // populate pvArray with move
         } else {
             break;
         }
-        // the search calls a repetition a draw & looks no further, so the pv ends with this move.
-        // We keep walking, as all this making & undoing reorders the piece lists: stop early and later searches change
-        if (!drawn) {
-            pvMoves = count;
-            drawn = isRepetition(board) || board.fiftyMove >= 100;
+        // the search calls a repetition a draw & looks no further, so the pv ends with this move
+        if (isRepetition(walk) || walk.fiftyMove >= 100) {
+            break;
         }
-        move = probePVTable(board, table);
+        move = probePVTable(walk, table);
     }
-    board.pvArray[count] = NO_MOVE;
+    pvArray[count] = NO_MOVE;
 
-    // Take the moves back!!!!11!!1!
-    while (board.ply > 0) {
-        undoMove(board);
+    return count;
+}
+
+/// The table's reply to a move, for something to ponder on when the pv is only that move long
+/// (a repetition ends the pv, but not the game). NO_MOVE if the table has no legal reply
+int probePonderMove(const Board& board, const int move, const HashTable& table) {
+    Board next = board;
+    if (!makeMove(next, move)) {
+        return NO_MOVE;
     }
-
-    return pvMoves;
+    int reply = probePVTable(next, table);
+    return (reply != NO_MOVE && moveExists(next, reply)) ? reply : NO_MOVE;
 }
 
 /// Loop through every entry in the table, setting each pos key and move to zero

@@ -72,6 +72,9 @@ check "root repetition still plays a move" $'position startpos moves g1f3 g8f6 f
     '^bestmove [a-h][1-8][a-h][1-8]'
 check "pv stops at a repetition" $'position fen 6k1/5p1p/n7/n7/8/8/rr3PPP/3Q2K1 w - - 0 1\ngo depth 9\n~0.5\nquit' \
     '^info depth 9 .*score cp 0 .* pv d1d8' '^info depth 9 .* pv( [a-h][1-8][a-h][1-8]){9}'
+# the first search fills the table. In the second, the only move repeats a position, so the pv is that one move
+check "a one-move pv still gets a ponder move" $'position fen 6k1/5p1p/n7/n7/8/8/rr3PPP/3Q2K1 w - - 0 1\ngo depth 7\n~0.5\nposition fen 6k1/5p1p/n7/n7/8/8/rr3PPP/3Q2K1 w - - 0 1 moves d1d8 g8g7 d8g5 g7f8 g5d8\ngo depth 6\n~0.5\nquit' \
+    '^bestmove f8g7 ponder d8g5' '^info depth 6 .* pv f8g7 '
 check "tiny clock still plays a legal move" $'position startpos\ngo wtime 30 btime 30\n~0.5\nquit' '^bestmove [a-h][1-8][a-h][1-8]'
 check "big increment is capped" $'debug on\nposition startpos\ngo wtime 500 btime 500 winc 5000 binc 5000\n~1\nquit' \
     'time budget 337 ms'
