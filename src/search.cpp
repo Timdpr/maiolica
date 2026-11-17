@@ -144,6 +144,10 @@ void initLmrReductions() {
     }
 }
 
+// Reverse futility pruning: how close to the leaves it applies, & how far above beta the eval must be per ply of depth left
+constexpr int RFP_MAX_DEPTH = 5;
+constexpr int RFP_MARGIN = 120;
+
 // History scores stay within +-HISTORY_MAX, well below the killers
 constexpr int HISTORY_MAX = 16384;
 constexpr int HISTORY_BONUS_MAX = 1600;
@@ -191,6 +195,13 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
     if (probeHashEntry(board, table, &pvMove, &score, alpha, beta, depth) == true) {
         table.cut++;
         return score;
+    }
+
+    // Reverse futility: near the leaves, a position already well above beta isn't going to fall below it. So don't look.
+    // Not in check, at the root, on the main line (where beta - alpha > 1) or when beta is a mate score
+    if (!inCheck && board.ply && beta - alpha == 1 && depth <= RFP_MAX_DEPTH && abs(beta) < IS_MATE
+        && evalPosition(board) - RFP_MARGIN * depth >= beta) {
+        return beta;
     }
 
     // if regular ab search was called AND not in check AND at least one move in AND do we have at least **1 big piece no including king** AND our depth is >= 4
