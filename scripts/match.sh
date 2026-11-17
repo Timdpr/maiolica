@@ -156,9 +156,29 @@ if [[ -z $RESUME ]]; then
 else
     ARGS=(-config file="$OUT/config.json")
 fi
+# On screen: one line every 100 games, with the score so far and a guess at the time left. The rest is in the log
+progress() {
+    trap '' INT   # a Ctrl-C is for fastchess: we keep reading until it has wound up
+    local total=$1 line n first="" elo="" llr="" due=""
+    while IFS= read -r line; do
+        case $line in
+            Elo:*)   elo=${line%%,*} ;;
+            LLR:*)   llr=", ${line%% (*}" ;;
+            Games:*) n=${line#Games: }; n=${n%%,*}
+                     [[ -n $first ]] || { first=$(( n - 2 )); SECONDS=0; }
+                     (( n % 100 )) || due=$(sed -E 's/Games: [0-9]+, Wins: ([0-9]+), Losses: ([0-9]+), Draws: ([0-9]+).*/\1-\2-\3/' <<< "$line") ;;
+            -----*)  [[ -n $due ]] || continue   # the end of a results block
+                     local left=$(( (total - n) * SECONDS / (n - first) / 60 ))
+                     echo "$(date +%H:%M)  $n of $total games  $due  $elo$llr  ($([[ $MODE == elo ]] && echo about || echo "at most") ${left} min left)"
+                     due="" ;;
+            SPRT*|"Finished match"|"Total Time"*|Error*|Fatal*) echo "$line" ;;
+        esac
+    done
+}
 trap ':' INT
 STATUS=0
-$AWAKE ${AWAKE:+-i} "$FASTCHESS" "${ARGS[@]}" 2>&1 | tee -a -i "$OUT/log.txt" || STATUS=$?
+$AWAKE ${AWAKE:+-i} "$FASTCHESS" "${ARGS[@]}" 2>&1 | tee -a -i "$OUT/log.txt" \
+    | progress "$([[ $MODE == elo ]] && echo "$GAMES" || echo "${CAP:-20000}")" || STATUS=$?
 trap - INT
 
 [[ -s $OUT/games.pgn ]] || { echo "no games were played" >&2; exit 1; }
@@ -168,7 +188,7 @@ TERMS=$(grep '^\[Termination ' "$OUT/games.pgn" | sort | uniq -c)
 { awk '/^Results of /{on=1; buf=""} on && NF{buf=buf $0 "\n"} END{printf "%s", buf}' "$OUT/log.txt" \
     | grep -Ev '^(Warning|Info|Position|Moves);|^(Started|Finished) game' || true
   printf '\nHow the games ended:\n%s\n' "$TERMS"; } > "$OUT/result.txt"
-printf '\nHow the games ended:\n%s\n' "$TERMS"
+cat "$OUT/result.txt"
 gzip -f "$OUT/log.txt"   # it runs to tens of MB otherwise
 
 # anything but 'normal' (time forfeit, illegal move, crash, disconnect) means a result
