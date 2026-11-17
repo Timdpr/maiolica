@@ -1,5 +1,6 @@
 #include "defs.h"
 #include <algorithm>
+#include <cmath>
 #include <string>
 #include <thread>
 
@@ -131,7 +132,17 @@ static int quiescence(int alpha, int beta, Board& board, SearchInfo& info) {
 // Late move reductions: the first few moves at a node always get a full search, and so does everything near the leaves
 constexpr int LMR_FULL_MOVES = 4;
 constexpr int LMR_MIN_DEPTH = 3;
-constexpr int LMR_DEEPER_MOVES = 6; // past this many, a move is reduced by two plies
+constexpr int LMR_MAX_MOVES = 64;
+static int lmrReductions[MAX_DEPTH][LMR_MAX_MOVES]; // plies to reduce by, indexed by depth left & how many legal moves in we are
+
+/// Fill the reduction table: the deeper there is still to go and the later the move, the more it is reduced
+void initLmrReductions() {
+    for (int depth = 1; depth < MAX_DEPTH; ++depth) {
+        for (int moves = 1; moves < LMR_MAX_MOVES; ++moves) {
+            lmrReductions[depth][moves] = std::max(1, int(0.75 + std::log(depth) * std::log(moves) / 2.25));
+        }
+    }
+}
 
 // History scores stay within +-HISTORY_MAX, well below the killers
 constexpr int HISTORY_MAX = 16384;
@@ -231,11 +242,12 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
         }
         legal++;
         // Late move reduction: moves are ordered best first, so a late quiet move is rarely any good.
-        // Look at it a ply or two shallower, just to ask 'does it beat alpha?'. Not when in check, or giving check
+        // Look at it a ply or more shallower, just to ask 'does it beat alpha?'. Not when in check, or giving check
         score = alpha + 1; // anything not reduced goes straight to the full search below
         if (reducible && legal > LMR_FULL_MOVES && depth >= LMR_MIN_DEPTH && !inCheck && !isInCheck(board)) {
-            // two plies for the latest moves, if that still leaves a ply to search
-            int reduction = 1 + (legal > LMR_DEEPER_MOVES && depth > LMR_MIN_DEPTH);
+            // by more for the later moves & at higher depths, but always leaving a ply to search
+            int reduction = lmrReductions[std::min(depth, MAX_DEPTH - 1)][std::min(legal, LMR_MAX_MOVES - 1)];
+            reduction = std::min(reduction, depth - 2);
             score = -alphaBeta(-alpha - 1, -alpha, depth-1-reduction, board, info, table, true);
         }
         // if it does (or it wasn't reduced), search it at full depth
