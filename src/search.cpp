@@ -128,6 +128,10 @@ static int quiescence(int alpha, int beta, Board& board, SearchInfo& info) {
     return alpha;
 }
 
+// Late move reductions: the first few moves at a node always get a full search, and so does everything near the leaves
+constexpr int LMR_FULL_MOVES = 4;
+constexpr int LMR_MIN_DEPTH = 3;
+
 /// Negamax alpha-beta search...
 static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& info, HashTable& table, int nullMoveAllowed) {
     ASSERT(checkBoard(board))
@@ -199,20 +203,33 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
     for (int moveNum = 0; moveNum < moveList.count; ++moveNum) {
         // order the moves
         pickNextMove(moveNum, moveList);
+        int move = moveList.moves[moveNum].move;
+        // a late move reduction is for quiet moves (no capture, no promotion) that aren't killers at this ply
+        int reducible = !(move & (MFLAG_CAPTURING | MFLAG_PROMOTION))
+                        && move != board.searchKillers[0][board.ply] && move != board.searchKillers[1][board.ply];
         // skip if it is not legal
-        if (!makeMove(board, moveList.moves[moveNum].move)) {
+        if (!makeMove(board, move)) {
             continue;
         }
         legal++;
-        // negamax, so flip it all. Also using principal variation search!
-        // TODO: PVS may be detrimental...
-        if (foundPV == true) {
-            score = -alphaBeta(-alpha - 1, -alpha, depth-1, board, info, table, true);
-            if (score > alpha && score < beta) {
+        // Late move reduction: moves are ordered best first, so a late quiet move is rarely any good.
+        // Look at it one ply shallower, just to ask 'does it beat alpha?'. Not when in check, or giving check
+        score = alpha + 1; // anything not reduced goes straight to the full search below
+        if (reducible && legal > LMR_FULL_MOVES && depth >= LMR_MIN_DEPTH && !inCheck && !isInCheck(board)) {
+            score = -alphaBeta(-alpha - 1, -alpha, depth-2, board, info, table, true);
+        }
+        // if it does (or it wasn't reduced), search it at full depth
+        if (score > alpha) {
+            // negamax, so flip it all. Also using principal variation search!
+            // TODO: PVS may be detrimental...
+            if (foundPV == true) {
+                score = -alphaBeta(-alpha - 1, -alpha, depth-1, board, info, table, true);
+                if (score > alpha && score < beta) {
+                    score = -alphaBeta(-beta, -alpha, depth-1, board, info, table, true);
+                }
+            } else {
                 score = -alphaBeta(-beta, -alpha, depth-1, board, info, table, true);
             }
-        } else {
-            score = -alphaBeta(-beta, -alpha, depth-1, board, info, table, true);
         }
         undoMove(board);
 
