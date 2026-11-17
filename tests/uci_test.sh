@@ -49,6 +49,18 @@ order() {
         echo "FAIL $1: wanted '$3' before '$4'"; sed 's/^/    /' <<< "$out" | tail -15; ((failures++)); fi
 }
 
+# depths <name> <script> <depth>: one info line for each depth from 1 to <depth>, in order, & bestmove is the last one's first move
+depths() {
+    local out got want pv best
+    out=$(run "$2")
+    got=$(grep -E '^info depth ' <<< "$out" | cut -d' ' -f3 | tr '\n' ' ')
+    want=$(printf '%s ' $(seq 1 "$3"))
+    pv=$(grep -E "^info depth $3 " <<< "$out" | sed 's/.* pv //' | cut -d' ' -f1)
+    best=$(grep -E '^bestmove ' <<< "$out" | cut -d' ' -f2)
+    if [[ $got == "$want" && -n $pv && $pv == "$best" ]] && ! grep -q "EXIT STATUS" <<< "$out"; then echo "ok   $1"; else
+        echo "FAIL $1: depths '$got', pv starts '$pv', bestmove '$best'"; sed 's/^/    /' <<< "$out" | tail -15; ((failures++)); fi
+}
+
 check "uci handshake" $'uci\nisready\nquit' 'option name Hash type spin'
 order "uciok before readyok" $'uci\nisready\nquit' '^uciok$' '^readyok$'
 session=$'uci\nisready\nposition startpos moves e2e4\ngo depth 4\n~0.5\nquit'
@@ -66,6 +78,10 @@ count "infinite then quit: just the one bestmove" $'position fen 8/8/4k3/8/8/4K3
 order "ponder waits for ponderhit" $'position startpos moves e2e4\ngo ponder wtime 2000 btime 2000\n~0.5\nisready\nponderhit\n~1\nquit' \
     '^readyok' '^bestmove'
 check "mate scores" $'position fen 6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1\ngo depth 4\n~0.5\nquit' 'score mate 1 .*pv a1a8'
+# a depth searched again with a wider window still gets one info line, & nothing is printed for the try that failed.
+# In the first the score jumps by three pawns at depth 6 (so it fails high, with a new move); in the second it drops
+depths "a fail high: each depth printed once" $'position fen 2rr3k/pp3pp1/1nnqbN1p/3pN3/2pP4/2P3Q1/PPB4P/R4RK1 w - - 0 1\ngo depth 7\n~0.5\nquit' 7
+depths "a fail low: each depth printed once" $'position fen 8/7p/5k2/5p2/p1p2P2/Pr1pPK2/1P1R3P/8 b - - 0 1\ngo depth 9\n~0.5\nquit' 9
 check "checkmated: bestmove 0000" $'position fen 6k1/5ppp/8/8/8/8/5PPP/r5K1 w - - 0 1\ngo depth 3\n~0.3\nquit' '^bestmove 0000'
 check "stalemate: bestmove 0000" $'position fen 7k/5Q2/6K1/8/8/8/8/8 b - - 0 1\ngo depth 3\n~0.3\nquit' '^bestmove 0000'
 check "root repetition still plays a move" $'position startpos moves g1f3 g8f6 f3g1 f6g8 g1f3 g8f6 f3g1 f6g8\ngo depth 4\n~0.5\nquit' \
