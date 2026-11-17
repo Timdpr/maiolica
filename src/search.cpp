@@ -1,5 +1,6 @@
 #include "defs.h"
 #include <algorithm>
+#include <cmath>
 #include <string>
 #include <thread>
 
@@ -12,9 +13,9 @@ static void checkUp(SearchInfo& info) {
 
 /// Swap the move at 'moveNum' index with the 'best' move in the moveList
 static void pickNextMove(int moveNum, MoveList& moveList) {
-    int bestScore = 0;
+    int bestScore = moveList.moves[moveNum].score; // start from the first candidate, as history scores can be negative
     int bestMoveNum = moveNum;
-    for (int i = moveNum; i < moveList.count; ++i) { // find move with highest score
+    for (int i = moveNum + 1; i < moveList.count; ++i) { // find move with highest score
         if (moveList.moves[i].score > bestScore) {
             bestScore = moveList.moves[i].score;
             bestMoveNum = i;
@@ -131,7 +132,32 @@ static int quiescence(int alpha, int beta, Board& board, SearchInfo& info) {
 // Late move reductions: the first few moves at a node always get a full search, and so does everything near the leaves
 constexpr int LMR_FULL_MOVES = 4;
 constexpr int LMR_MIN_DEPTH = 3;
-constexpr int LMR_DEEPER_MOVES = 6; // past this many, a move is reduced by two plies
+constexpr int LMR_MAX_MOVES = 64;
+static int lmrReductions[MAX_DEPTH][LMR_MAX_MOVES]; // plies to reduce by, indexed by depth left & how many legal moves in we are
+
+/// Fill the reduction table: the deeper there is still to go and the later the move, the more it is reduced
+void initLmrReductions() {
+    for (int depth = 1; depth < MAX_DEPTH; ++depth) {
+        for (int moves = 1; moves < LMR_MAX_MOVES; ++moves) {
+            lmrReductions[depth][moves] = std::max(1, int(0.75 + std::log(depth) * std::log(moves) / 2.25));
+        }
+    }
+}
+
+// History scores stay within +-HISTORY_MAX, well below the killers
+constexpr int HISTORY_MAX = 16384;
+constexpr int HISTORY_BONUS_MAX = 1600;
+
+/// How much a quiet move's history score moves by: more when there was more depth left to search
+static int historyBonus(int depth) {
+    return std::min(16 * depth * depth, HISTORY_BONUS_MAX);
+}
+
+/// Nudge a quiet move's history score up (it worked) or down (it was tried first & didn't)
+static void updateHistory(Board& board, int move, int bonus) {
+    int& entry = board.searchHistory[board.pieces[GET_FROM(move)]][GET_TO(move)];
+    entry += bonus - entry * abs(bonus) / HISTORY_MAX; // the nearer the limit, the less it moves. So new results outweigh old ones
+}
 
 /// Negamax alpha-beta search...
 static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& info, HashTable& table, int nullMoveAllowed) {
@@ -188,6 +214,8 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
     int oldAlpha = alpha;
     int bestMove = NO_MOVE;
     int bestScore = -ALPHABETA_BOUND;
+    int quietsTried[MAX_POSITION_MOVES]; // the non-captures searched so far that didn't cut off
+    int quietCount = 0;
 
     if (pvMove != NO_MOVE) { // if we have a principal variation move
         for (int moveNum = 0; moveNum < moveList.count; ++moveNum) {
@@ -214,11 +242,12 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
         }
         legal++;
         // Late move reduction: moves are ordered best first, so a late quiet move is rarely any good.
-        // Look at it a ply or two shallower, just to ask 'does it beat alpha?'. Not when in check, or giving check
+        // Look at it a ply or more shallower, just to ask 'does it beat alpha?'. Not when in check, or giving check
         score = alpha + 1; // anything not reduced goes straight to the full search below
         if (reducible && legal > LMR_FULL_MOVES && depth >= LMR_MIN_DEPTH && !inCheck && !isInCheck(board)) {
-            // two plies for the latest moves, if that still leaves a ply to search
-            int reduction = 1 + (legal > LMR_DEEPER_MOVES && depth > LMR_MIN_DEPTH);
+            // by more for the later moves & at higher depths, but always leaving a ply to search
+            int reduction = lmrReductions[std::min(depth, MAX_DEPTH - 1)][std::min(legal, LMR_MAX_MOVES - 1)];
+            reduction = std::min(reduction, depth - 2);
             score = -alphaBeta(-alpha - 1, -alpha, depth-1-reduction, board, info, table, true);
         }
         // if it does (or it wasn't reduced), search it at full depth
@@ -255,6 +284,12 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
                         board.searchKillers[1][board.ply] = board.searchKillers[0][board.ply];
                         // ...and add current move
                         board.searchKillers[0][board.ply] = moveList.moves[moveNum].move;
+                        // ...and its history score goes up, while the quiet moves tried before it go down
+                        int bonus = historyBonus(depth);
+                        updateHistory(board, bestMove, bonus);
+                        for (int i = 0; i < quietCount; ++i) {
+                            updateHistory(board, quietsTried[i], -bonus);
+                        }
                     }
                     storeHashEntry(board, table,  bestMove, beta, HF_BETA, depth);
                     return beta;
@@ -264,11 +299,14 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
                 bestMove = moveList.moves[moveNum].move;
                 // Update search history
                 if (!(moveList.moves[moveNum].move & MFLAG_CAPTURING)) {
-                    // increment by depth to prioritise moves nearer the root of the tree
-                    board.searchHistory[board.pieces[GET_FROM(bestMove)]][GET_TO(bestMove)] += depth;
+                    // by more when there's more depth left, to prioritise moves nearer the root of the tree
+                    updateHistory(board, bestMove, historyBonus(depth));
                 }
 
             }
+        }
+        if (!(move & MFLAG_CAPTURING)) { // no cutoff from this one. Remember it, in case a later move gets one
+            quietsTried[quietCount++] = move;
         }
     }
     if (legal == 0) { // if we don't have any legal moves...

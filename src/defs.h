@@ -321,6 +321,7 @@ void perftTest(int depth, Board& board);
 TimeMS getTimeMS();
 
 // search.cpp
+void initLmrReductions();
 [[nodiscard]] int isRepetition(const Board& board);
 void searchPosition(Board& board, SearchInfo& info, HashTable& table);
 

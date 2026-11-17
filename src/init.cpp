@@ -151,4 +151,5 @@ void initAll() {
     initEvalMasks();
     initMVVLVA();
     initLineSteps();
+    initLmrReductions();
 }
