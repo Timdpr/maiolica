@@ -79,9 +79,9 @@ Scores (set at generation; `alphaBeta` then sets the TT move to 2,000,000):
 | Capture (incl. capture-promotion) | 1,000,000 + `mVVLVAScores[victim][attacker]` = victimScore + 6 − attackerScore/100 (P..K = 100..600; PxQ 505, QxP 101) |
 | En passant | 1,000,105 (= PxP) |
 | Killer 0 / killer 1 at this ply | 900,000 / 800,000 |
-| Other quiet (incl. quiet promotion) | `searchHistory[piece][to]` |
+| Other quiet (incl. quiet promotion) | `searchHistory[piece][to]`, between −16,384 and 16,384 (`HISTORY_MAX`) |
 
-`pickNextMove` (search.cpp) is a selection step: scan from `moveNum` for strictly greater score (starting from 0), swap it into place. Ties go to the earliest index in the **current, already-swapped** list, so generation order, piece-list order and the swap pattern all decide tie-breaks (e.g. the four capture-promotions on one square score equal). **Any change to generation order, piece-list order, scores or the tie-break changes search node counts, so it changes the bench signature.**
+`pickNextMove` (search.cpp) is a selection step: scan from `moveNum` for strictly greater score (starting from the score at `moveNum`, since history scores can be negative), swap it into place. Ties go to the earliest index in the **current, already-swapped** list, so generation order, piece-list order and the swap pattern all decide tie-breaks (e.g. the four capture-promotions on one square score equal). **Any change to generation order, piece-list order, scores or the tie-break changes search node counts, so it changes the bench signature.**
 
 `moveExists` (generate + try each) validates TT moves in `getPVLine`; `parseMove` matches UCI strings against generated moves.
 
@@ -116,7 +116,7 @@ Zobrist: `pieceKeys[13][120]` (row `EMPTY` doubles as the EP-square key), `sideK
 6. Null move if allowed, not in check, `ply > 0`, `bigPieces[side] > 1` (king counts, so ≥1 real piece) and `depth >= 4`: search `depth-4` (R=3) with window (−beta, −beta+1) and null disabled; `score >= beta` and not a mate score → return beta (not stored in the TT).
 7. Generate, give the TT move 2,000,000, loop with `pickNextMove`. PVS: the first move with a full window; once alpha has been raised, null window then re-search if `alpha < score < beta`.
    Late move reduction, before that: from the 5th legal move on (`LMR_FULL_MOVES` 4), at `depth >= 3` (`LMR_MIN_DEPTH`), a quiet move (no capture, no promotion) that isn't a killer at this ply is first searched at `depth-2` with window (−alpha−1, −alpha); at `depth-3` from the 7th legal move on (`LMR_DEEPER_MOVES` 6) when `depth >= 4`. Not when in check, nor when the move gives check. Only a score above alpha sends it on to the PVS search at full depth; otherwise the reduced score stands.
-8. Beta cutoff: non-captures (by `MFLAG_CAPTURING`) shift into killers at this ply; store `HF_BETA` with beta; return beta. Alpha raised: quiet moves get `searchHistory[piece][to] += depth` (only on alpha raises, not on cutoffs).
+8. Beta cutoff: non-captures (by `MFLAG_CAPTURING`) shift into killers at this ply; store `HF_BETA` with beta; return beta. A non-capture that cuts off also has its history score raised by `historyBonus(depth)` = min(16 × depth², 1,600), and every non-capture searched before it at this node is lowered by the same amount. Alpha raised without a cutoff: a non-capture gets the same bonus, and nothing is lowered. `updateHistory` applies each change as `entry += bonus − entry × |bonus| / HISTORY_MAX`, which keeps scores within ±16,384 (far below the killers) and lets new results outweigh old ones.
 9. No legal moves: `-ALPHABETA_BOUND + ply` if in check, else 0. Store `HF_EXACT` (bestScore) if alpha rose, else `HF_ALPHA` (alpha, with the best fail-low move).
 
 `quiescence`: checkUp/nodes/`selDepth`, repetition/fifty (only at `ply > 0`), max-ply eval, stand pat (`eval >= beta` → beta, raise alpha), then `generateAllCaptureMoves` with the same ordering. No TT, no check evasions, no delta pruning.

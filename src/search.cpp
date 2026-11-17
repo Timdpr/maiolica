@@ -12,9 +12,9 @@ static void checkUp(SearchInfo& info) {
 
 /// Swap the move at 'moveNum' index with the 'best' move in the moveList
 static void pickNextMove(int moveNum, MoveList& moveList) {
-    int bestScore = 0;
+    int bestScore = moveList.moves[moveNum].score; // start from the first candidate, as history scores can be negative
     int bestMoveNum = moveNum;
-    for (int i = moveNum; i < moveList.count; ++i) { // find move with highest score
+    for (int i = moveNum + 1; i < moveList.count; ++i) { // find move with highest score
         if (moveList.moves[i].score > bestScore) {
             bestScore = moveList.moves[i].score;
             bestMoveNum = i;
@@ -133,6 +133,21 @@ constexpr int LMR_FULL_MOVES = 4;
 constexpr int LMR_MIN_DEPTH = 3;
 constexpr int LMR_DEEPER_MOVES = 6; // past this many, a move is reduced by two plies
 
+// History scores stay within +-HISTORY_MAX, well below the killers
+constexpr int HISTORY_MAX = 16384;
+constexpr int HISTORY_BONUS_MAX = 1600;
+
+/// How much a quiet move's history score moves by: more when there was more depth left to search
+static int historyBonus(int depth) {
+    return std::min(16 * depth * depth, HISTORY_BONUS_MAX);
+}
+
+/// Nudge a quiet move's history score up (it worked) or down (it was tried first & didn't)
+static void updateHistory(Board& board, int move, int bonus) {
+    int& entry = board.searchHistory[board.pieces[GET_FROM(move)]][GET_TO(move)];
+    entry += bonus - entry * abs(bonus) / HISTORY_MAX; // the nearer the limit, the less it moves. So new results outweigh old ones
+}
+
 /// Negamax alpha-beta search...
 static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& info, HashTable& table, int nullMoveAllowed) {
     ASSERT(checkBoard(board))
@@ -188,6 +203,8 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
     int oldAlpha = alpha;
     int bestMove = NO_MOVE;
     int bestScore = -ALPHABETA_BOUND;
+    int quietsTried[MAX_POSITION_MOVES]; // the non-captures searched so far that didn't cut off
+    int quietCount = 0;
 
     if (pvMove != NO_MOVE) { // if we have a principal variation move
         for (int moveNum = 0; moveNum < moveList.count; ++moveNum) {
@@ -255,6 +272,12 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
                         board.searchKillers[1][board.ply] = board.searchKillers[0][board.ply];
                         // ...and add current move
                         board.searchKillers[0][board.ply] = moveList.moves[moveNum].move;
+                        // ...and its history score goes up, while the quiet moves tried before it go down
+                        int bonus = historyBonus(depth);
+                        updateHistory(board, bestMove, bonus);
+                        for (int i = 0; i < quietCount; ++i) {
+                            updateHistory(board, quietsTried[i], -bonus);
+                        }
                     }
                     storeHashEntry(board, table,  bestMove, beta, HF_BETA, depth);
                     return beta;
@@ -264,11 +287,14 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
                 bestMove = moveList.moves[moveNum].move;
                 // Update search history
                 if (!(moveList.moves[moveNum].move & MFLAG_CAPTURING)) {
-                    // increment by depth to prioritise moves nearer the root of the tree
-                    board.searchHistory[board.pieces[GET_FROM(bestMove)]][GET_TO(bestMove)] += depth;
+                    // by more when there's more depth left, to prioritise moves nearer the root of the tree
+                    updateHistory(board, bestMove, historyBonus(depth));
                 }
 
             }
+        }
+        if (!(move & MFLAG_CAPTURING)) { // no cutoff from this one. Remember it, in case a later move gets one
+            quietsTried[quietCount++] = move;
         }
     }
     if (legal == 0) { // if we don't have any legal moves...
