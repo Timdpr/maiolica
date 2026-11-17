@@ -144,6 +144,15 @@ void initLmrReductions() {
     }
 }
 
+// Reverse futility pruning: how close to the leaves it applies, & how far above beta the eval must be per ply of depth left
+constexpr int RFP_MAX_DEPTH = 5;
+constexpr int RFP_MARGIN = 120;
+
+// Futility pruning: how close to the leaves, & how far below alpha the eval must be: 200 at depth 1, 325 at depth 2...
+constexpr int FUTILITY_MAX_DEPTH = 6;
+constexpr int FUTILITY_MARGIN_BASE = 75;
+constexpr int FUTILITY_MARGIN_PER_DEPTH = 125;
+
 // History scores stay within +-HISTORY_MAX, well below the killers
 constexpr int HISTORY_MAX = 16384;
 constexpr int HISTORY_BONUS_MAX = 1600;
@@ -193,6 +202,20 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
         return score;
     }
 
+    // The two futility prunings trust the static eval near the leaves. Not in check, at the root or on the main line
+    // (where beta - alpha > 1), so that is the only place the eval is worked out
+    int nearLeaf = !inCheck && board.ply && beta - alpha == 1 && depth <= FUTILITY_MAX_DEPTH;
+    int eval = nearLeaf ? evalPosition(board) : 0;
+
+    // Reverse futility: a position already well above beta isn't going to fall below it. So don't look
+    if (nearLeaf && depth <= RFP_MAX_DEPTH && abs(beta) < IS_MATE && eval - RFP_MARGIN * depth >= beta) {
+        return beta;
+    }
+    // Futility: so far below alpha that no quiet move will make up the difference in the depth that's left.
+    // Not with only pawns & a king (bigPieces counts the king), where one quiet move can decide the game
+    int futile = nearLeaf && abs(alpha) < IS_MATE && board.bigPieces[board.side] > 1
+                 && eval + FUTILITY_MARGIN_BASE + FUTILITY_MARGIN_PER_DEPTH * depth <= alpha;
+
     // if regular ab search was called AND not in check AND at least one move in AND do we have at least **1 big piece no including king** AND our depth is >= 4
     if (nullMoveAllowed && !inCheck && board.ply && (board.bigPieces[board.side] > 1) && depth >= 4) {
         // if so, we can make a null move
@@ -236,6 +259,10 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
         // a late move reduction is for quiet moves (no capture, no promotion) that aren't killers at this ply
         int reducible = !(move & (MFLAG_CAPTURING | MFLAG_PROMOTION))
                         && move != board.searchKillers[0][board.ply] && move != board.searchKillers[1][board.ply];
+        // at a futile node, once one move has been searched, the quiet ones aren't worth making, let alone searching
+        if (futile && legal > 0 && !(move & (MFLAG_CAPTURING | MFLAG_PROMOTION))) {
+            continue;
+        }
         // skip if it is not legal
         if (!makeMove(board, move)) {
             continue;
