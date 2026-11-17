@@ -131,6 +131,7 @@ static int quiescence(int alpha, int beta, Board& board, SearchInfo& info) {
 // Late move reductions: the first few moves at a node always get a full search, and so does everything near the leaves
 constexpr int LMR_FULL_MOVES = 4;
 constexpr int LMR_MIN_DEPTH = 3;
+constexpr int LMR_DEEPER_MOVES = 6; // past this many, a move is reduced by two plies
 
 /// Negamax alpha-beta search...
 static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& info, HashTable& table, int nullMoveAllowed) {
@@ -213,10 +214,12 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
         }
         legal++;
         // Late move reduction: moves are ordered best first, so a late quiet move is rarely any good.
-        // Look at it one ply shallower, just to ask 'does it beat alpha?'. Not when in check, or giving check
+        // Look at it a ply or two shallower, just to ask 'does it beat alpha?'. Not when in check, or giving check
         score = alpha + 1; // anything not reduced goes straight to the full search below
         if (reducible && legal > LMR_FULL_MOVES && depth >= LMR_MIN_DEPTH && !inCheck && !isInCheck(board)) {
-            score = -alphaBeta(-alpha - 1, -alpha, depth-2, board, info, table, true);
+            // two plies for the latest moves, if that still leaves a ply to search
+            int reduction = 1 + (legal > LMR_DEEPER_MOVES && depth > LMR_MIN_DEPTH);
+            score = -alphaBeta(-alpha - 1, -alpha, depth-1-reduction, board, info, table, true);
         }
         // if it does (or it wasn't reduced), search it at full depth
         if (score > alpha) {
