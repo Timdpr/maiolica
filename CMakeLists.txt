@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.21)
-project(maiolica VERSION 1.0 LANGUAGES CXX)
+project(maiolica VERSION 1.1 LANGUAGES CXX)
 
 # Default to an optimised build, since that's what you want for playing
 if(NOT CMAKE_BUILD_TYPE AND NOT CMAKE_CONFIGURATION_TYPES)

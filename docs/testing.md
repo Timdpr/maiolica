@@ -90,17 +90,20 @@ scripts/match.sh master gain     # SPRT, elo0=0 elo1=10: does it gain?
 scripts/match.sh master nonreg   # SPRT, elo0=-10 elo1=0: doesn't lose (simplifications, bug fixes)
 scripts/match.sh <ref> elo       # 2000 games, no SPRT: how big is the gap?
 CAP=2000 scripts/match.sh master nonreg   # the same SPRT, but stop at 2000 games if it still hasn't decided
+NODES=30000 scripts/match.sh master nonreg   # a quick first look, with no clock: every move searches 30,000 nodes
 ```
 The script builds the working tree ("dev") and the given ref ("base"). It plays 8+0.08 games (8 seconds each, plus 0.08 a move) with Hash 16, from `books/8moves_v3.pgn`, in pairs with colours swapped, 6 at a time.
 
 - **`gain` and `nonreg`** are SPRTs (sequential probability ratio tests): the match goes on only until the result is statistically clear either way, then stops. That answers "is it better?" in the fewest games. It uses the logistic model with α = β = 0.05, so it gives the wrong answer about 1 time in 20.
 - **`elo`** plays a fixed number of games and reports the Elo difference with its error margin. Use it to measure a gap. Don't read the gap off an SPRT: because an SPRT stops the moment the score looks convincing, the Elo it shows at that point is biased. `GAMES=500 scripts/match.sh <ref> elo` changes the length. 2000 games take about 2 hours and give a margin of roughly ±9 Elo.
 - **`CAP=<games>`** puts an upper limit on a `gain` or `nonreg` run. Decide on one before starting: see "How long an SPRT takes" below. Without one the script says so in `info.txt`.
+- **`NODES=<n>`** takes the clock away and gives every move the same number of nodes instead. It is a quick first look, not a verdict: see "A quick look at fixed nodes" below.
 - **Seed:** the openings are drawn from the book at random. The seed is printed and saved in `info.txt`, and `SEED=<n> scripts/match.sh ...` replays a match with the same openings in the same order.
 - **Terminations:** when the match finishes, the script counts how the games ended. Anything other than `normal` (a time forfeit, an illegal move, a crash, a disconnect) makes it exit non-zero, because that result wasn't decided on the board.
 - **A stale base:** `master` here is your local copy of the branch, which only moves when you pull. The script fetches first, and if the base branch is behind its remote copy it says so on screen and in `info.txt`. Using `origin/master` as the base avoids the question.
 - **A steady machine:** the laptop is kept awake for the length of the match. If it was on battery, in low power mode or already busy when the match started, a warning goes on screen and into `info.txt`, since any of those can skew a result.
-- **Stopping early:** Ctrl-C ends a match cleanly. The games played so far are still written up, and the row in the table says `stopped early`. A run that reaches its `CAP` says `capped at N games`, with the LLR it had got to.
+- **Pausing:** Ctrl-C pauses a match. Every finished game is kept; the few in progress are dropped. The row in the table says `paused at N games`, and the script prints the command that carries on: `RESUME=<folder> scripts/match.sh`. That takes no other arguments, since the engines, openings, settings and score so far are read back from the folder. The dropped games are played again from their openings, and the match runs to the length it was started with, so a paused match is not a shortened one. Checked with a 200-game fixed-node match paused twice: it ended with the same games as the one played straight through. `games.pgn` can hold one game twice, if it finished at the moment of the pause; the score counts it once.
+- **A cap:** a run that reaches its `CAP` says `capped at N games`, with the LLR it had got to.
 - **No adjudication:** games are played out to mate or a draw by the rules. Ending them early on the engines' own scores (resigning at -6.00, calling a draw when both sides sit near 0.00) was simulated on 790 real games: it would have got 17 to 20 results wrong, for 5 to 12% fewer moves played.
 
 ### How long an SPRT takes, and when to cap it
@@ -125,6 +128,25 @@ So before starting one, ask what the run is for and what it is likely to cost, a
 - **2,000 games is the natural cap**: by then the Elo figure is good to about ±9, and twice as many games only brings that to about ±7.
 - **A baseline match is never capped or cut short.** It is `elo` mode, which has a fixed length already.
 
+### A quick look at fixed nodes
+`NODES=30000 scripts/match.sh master nonreg` plays the same kind of match with no clock: each move searches 30,000 nodes (positions) and then has to answer. A run takes a minute or two, where a timed SPRT takes hours.
+
+- **What it is for:** finding out early that a change is broken or clearly worse, before a timed match is spent on it.
+- **What it can't see:** anything about speed or time management, since both sides get the same nodes however long they take over them. It can't see the size of the table either, which never fills at this depth. A gain at 30,000 nodes (about depth 6) needn't be the same size in a real game (about depth 9). So a change still has to pass the timed test to go in.
+- **The machine's load doesn't matter.** The same 200 games played on a quiet machine and on one with every core busy came out identical, move for move. The battery, low-power and busy warnings are left out of `info.txt` for these runs, and `CONCURRENCY` can go up to the number of cores.
+- **Checked against three results already known from timed matches** (Nov 2026, 30,000 nodes, 3,000 games each):
+
+  | Change | Timed SPRTs at 8+0.08 | Fixed nodes |
+  |---|---|---|
+  | King's endgame table in use (`6cacedd`) | passed, +82 to +98 Elo | +71.0 ± 8.1 |
+  | Pawnless-draw check fixed (`d23669b`) | passed, +14 to +25 | +7.6 ± 2.6 |
+  | En passant square only when capturable (`0c91a9d`) | level, -0.5 ± 7.6 | +1.2 ± 5.8 |
+
+  The order and the signs agree; the gains come out smaller. 10,000 nodes gave the same picture (+67, +5, +0.5).
+- **It is still an SPRT, so it is wrong about 1 time in 20.** As `nonreg` runs, the two gains passed in 200 to 300 games, and failed when old and new were swapped. The level change passed three times and failed once. When a run fails a change you have reason to think is harmless, run it again before believing it: it costs a minute.
+- **The margins look small because the games come in pairs.** With no clock, two engines that differ only slightly play the same game twice with colours swapped unless the change comes into it, and those pairs cancel out exactly.
+- The engine checks the limit every 2,048 nodes, so a count below that behaves like 2,048.
+
 Setup is a one-off:
 - Build fastchess in `external/fastchess`, at the commit the results so far were played with (alpha 1.8.3): `git clone https://github.com/Disservin/fastchess external/fastchess && git -C external/fastchess checkout 2a2aa4e && make -C external/fastchess -j`.
 - Unzip the book from official-stockfish/books into `books/`.
@@ -134,10 +156,10 @@ Every match gets a folder in `matches/`, named `<date>-<time>-<dev commit>-vs-<b
 
 | File | What it is |
 |---|---|
-| `info.txt` | what was compared, the conditions, the seed, the fastchess version and any warnings |
+| `info.txt` | what was compared, the conditions, the seed, the fastchess version, any warnings, and when it was paused and resumed |
 | `result.txt` | fastchess's final score, Elo and SPRT verdict, and how the games ended |
 | `games.pgn` | every game, with each move's score, depth and time |
-| `config.json` | fastchess's full settings |
+| `config.json` | fastchess's full settings and the score so far, which is what a resumed match starts from |
 | `log.txt.gz` | fastchess's running output, compressed |
 | `dev`, `base` | the two binaries that played |
 
@@ -156,8 +178,49 @@ The routine:
 |---|---|---|---|---|
 | 2026-11-13 | `baseline-2026-11` | 4527030 | | 0 (by definition) |
 | 2026-11-14 | `969b6f5` (piece-list index, cheap legality test) | 4527030 | 2000 | +15.7 ± 10.3 (631 wins, 541 losses, 828 draws) |
+| 2026-11-16 | 1.1, `8051995` (two eval fixes, an en passant square only when a pawn can take, a pv walk that leaves the search's board alone) | 3938564 | 2000 | +126.4 ± 12.7 (1108 wins, 411 losses, 481 draws) |
 
 The baseline played itself under these conditions, to check the setup favours neither side: 2000 games came out at -2.3 ± 9.1 Elo (591 wins, 604 losses, 805 draws), every game ending normally. So a gap under about 9 Elo at this length is noise.
+
+## Against other engines
+Everything above measures the engine against an older copy of itself, which says how much it has gained and overstates what that gain is worth against anyone else. `scripts/outside.sh` gives a rough outside figure: it plays the working tree against other engines whose ratings are published.
+
+```sh
+scripts/outside.sh                      # 300 games against each engine in external/engines/list.txt (~2 hours for six)
+GAMES=20 scripts/outside.sh             # a short trial, e.g. to see whether a new opponent loses on time
+RESUME=<folder> scripts/outside.sh      # carry on after a Ctrl-C
+```
+
+- **Conditions** are the baseline's: 8+0.08, Hash 16, `books/8moves_v3.pgn`, 6 games at once, no adjudication, one thread, no opening books or tablebases of the engines' own.
+- **One match per opponent**, each from the same openings. Ctrl-C pauses and `RESUME=` carries on, as for `match.sh`.
+- **The figure** is a performance rating: the rating at which our total score against these opponents, at their published ratings, would be exactly the expected one. `result.txt` also shows each opponent separately, and how many games weren't decided on the board and who lost them.
+- **The ratings** are from the [CCRL Blitz list](https://computerchess.org.uk/ccrl/404/), the best-known public list of engine ratings. CCRL plays at 2 minutes plus 1 second a move, on its own hardware, with 128 or 256MB tables and a general opening book; we play much faster, on a different machine, with a small table. Engines gain different amounts from extra time, so read the result as "roughly X on that scale, give or take 40", not as a rating. Only CCRL testing a release gives the real number.
+
+### The opponents
+C and C++ engines that build with the system compiler and speak UCI. They are a ladder, not a pool chosen around today's strength, so the same engines stay useful as the engine improves. Sources go in `external/engines/src/`, binaries in `external/engines/bin/`, and `external/engines/list.txt` has a line for each: name, rating, binary. All of that is gitignored.
+
+| Engine | CCRL Blitz, 14 Nov 2026 | Source, at the tag CCRL rated | Built with |
+|---|---|---|---|
+| Stash 12.0 | 1882 | `github.com/mhouppin/stash-bot`, `v12` | `make CC=cc EXT_OFLAGS="-Wno-error -w"` |
+| BBC 1.2 | 1945 | `github.com/maksimKorzh/bbc`, `1.2` | `cc -Ofast` on `src/bbc_1.2.c`, through a wrapper file that includes the system headers and then has `#define time bbc_time` before including the source: macOS declares `time()` where the engine has a global of that name |
+| Stash 14.0 | 2058 | the same, `v14` | as Stash 12.0, in `src/` |
+| CeeChess 1.3.2 | 2171 | `github.com/bctboi23/CeeChess`, `v1.3.2` | `cc -O3` on the `.c` files its makefile lists |
+| Supernova 2.1.4 | 2259 | `github.com/MichaeltheCoder7/Supernova`, `v2.1.4` | `cc -std=c99 -O3 src/*.c -lpthread` in `Linux/` |
+| Cinnamon 2.4 | 2326 | `github.com/gekomad/Cinnamon`, `v2.4` | `make cinnamon64-ARM COMP=clang++ LIBS=-lpthread` in `src/` |
+
+Higher rungs for later, from the same list: Stash 17.0 (2296), CeeChess 1.4 (2362), Halogen 6 (2410), Stash 19.0 (2472).
+
+### Results
+| Date | Version | Games | Score | Performance |
+|---|---|---|---|---|
+| 2026-11-16 | 1.1 (`7bf997a`, bench 3938564) | 1800 | 39.5% (551 wins, 929 losses, 320 draws) | about 2020 (± 16 from luck alone) |
+
+Opponent by opponent: 64.8% against Stash 12.0, 58.0% against BBC 1.2, 48.2% against Stash 14.0, 30.8% against CeeChess 1.3.2, 17.5% against Supernova 2.1.4 and 17.7% against Cinnamon 2.4. Taken one at a time they put the engine between 1988 and 2059. The engine lost no game on time and drew no warnings from fastchess. BBC lost 10 games on time and Stash 14.0 one; leaving those out moves the figure by about 2.
+
+What the game records showed:
+- **Raw speed is not the gap.** On one middlegame position for one second, the engine searched 8.9 million nodes a second, level with Stash 12.0 and 2.5 to 4 times the others. It reached depth 9 from 8.4 million nodes; Cinnamon reached depth 14 from 1.0 million. The stronger engines get 2 to 5 plies deeper per move by searching fewer, better-chosen positions.
+- **A third of the losses turn on one move:** in 307 of 929, the engine's own score fell by 1.5 pawns or more in a single move from a position it thought was level or better. That is a tactic just past where it stopped looking.
+- **About a fifth of the clock goes unused** at this speed. The time for a move is a thirtieth of the clock, plus the increment, less `Move Overhead` (50 ms). So the clock settles near 30 × 50 ms and never drops below it: the lowest it reached in any of 1,800 games was 1.34 seconds, and it usually ended with 2.3 of its 8 seconds left. At 0.17 seconds a move, 50 ms is a large share; at slow time controls it is nothing. Most of the opponents keep a similar reserve.
 
 ## Sanitisers
 - `ctest --preset asan` runs Debug with ASan and UBSan: perft smoke, `fen`, `search` and `eval`, with every `ASSERT` on (~40s). CI runs it on Linux, on every pull request and every push to master.

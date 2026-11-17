@@ -8,8 +8,12 @@
 # An SPRT has no fixed length: a change worth about 0 Elo needs ~2,650 games on average and can
 # take far more. CAP=<games> ends it there if it hasn't decided. Pick one before you start (or
 # decide not to): docs/testing.md has the lengths to expect and what a cap costs.
+# NODES=<n> swaps the clock for a fixed number of nodes a move: a quick screen that comes out the same
+# however busy the machine is, but is blind to speed & time management. It doesn't replace the timed test.
+# Ctrl-C pauses a match: the games that have finished are kept, & RESUME=<its folder> scripts/match.sh
+# carries on from there, with the same engines, openings & settings (no other arguments needed).
 # env overrides: FASTCHESS, BOOK, MATCHES, CONCURRENCY, SEED (same seed, same openings), GAMES (elo only),
-#                CAP (gain & nonreg only)
+#                CAP (gain & nonreg only), NODES (in place of a time control)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -26,6 +30,32 @@ SEED=${SEED:-$(( (RANDOM << 15) | RANDOM ))}   # picks the openings; recorded so
 GAMES=${GAMES:-2000}
 CAP=${CAP:-}   # gain & nonreg: give up waiting for a verdict after this many games
 [[ -z $CAP || $CAP =~ ^[1-9][0-9]*$ ]] || { echo "CAP must be a number of games, got '$CAP'" >&2; exit 1; }
+NODES=${NODES:-}   # every move searches this many nodes, & there is no clock
+[[ -z $NODES || $NODES =~ ^[1-9][0-9]*$ ]] || { echo "NODES must be a number of nodes a move, got '$NODES'" >&2; exit 1; }
+[[ -z $NODES || $# -lt 3 ]] || { echo "NODES takes the place of the time control: give one or the other" >&2; exit 1; }
+if [[ -n $NODES ]]; then
+    LIMIT="nodes=$NODES" LIMIT_NAME=limit LIMIT_DESC="$NODES nodes a move"
+else
+    LIMIT="tc=$TC" LIMIT_NAME=tc LIMIT_DESC=$TC
+fi
+
+# RESUME=<folder>: carry on a paused match. Everything is read back from its folder
+RESUME=${RESUME:-}
+if [[ -n $RESUME ]]; then
+    NAME=$(basename "$RESUME")
+    OUT=$MATCHES/$NAME
+    INFO=$OUT/info.txt
+    [[ -f $OUT/config.json && -f $INFO && -x $OUT/dev && -x $OUT/base ]] || { echo "no match to resume in $OUT" >&2; exit 1; }
+    [[ $(tail -n 1 "$INFO") == paused:* ]] || { echo "$NAME isn't paused: it has finished, or it's still running" >&2; exit 1; }
+    DEV_SHA=$(sed -n 's/^dev:  *//p' "$INFO")
+    BASE_SHA=$(sed -n 's/^base: .*(\(.*\))$/\1/p' "$INFO")
+    MODE=$(sed -n 's/^mode: \([a-z]*\) (.*/\1/p' "$INFO")
+    LIMIT_DESC=$(sed -n 's/^mode: .*), [a-z]*: \(.*\), book: .*/\1/p' "$INFO")
+    CAP=$(sed -n 's/^mode: .*capped at \([0-9]*\) games.*/\1/p' "$INFO")
+    GAMES=$(sed -n 's/^mode: elo (\([0-9]*\) games.*/\1/p' "$INFO")
+    WHAT=$(sed -n 's/^what: //p' "$INFO")
+    NODES=$([[ $LIMIT_DESC != *"nodes a move" ]] || echo "${LIMIT_DESC%% *}")
+fi
 
 case $MODE in
   gain)   SPRT="elo0=0 elo1=10"  BOUNDS=" [0, 10]" ;;    # does the change actually gain?
@@ -48,73 +78,87 @@ fi
 
 [[ -x $FASTCHESS ]] || { echo "no fastchess at $FASTCHESS (set FASTCHESS=...)" >&2; exit 1; }
 [[ -f $BOOK ]] || { echo "no opening book at $BOOK (set BOOK=...)" >&2; exit 1; }
-git rev-parse --verify --quiet "$BASE_REF^{commit}" >/dev/null || { echo "unknown ref '$BASE_REF'" >&2; exit 1; }
+[[ -n $RESUME ]] || git rev-parse --verify --quiet "$BASE_REF^{commit}" >/dev/null || { echo "unknown ref '$BASE_REF'" >&2; exit 1; }
 
 # a local branch only moves when it's pulled, so say so if its remote copy has gone on ahead
 NOTES=""
-git fetch --quiet 2>/dev/null || true
-UPSTREAM=$(git rev-parse --abbrev-ref "$BASE_REF@{upstream}" 2>/dev/null || true)
-if [[ -n $UPSTREAM ]]; then
-    BEHIND=$(git rev-list --count "$BASE_REF..$UPSTREAM")
-    ((BEHIND == 0)) || NOTES+="warning: $BASE_REF is $BEHIND commits behind $UPSTREAM. Pull it, or use $UPSTREAM as the base"$'\n'
+if [[ -z $RESUME ]]; then
+    git fetch --quiet 2>/dev/null || true
+    UPSTREAM=$(git rev-parse --abbrev-ref "$BASE_REF@{upstream}" 2>/dev/null || true)
+    if [[ -n $UPSTREAM ]]; then
+        BEHIND=$(git rev-list --count "$BASE_REF..$UPSTREAM")
+        ((BEHIND == 0)) || NOTES+="warning: $BASE_REF is $BEHIND commits behind $UPSTREAM. Pull it, or use $UPSTREAM as the base"$'\n'
+    fi
 fi
 
 # a match is only as fair as the machine is steady: say so if it's on battery, saving power,
 # or busy before we've even started (6 games at once leave 2 fast cores spare)
-if command -v pmset >/dev/null; then
+# (none of that touches a fixed-node game: the same nodes get searched, just more slowly)
+if [[ -n $NODES ]]; then
+    NOTES+="fixed nodes: a screen, blind to speed & time management. The timed test still decides"$'\n'
+elif command -v pmset >/dev/null; then
     POWER=$(pmset -g batt; pmset -g)
     [[ $POWER != *"Battery Power"* ]] || NOTES+="warning: running on battery"$'\n'
     [[ ! $POWER =~ lowpowermode\ +1 ]] || NOTES+="warning: low power mode is on"$'\n'
 fi
 LOAD=$(uptime | sed 's/.*load averages*: *//; s/[, ].*//')
-awk -v load="$LOAD" 'BEGIN {exit load > 2}' || NOTES+="warning: the machine was already busy (load $LOAD)"$'\n'
+[[ -n $NODES ]] || awk -v load="$LOAD" 'BEGIN {exit load > 2}' || NOTES+="warning: the machine was already busy (load $LOAD)"$'\n'
 AWAKE=$(command -v caffeinate || true)   # macOS: keeps the laptop from sleeping mid-match
 
-DEV_SHA=$(git rev-parse --short HEAD)$(git diff --quiet HEAD || echo +dirty)   # +dirty: uncommitted changes
-BASE_SHA=$(git rev-parse --short "$BASE_REF^{commit}")
-NAME=$(date +%Y%m%d-%H%M%S)-$DEV_SHA-vs-${BASE_REF//\//_}-$MODE
-OUT=$MATCHES/$NAME
-mkdir -p "$OUT"
+if [[ -z $RESUME ]]; then
+    DEV_SHA=$(git rev-parse --short HEAD)$(git diff --quiet HEAD || echo +dirty)   # +dirty: uncommitted changes
+    BASE_SHA=$(git rev-parse --short "$BASE_REF^{commit}")
+    NAME=$(date +%Y%m%d-%H%M%S)-$DEV_SHA-vs-${BASE_REF//\//_}-$MODE${NODES:+-nodes}
+    OUT=$MATCHES/$NAME
+    mkdir -p "$OUT"
 
-# build dev from the working tree with the normal release preset
-cmake --preset release >/dev/null
-cmake --build --preset release
-cp cmake-build-release/maiolica "$OUT/dev"
+    # build dev from the working tree with the normal release preset
+    cmake --preset release >/dev/null
+    cmake --build --preset release
+    cp cmake-build-release/maiolica "$OUT/dev"
 
-# build the base ref from a clean export, so old CMakeLists still work
-TMP=$(mktemp -d)
-trap 'rm -rf "$TMP"' EXIT
-git archive "$BASE_REF" | tar -x -C "$TMP"
-cmake -S "$TMP" -B "$TMP/build" -DCMAKE_BUILD_TYPE=Release >/dev/null
-cmake --build "$TMP/build" -j
-cp "$TMP/build/maiolica" "$OUT/base"
+    # build the base ref from a clean export, so old CMakeLists still work
+    TMP=$(mktemp -d)
+    trap 'rm -rf "$TMP"' EXIT
+    git archive "$BASE_REF" | tar -x -C "$TMP"
+    cmake -S "$TMP" -B "$TMP/build" -DCMAKE_BUILD_TYPE=Release >/dev/null
+    cmake --build "$TMP/build" -j
+    cp "$TMP/build/maiolica" "$OUT/base"
 
-# record what we're comparing, so the folder makes sense later
-{ echo "dev:  $DEV_SHA"
-  echo "base: $BASE_REF ($BASE_SHA)"
-  echo "mode: $MODE ($DESC), tc: $TC, book: $BOOK"
-  echo "seed: $SEED"
-  [[ -z ${CAPNOTE:-} ]] || echo "$CAPNOTE"
-  echo "fastchess: $("$FASTCHESS" --version | sed 's/^fastchess //')"
-  printf '%s' "$NOTES"; } | tee "$OUT/info.txt"
+    # record what we're comparing, so the folder makes sense later
+    { echo "dev:  $DEV_SHA"
+      echo "base: $BASE_REF ($BASE_SHA)"
+      echo "mode: $MODE ($DESC), $LIMIT_NAME: $LIMIT_DESC, book: $BOOK"
+      echo "seed: $SEED"
+      [[ -z ${WHAT:-} ]] || echo "what: $WHAT"
+      [[ -z ${CAPNOTE:-} ]] || echo "$CAPNOTE"
+      echo "fastchess: $("$FASTCHESS" --version | sed 's/^fastchess //')"
+      printf '%s' "$NOTES"; } | tee "$OUT/info.txt"
+else
+    # the engines, the openings & the score so far are all in the folder already
+    [[ ! -f $OUT/log.txt.gz ]] || gunzip -f "$OUT/log.txt.gz"
+    { echo "resumed: $(date '+%Y-%m-%d %H:%M')"; printf '%s' "$NOTES"; } | tee -a "$OUT/info.txt"
+fi
 
 # book format is just the file extension (pgn or epd)
 # no resign or draw adjudication: on 790 of our own games the usual rules got 17-20 results wrong
-# Ctrl-C: fastchess winds the match down, and what was played still gets written up
-# (it's asked for the score after every pair, so there's always a recent one to keep)
-STOPPED=""
-trap 'STOPPED=1' INT
+# Ctrl-C: fastchess winds the match down & saves where it got to in config.json. What was played
+# still gets written up, as 'paused' (it's asked for the score after every pair, so there's always a recent one)
+if [[ -z $RESUME ]]; then
+    ARGS=(-engine cmd="$OUT/dev" name=dev
+          -engine cmd="$OUT/base" name=base
+          -each "$LIMIT" option.Hash=16
+          -openings file="$BOOK" format="${BOOK##*.}" order=random -srand "$SEED"
+          -games 2 -repeat $LENGTH -concurrency "$CONCURRENCY"
+          -pgnout file="$OUT/games.pgn"
+          -config outname="$OUT/config.json"
+          -recover -ratinginterval 1)
+else
+    ARGS=(-config file="$OUT/config.json")
+fi
+trap ':' INT
 STATUS=0
-$AWAKE ${AWAKE:+-i} "$FASTCHESS" \
-  -engine cmd="$OUT/dev" name=dev \
-  -engine cmd="$OUT/base" name=base \
-  -each tc="$TC" option.Hash=16 \
-  -openings file="$BOOK" format="${BOOK##*.}" order=random -srand "$SEED" \
-  -games 2 -repeat $LENGTH -concurrency "$CONCURRENCY" \
-  -pgnout file="$OUT/games.pgn" \
-  -config outname="$OUT/config.json" \
-  -recover -ratinginterval 1 \
-  2>&1 | tee -i "$OUT/log.txt" || STATUS=$?
+$AWAKE ${AWAKE:+-i} "$FASTCHESS" "${ARGS[@]}" 2>&1 | tee -a -i "$OUT/log.txt" || STATUS=$?
 trap - INT
 
 [[ -s $OUT/games.pgn ]] || { echo "no games were played" >&2; exit 1; }
@@ -130,7 +174,7 @@ gzip -f "$OUT/log.txt"   # it runs to tens of MB otherwise
 # anything but 'normal' (time forfeit, illegal move, crash, disconnect) means a result
 # that wasn't decided on the board
 ODD=$(grep -v '"normal"\]$' <<< "$TERMS" || true)
-[[ -z $STOPPED ]] || ODD=$(grep -v '"unterminated"\]$' <<< "$ODD" || true)   # the games Ctrl-C cut short
+ODD=$(grep -v '"unterminated"\]$' <<< "$ODD" || true)   # the games a pause cut short: they get played again
 
 # one row per match in the table of them all, written from result.txt
 README=$MATCHES/README.md
@@ -167,18 +211,29 @@ case $(grep -o 'H[01] was accepted' "$OUT/result.txt" || true) in
   H0*) VERDICT="failed (LLR $LLR)" ;;
   *)   VERDICT=$([[ $MODE == elo ]] && echo "-" || echo "unfinished (LLR $LLR)") ;;
 esac
-# ran out of games before the SPRT made up its mind. LLR above 0 leans towards a pass, below 0 towards a fail
-# (fewer games than the cap means fastchess gave up for some other reason: that stays 'unfinished')
-[[ $MODE == elo || -z $CAP || -n $STOPPED || $VERDICT != unfinished* ]] || (( ${SCORE%% *} < CAP )) || VERDICT="capped at $CAP games (LLR $LLR)"
-[[ -z $STOPPED ]] || VERDICT="stopped early${LLR:+ (LLR $LLR)}"
+# no verdict, & games still to play: it was paused (or fastchess fell over), & RESUME picks it up
+PLAYED=${SCORE%% *}
+PAUSED=""
+[[ $VERDICT != unfinished* && $MODE != elo ]] || (( PLAYED >= $([[ $MODE == elo ]] && echo "$GAMES" || echo "${CAP:-20000}") )) || PAUSED=1
+if [[ -n $PAUSED ]]; then
+    VERDICT="paused at $PLAYED games${LLR:+ (LLR $LLR)}"
+    echo "paused: $(date '+%Y-%m-%d %H:%M'), $PLAYED games played" >> "$OUT/info.txt"
+elif [[ $VERDICT == unfinished* ]]; then
+    # ran out of games before the SPRT made up its mind. LLR above 0 leans towards a pass, below 0 towards a fail
+    VERDICT="capped at ${CAP:-20000} games (LLR $LLR)"
+fi
 [[ -z $ODD ]] || VERDICT="$VERDICT, but not every game ended normally"
 [[ -z $(tail -c 1 "$README") ]] || echo >> "$README"   # the last row might lack its newline
-echo "| ${NAME:0:4}-${NAME:4:2}-${NAME:6:2} | ${WHAT:-} | \`$DEV_SHA\` | \`$BASE_SHA\` | $MODE$BOUNDS | $TC, Hash 16 | $SCORE | $ELO | $VERDICT | \`$NAME\` |" >> "$README"
+grep -vF "\`$NAME\`" "$README" > "$README.tmp" && mv "$README.tmp" "$README"   # a resumed match keeps its one row
+echo "| ${NAME:0:4}-${NAME:4:2}-${NAME:6:2} | ${WHAT:-} | \`$DEV_SHA\` | \`$BASE_SHA\` | $MODE$BOUNDS | $LIMIT_DESC, Hash 16 | $SCORE | $ELO | $VERDICT | \`$NAME\` |" >> "$README"
 echo "results are in $OUT"
 
 if [[ -n $ODD ]]; then
     echo "not every game ended normally: look in $OUT/games.pgn" >&2
     exit 1
 fi
-[[ -z $STOPPED ]] || exit 130
+if [[ -n $PAUSED ]]; then
+    echo "paused. To carry on: RESUME=$NAME scripts/match.sh"
+    exit 130
+fi
 exit $STATUS
