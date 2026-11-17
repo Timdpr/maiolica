@@ -101,6 +101,7 @@ The script builds the working tree ("dev") and the given ref ("base"). It plays 
 - **Seed:** the openings are drawn from the book at random. The seed is printed and saved in `info.txt`, and `SEED=<n> scripts/match.sh ...` replays a match with the same openings in the same order.
 - **Terminations:** when the match finishes, the script counts how the games ended. Anything other than `normal` (a time forfeit, an illegal move, a crash, a disconnect) makes it exit non-zero, because that result wasn't decided on the board.
 - **A stale base:** `master` here is your local copy of the branch, which only moves when you pull. The script fetches first, and if the base branch is behind its remote copy it says so on screen and in `info.txt`. Using `origin/master` as the base avoids the question.
+- **On screen:** one line every 100 games, with the score so far, the Elo and a guess at the time left, then the final result. Every game is in the log.
 - **A steady machine:** the laptop is kept awake for the length of the match. If it was on battery, in low power mode or already busy when the match started, a warning goes on screen and into `info.txt`, since any of those can skew a result.
 - **Pausing:** Ctrl-C pauses a match. Every finished game is kept; the few in progress are dropped. The row in the table says `paused at N games`, and the script prints the command that carries on: `RESUME=<folder> scripts/match.sh`. That takes no other arguments, since the engines, openings, settings and score so far are read back from the folder. The dropped games are played again from their openings, and the match runs to the length it was started with, so a paused match is not a shortened one. Checked with a 200-game fixed-node match paused twice: it ended with the same games as the one played straight through. `games.pgn` can hold one game twice, if it finished at the moment of the pause; the score counts it once.
 - **A cap:** a run that reaches its `CAP` says `capped at N games`, with the LLR it had got to.
@@ -179,6 +180,7 @@ The routine:
 | 2026-11-13 | `baseline-2026-11` | 4527030 | | 0 (by definition) |
 | 2026-11-14 | `969b6f5` (piece-list index, cheap legality test) | 4527030 | 2000 | +15.7 ± 10.3 (631 wins, 541 losses, 828 draws) |
 | 2026-11-16 | 1.1, `8051995` (two eval fixes, an en passant square only when a pawn can take, a pv walk that leaves the search's board alone) | 3938564 | 2000 | +126.4 ± 12.7 (1108 wins, 411 losses, 481 draws) |
+| 2026-11-17 | `c3307c9` (late move reductions) | 658098 | 2000 | +201.0 ± 14.2 (1289 wins, 246 losses, 465 draws) |
 
 The baseline played itself under these conditions, to check the setup favours neither side: 2000 games came out at -2.3 ± 9.1 Elo (591 wins, 604 losses, 805 draws), every game ending normally. So a gap under about 9 Elo at this length is noise.
 
