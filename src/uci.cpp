@@ -17,7 +17,7 @@ static Board board{}; // the position the gui has set up
 static SearchInfo info{};
 static std::thread searchThread; // the running search, if any
 static int hashMB = 64;
-static int moveOverhead = 50; // ms kept back each move, for lag
+static int moveOverhead = 20; // ms kept back each move, for lag
 static TimeMS ponderSoft = 0, ponderHard = 0; // time to use once a ponder search gets 'ponderhit'
 
 // The budget for a move is split in two. No new depth is started once SOFT_LIMIT_PERCENT of it has gone,
@@ -193,7 +193,7 @@ static void sendId() {
     sendLine("option name Clear Hash type button");
     sendLine("option name Threads type spin default 1 min 1 max 1");
     sendLine("option name Ponder type check default false");
-    sendLine("option name Move Overhead type spin default 50 min 0 max 5000");
+    sendLine("option name Move Overhead type spin default 20 min 0 max 5000");
     sendLine("uciok");
 }
 

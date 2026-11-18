@@ -34,7 +34,9 @@ Maiolica speaks [UCI](https://www.shredderchess.com/download/div/uci.zip), so it
 | `Clear Hash` | button | | |
 | `Threads` | spin | 1 | 1–1 (accepted for tools that always set it) |
 | `Ponder` | check | false | (tells the GUI we can ponder) |
-| `Move Overhead` | spin (ms) | 50 | 0–5000 |
+| `Move Overhead` | spin (ms) | 20 | 0–5000 |
+
+`Move Overhead` is taken off every move's budget, to cover the delay between the engine sending its move and the GUI or match runner stopping the clock. It also sets how low the clock can go: with an increment, the clock settles at about 30 times the part of the overhead that isn't needed. On one machine the delay is a few milliseconds and 20 is plenty. Playing over a network (a server, or a bot account), raise it to cover the slowest reply you expect.
 
 ## Output
 
