@@ -69,6 +69,7 @@ void debugAnalysisTest(const char *epdFile, Board& board, SearchInfo& info, Hash
         while(fgets (lineIn , 1024 , file) != nullptr) {
             info.startTime = getTimeMS();
             info.stopTime = info.startTime + time;
+            info.softStopTime = info.stopTime.load(); // a set time for each position, so use all of it
             info.stopped = false;
             clearHashTable(table);
             parseFen(lineIn, board);

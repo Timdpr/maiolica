@@ -96,9 +96,22 @@ check "pv stops at the fifty-move limit" $'position fen 8/8/4k3/8/8/4K3/8/7R w -
     '^info depth 8 .*score cp 0 .* pv [a-h][1-8][a-h][1-8]$' '^info depth 8 .* pv [a-h][1-8][a-h][1-8] '
 check "tiny clock still plays a legal move" $'position startpos\ngo wtime 30 btime 30\n~0.5\nquit' '^bestmove [a-h][1-8][a-h][1-8]'
 check "big increment is capped" $'debug on\nposition startpos\ngo wtime 500 btime 500 winc 5000 binc 5000\n~1\nquit' \
-    'time budget 337 ms'
+    'time budget 216 ms, at most 360 ms'
 check "negative clock still moves at once" $'debug on\nposition startpos\ngo wtime -30 btime 5000 winc 100 binc 100\n~0.5\nquit' \
-    'time budget 1 ms'
+    'time budget 0 ms, at most 1 ms'
+# the budget is 180 ms: no new depth after 108, & the one under way has until 360. From the start position each depth takes
+# about twice the one before, so the search ends between depths
+order "a clock search ends between depths" $'debug on\nposition startpos\ngo wtime 6000 btime 6000\n~1\nquit' \
+    '^info string stopped at the soft limit' '^bestmove'
+check "and not on the hard limit" $'debug on\nposition startpos\ngo wtime 6000 btime 6000\n~1\nquit' \
+    'time budget 108 ms, at most 360 ms' 'stopped at the hard limit'
+# a low clock: the budget is 86 ms, & the hard limit is an eighth of the clock where twice the budget would be 172
+check "a low clock keeps the hard limit short" $'debug on\nposition startpos\ngo wtime 800 btime 800 winc 80 binc 80\n~0.5\nquit' \
+    'time budget 51 ms, at most 100 ms'
+check "and a lower one gives it the budget, no more" $'debug on\nposition startpos\ngo wtime 400 btime 400 winc 80 binc 80\n~0.5\nquit' \
+    'time budget 43 ms, at most 73 ms'
+check "movetime uses all its time" $'debug on\nposition startpos\ngo movetime 250\n~1\nquit' \
+    'time budget 230 ms, at most 230 ms'
 order "ponder ignores the node limit" $'position startpos moves e2e4\ngo ponder nodes 3000\n~0.5\nisready\nponderhit\n~0.5\nquit' \
     '^readyok' '^bestmove'
 order "go nodes stops by itself" $'position startpos\ngo nodes 3000\n~0.5\nisready\nquit' '^bestmove' '^readyok'

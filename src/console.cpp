@@ -189,6 +189,7 @@ static int think(Board& board, const int moveTime, const int depth) {
     info.stopped = false;
     info.startTime = getTimeMS();
     info.stopTime = info.startTime + moveTime;
+    info.softStopTime = info.stopTime.load(); // a set time for the move, so use all of it
     info.timeSet = moveTime > 0;
     searchingSide = board.side;
     searchPosition(board, info, hashTable); // on this thread: there's nothing else to listen to

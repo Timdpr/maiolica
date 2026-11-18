@@ -147,7 +147,8 @@ static_assert(std::is_trivially_copyable_v<Board>); // boards get copied whole: 
 /// Limits & stats for a search. The atomics are shared between the search & input threads
 struct SearchInfo {
     TimeMS startTime;
-    std::atomic<TimeMS> stopTime{0};
+    std::atomic<TimeMS> softStopTime{0}; // no new depth is started after this
+    std::atomic<TimeMS> stopTime{0}; // & the search is stopped dead at this
     std::atomic<bool> timeSet{false}; // only stop on time if this is set
     int depth;
     long long nodeLimit; // 'go nodes', 0 if none
