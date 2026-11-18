@@ -95,7 +95,7 @@ NODES=30000 scripts/match.sh master nonreg   # a quick first look, with no clock
 The script builds the working tree ("dev") and the given ref ("base"). It plays 8+0.08 games (8 seconds each, plus 0.08 a move) with Hash 16, from `books/8moves_v3.pgn`, in pairs with colours swapped, 6 at a time.
 
 - **`gain` and `nonreg`** are SPRTs (sequential probability ratio tests): the match goes on only until the result is statistically clear either way, then stops. That answers "is it better?" in the fewest games. It uses the logistic model with α = β = 0.05, so it gives the wrong answer about 1 time in 20.
-- **`elo`** plays a fixed number of games and reports the Elo difference with its error margin. Use it to measure a gap. Don't read the gap off an SPRT: because an SPRT stops the moment the score looks convincing, the Elo it shows at that point is biased. `GAMES=500 scripts/match.sh <ref> elo` changes the length. 2000 games take about 2 hours and give a margin of roughly ±9 Elo.
+- **`elo`** plays a fixed number of games and reports the Elo difference with its error margin. Use it to measure a gap. Don't read the gap off an SPRT: because an SPRT stops the moment the score looks convincing, the Elo it shows at that point is biased. `GAMES=500 scripts/match.sh <ref> elo` changes the length. 2000 games take about 2 hours and give a margin of roughly ±9 Elo between two versions of about the same strength. The margin widens as the gap does: it was ±19 at +387.
 - **`CAP=<games>`** puts an upper limit on a `gain` or `nonreg` run. Decide on one before starting: see "How long an SPRT takes" below. Without one the script says so in `info.txt`.
 - **`NODES=<n>`** takes the clock away and gives every move the same number of nodes instead. It is a quick first look, not a verdict: see "A quick look at fixed nodes" below.
 - **Seed:** the openings are drawn from the book at random. The seed is printed and saved in `info.txt`, and `SEED=<n> scripts/match.sh ...` replays a match with the same openings in the same order.
@@ -167,13 +167,30 @@ Every match gets a folder in `matches/`, named `<date>-<time>-<dev commit>-vs-<b
 Each match also adds a row to the table in `matches/README.md` (the file is created if it's missing): date, description, both commits, mode, time control, games, wins-losses-draws, Elo, verdict and folder. `WHAT="null move tweak" scripts/match.sh master gain` fills in the description. The folder is gitignored, so these are local records.
 
 ## Baseline
-The baseline is a fixed version of the engine that later versions are measured against. It is the git tag **`baseline-2026-11`** (bench signature `4527030`).
+A baseline is a fixed version of the engine that later versions are measured against. It is a git tag. There have been two, and **new matches are played against the newer one**:
+
+| Tag | Commit | Bench | Where it stands |
+|---|---|---|---|
+| `baseline-2026-11` | `b834c5a` | 4527030 | the first: 0 by definition |
+| **`baseline-2026-11-18`** | `c2b6c1c` | 440084 | +387.1 ± 19.4 against the first |
+
+The second tag was made when the engine was taking 90% of the points against the first (52 losses in 2000 games). That far from level, a small change in the score is a large change in Elo, so the same 2000 games give a wider margin each time: ±9 when the two sides are level, ±19 at +387. Against a baseline of about its own strength the margin is back to ±9.
+
+To place a later version on the first baseline's scale, add its figure to +387. That sum is rough: Elo gaps measured against different opponents don't add up exactly, and both margins come along.
 
 The conditions never change, so that results stay comparable: 8+0.08, Hash 16, `books/8moves_v3.pgn`, 6 games at once, no adjudication. These are the script's defaults, so don't override them for a baseline run.
 
 The routine:
 1. Every change to the engine gets an SPRT against the previous master: `scripts/match.sh master gain` (or `nonreg`).
-2. After each larger batch of work, measure the total gain with `scripts/match.sh baseline-2026-11 elo` and add a row here.
+2. After each larger batch of work, measure the total gain with `scripts/match.sh baseline-2026-11-18 elo` and add a row here.
+
+Against `baseline-2026-11-18`:
+
+| Date | Version | Bench | Games | Elo vs baseline |
+|---|---|---|---|---|
+| 2026-11-18 | `baseline-2026-11-18` | 440084 | | 0 (by definition) |
+
+Against `baseline-2026-11` (closed: the last row is the version the second tag marks):
 
 | Date | Version | Bench | Games | Elo vs baseline |
 |---|---|---|---|---|
@@ -183,7 +200,7 @@ The routine:
 | 2026-11-17 | `c3307c9` (late move reductions) | 658098 | 2000 | +201.0 ± 14.2 (1289 wins, 246 losses, 465 draws) |
 | 2026-11-18 | `b2ced09` (quiet moves scored by the cutoffs they caused, a formula for late move reductions, reverse futility and futility pruning, aspiration windows) | 440084 | 2000 | +387.1 ± 19.4 (1663 wins, 52 losses, 285 draws) |
 
-The baseline played itself under these conditions, to check the setup favours neither side: 2000 games came out at -2.3 ± 9.1 Elo (591 wins, 604 losses, 805 draws), every game ending normally. So a gap under about 9 Elo at this length is noise.
+The first baseline played itself under these conditions, to check the setup favours neither side: 2000 games came out at -2.3 ± 9.1 Elo (591 wins, 604 losses, 805 draws), every game ending normally. So a gap under about 9 Elo at this length is noise.
 
 ## Against other engines
 Everything above measures the engine against an older copy of itself, which says how much it has gained and overstates what that gain is worth against anyone else. `scripts/outside.sh` gives a rough outside figure: it plays the working tree against other engines whose ratings are published.
