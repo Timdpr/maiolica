@@ -105,6 +105,11 @@ order "a clock search ends between depths" $'debug on\nposition startpos\ngo wti
     '^info string stopped at the soft limit' '^bestmove'
 check "and not on the hard limit" $'debug on\nposition startpos\ngo wtime 6000 btime 6000\n~1\nquit' \
     'time budget 108 ms, at most 360 ms' 'stopped at the hard limit'
+# a low clock: the budget is 86 ms, & the hard limit is an eighth of the clock where twice the budget would be 172
+check "a low clock keeps the hard limit short" $'debug on\nposition startpos\ngo wtime 800 btime 800 winc 80 binc 80\n~0.5\nquit' \
+    'time budget 51 ms, at most 100 ms'
+check "and a lower one gives it the budget, no more" $'debug on\nposition startpos\ngo wtime 400 btime 400 winc 80 binc 80\n~0.5\nquit' \
+    'time budget 43 ms, at most 73 ms'
 check "movetime uses all its time" $'debug on\nposition startpos\ngo movetime 250\n~1\nquit' \
     'time budget 230 ms, at most 230 ms'
 order "ponder ignores the node limit" $'position startpos moves e2e4\ngo ponder nodes 3000\n~0.5\nisready\nponderhit\n~0.5\nquit' \

@@ -21,9 +21,11 @@ static int moveOverhead = 20; // ms kept back each move, for lag
 static TimeMS ponderSoft = 0, ponderHard = 0; // time to use once a ponder search gets 'ponderhit'
 
 // The budget for a move is split in two. No new depth is started once SOFT_LIMIT_PERCENT of it has gone,
-// & a depth that's under way is stopped dead at HARD_LIMIT_PERCENT
+// & a depth that's under way is stopped dead at HARD_LIMIT_PERCENT. What it takes beyond the budget comes off the
+// clock for good, so that is kept to 1/HARD_LIMIT_CLOCK_SHARE of the clock: else a run of long moves empties it
 constexpr int SOFT_LIMIT_PERCENT = 60;
 constexpr int HARD_LIMIT_PERCENT = 200;
+constexpr int HARD_LIMIT_CLOCK_SHARE = 8;
 
 /// Print a whole line to the gui at once, so the search & input threads can't interleave
 void sendLine(const char *format, ...) {
@@ -52,8 +54,8 @@ static void stopSearch() {
     }
 }
 
-/// How long to think. The budget is a share of the clock plus the increment, less the overhead. 'soft' is when
-/// to stop starting new depths & 'hard' when to stop dead, never more than 3/4 of what's left. Both -1 if there's no time limit
+/// How long to think. The budget is a share of the clock plus the increment, less the overhead, & never more than 3/4
+/// of what's left. 'soft' is when to stop starting new depths & 'hard' when to stop dead. Both -1 if there's no time limit
 static void timeBudget(long time, long inc, long movesToGo, long moveTime, TimeMS& soft, TimeMS& hard) {
     if (moveTime >= 0) { // told exactly how long to take, so take it
         soft = hard = std::max(1L, moveTime - moveOverhead);
@@ -66,7 +68,7 @@ static void timeBudget(long time, long inc, long movesToGo, long moveTime, TimeM
     long cap = std::max(1L, (time - moveOverhead) * 3 / 4);
     long budget = std::clamp(time / (movesToGo > 0 ? movesToGo : 30) + inc - moveOverhead, 1L, cap); // 30 moves to go if not told
     soft = budget * SOFT_LIMIT_PERCENT / 100;
-    hard = std::min(budget * HARD_LIMIT_PERCENT / 100, cap);
+    hard = std::clamp(time / HARD_LIMIT_CLOCK_SHARE, budget, budget * HARD_LIMIT_PERCENT / 100); // so the budget itself when the clock is low
 }
 
 /// e.g. go depth 6 wtime 180000 btime 100000 binc 1000 winc 1000 movetime 1000 movestogo 40
