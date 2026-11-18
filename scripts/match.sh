@@ -10,10 +10,12 @@
 # decide not to): docs/testing.md has the lengths to expect and what a cap costs.
 # NODES=<n> swaps the clock for a fixed number of nodes a move: a quick screen that comes out the same
 # however busy the machine is, but is blind to speed & time management. It doesn't replace the timed test.
+# THREADS=<n> gives dev that many search threads (base keeps one), to test the threads themselves. Fewer games
+# are then played at once, so that no more than 6 threads are ever busy: 3 for two threads, 1 for four.
 # Ctrl-C pauses a match: the games that have finished are kept, & RESUME=<its folder> scripts/match.sh
 # carries on from there, with the same engines, openings & settings (no other arguments needed).
 # env overrides: FASTCHESS, BOOK, MATCHES, CONCURRENCY, SEED (same seed, same openings), GAMES (elo only),
-#                CAP (gain & nonreg only), NODES (in place of a time control)
+#                CAP (gain & nonreg only), NODES (in place of a time control), THREADS (dev's search threads)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -25,7 +27,11 @@ MAIN=$(dirname "$(git rev-parse --path-format=absolute --git-common-dir)")
 FASTCHESS=${FASTCHESS:-$MAIN/external/fastchess/fastchess}
 BOOK=${BOOK:-$MAIN/books/8moves_v3.pgn}
 MATCHES=${MATCHES:-$MAIN/matches}
-CONCURRENCY=${CONCURRENCY:-6}   # M1 Pro has 8 P-cores; leave a bit of headroom
+THREADS=${THREADS:-}   # dev's Threads option. Unset, neither engine is given one
+[[ -z $THREADS || $THREADS =~ ^[1-9][0-9]*$ ]] || { echo "THREADS must be a number of threads, got '$THREADS'" >&2; exit 1; }
+# M1 Pro has 8 P-cores; leave a bit of headroom. Only one side thinks at a time, so a game keeps dev's threads busy at most
+BUSY=6
+CONCURRENCY=${CONCURRENCY:-$(( THREADS > BUSY ? 1 : BUSY / ${THREADS:-1} ))}
 SEED=${SEED:-$(( (RANDOM << 15) | RANDOM ))}   # picks the openings; recorded so a match can be repeated
 GAMES=${GAMES:-2000}
 CAP=${CAP:-}   # gain & nonreg: give up waiting for a verdict after this many games
@@ -33,6 +39,8 @@ CAP=${CAP:-}   # gain & nonreg: give up waiting for a verdict after this many ga
 NODES=${NODES:-}   # every move searches this many nodes, & there is no clock
 [[ -z $NODES || $NODES =~ ^[1-9][0-9]*$ ]] || { echo "NODES must be a number of nodes a move, got '$NODES'" >&2; exit 1; }
 [[ -z $NODES || $# -lt 3 ]] || { echo "NODES takes the place of the time control: give one or the other" >&2; exit 1; }
+# with threads the same number of nodes isn't the same search twice, nor shared out the same way
+[[ -z $NODES || -z $THREADS ]] || { echo "NODES can't be used with THREADS: threads need the timed test" >&2; exit 1; }
 if [[ -n $NODES ]]; then
     LIMIT="nodes=$NODES" LIMIT_NAME=limit LIMIT_DESC="$NODES nodes a move"
 else
@@ -54,6 +62,7 @@ if [[ -n $RESUME ]]; then
     CAP=$(sed -n 's/^mode: .*capped at \([0-9]*\) games.*/\1/p' "$INFO")
     GAMES=$(sed -n 's/^mode: elo (\([0-9]*\) games.*/\1/p' "$INFO")
     WHAT=$(sed -n 's/^what: //p' "$INFO")
+    THREADS=$(sed -n 's/^threads: dev \([0-9]*\),.*/\1/p' "$INFO")
     NODES=$([[ $LIMIT_DESC != *"nodes a move" ]] || echo "${LIMIT_DESC%% *}")
 fi
 
@@ -130,6 +139,7 @@ if [[ -z $RESUME ]]; then
       echo "base: $BASE_REF ($BASE_SHA)"
       echo "mode: $MODE ($DESC), $LIMIT_NAME: $LIMIT_DESC, book: $BOOK"
       echo "seed: $SEED"
+      [[ -z $THREADS ]] || echo "threads: dev $THREADS, base 1, $CONCURRENCY games at once"
       [[ -z ${WHAT:-} ]] || echo "what: $WHAT"
       [[ -z ${CAPNOTE:-} ]] || echo "$CAPNOTE"
       echo "fastchess: $("$FASTCHESS" --version | sed 's/^fastchess //')"
@@ -145,7 +155,7 @@ fi
 # Ctrl-C: fastchess winds the match down & saves where it got to in config.json. What was played
 # still gets written up, as 'paused' (it's asked for the score after every pair, so there's always a recent one)
 if [[ -z $RESUME ]]; then
-    ARGS=(-engine cmd="$OUT/dev" name=dev
+    ARGS=(-engine cmd="$OUT/dev" name=dev ${THREADS:+option.Threads=$THREADS}
           -engine cmd="$OUT/base" name=base
           -each "$LIMIT" option.Hash=16
           -openings file="$BOOK" format="${BOOK##*.}" order=random -srand "$SEED"
@@ -245,7 +255,7 @@ fi
 [[ -z $ODD ]] || VERDICT="$VERDICT, but not every game ended normally"
 [[ -z $(tail -c 1 "$README") ]] || echo >> "$README"   # the last row might lack its newline
 grep -vF "\`$NAME\`" "$README" > "$README.tmp" && mv "$README.tmp" "$README"   # a resumed match keeps its one row
-echo "| ${NAME:0:4}-${NAME:4:2}-${NAME:6:2} | ${WHAT:-} | \`$DEV_SHA\` | \`$BASE_SHA\` | $MODE$BOUNDS | $LIMIT_DESC, Hash 16 | $SCORE | $ELO | $VERDICT | \`$NAME\` |" >> "$README"
+echo "| ${NAME:0:4}-${NAME:4:2}-${NAME:6:2} | ${WHAT:-} | \`$DEV_SHA\` | \`$BASE_SHA\` | $MODE$BOUNDS | $LIMIT_DESC, Hash 16${THREADS:+, dev $THREADS threads} | $SCORE | $ELO | $VERDICT | \`$NAME\` |" >> "$README"
 echo "results are in $OUT"
 
 if [[ -n $ODD ]]; then
