@@ -78,6 +78,9 @@ count "infinite then quit: just the one bestmove" $'position fen 8/8/4k3/8/8/4K3
 order "ponder waits for ponderhit" $'position startpos moves e2e4\ngo ponder wtime 2000 btime 2000\n~0.5\nisready\nponderhit\n~1\nquit' \
     '^readyok' '^bestmove'
 check "mate scores" $'position fen 6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1\ngo depth 4\n~0.5\nquit' 'score mate 1 .*pv a1a8'
+# the mating move is the last one a depth 1 search looks at: the position after it mustn't be scored as if it could stand still
+check "a mate on the last ply is seen" $'position fen 6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1\ngo depth 1\n~0.3\nquit' \
+    '^info depth 1 .*score mate 1 .*pv a1a8'
 # a depth searched again with a wider window still gets one info line, & nothing is printed for the try that failed.
 # In the first the score jumps by three pawns at depth 6 (so it fails high, with a new move); in the second it drops
 depths "a fail high: each depth printed once" $'position fen 2rr3k/pp3pp1/1nnqbN1p/3pN3/2pP4/2P3Q1/PPB4P/R4RK1 w - - 0 1\ngo depth 7\n~0.5\nquit' 7
