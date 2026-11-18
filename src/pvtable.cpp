@@ -88,7 +88,7 @@ void clearHashTable(HashTable& table) {
  */
 void initHashTable(HashTable& table, const int MB) {
     size_t hashSize = 0x100000 * size_t(MB); // size_t, as an int overflows at 2048MB
-    table.numEntries = int(hashSize / (2 * sizeof(HashEntry))); // half of what would fit, which is how many there were at 32 bytes each
+    table.numEntries = int(hashSize / sizeof(HashEntry)); // how many entries can we fit inside?
     table.numEntries -= 2; // make sure we don't go over!
 
     if (table.hTable != nullptr) {
