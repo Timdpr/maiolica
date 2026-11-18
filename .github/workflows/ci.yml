@@ -34,6 +34,16 @@ jobs:
       - run: cmake --build --preset asan -j 4
       - run: ctest --preset asan
 
+  # The thread sanitiser, on the tests that search with several threads: it reports any memory that two threads
+  # touch without it being atomic. One report fails the test
+  tsan:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: cmake --preset tsan
+      - run: cmake --build --preset tsan -j 4
+      - run: ctest --preset tsan
+
   # Did search change? Runs the same searches through the PR and its base, and compares the output.
   # A PR that changes search on purpose updates the bench signature, and then there's nothing to compare
   difftest:
