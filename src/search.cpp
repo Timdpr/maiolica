@@ -153,6 +153,10 @@ constexpr int FUTILITY_MAX_DEPTH = 6;
 constexpr int FUTILITY_MARGIN_BASE = 75;
 constexpr int FUTILITY_MARGIN_PER_DEPTH = 125;
 
+// Aspiration windows: from this depth on, the root is searched within this much of the last depth's score
+constexpr int ASPIRATION_MIN_DEPTH = 4;
+constexpr int ASPIRATION_WINDOW = 50;
+
 // History scores stay within +-HISTORY_MAX, well below the killers
 constexpr int HISTORY_MAX = 16384;
 constexpr int HISTORY_BONUS_MAX = 1600;
@@ -376,18 +380,47 @@ void searchPosition(Board& board, SearchInfo& info, HashTable& table) {
     clearForSearch(board, info, table);
     int bestMove = NO_MOVE;
     int ponderMove = NO_MOVE;
+    int lastScore = 0;
 
     for (int currentDepth = 1; currentDepth <= info.depth; ++currentDepth) {
-        int bestScore = alphaBeta(-ALPHABETA_BOUND, ALPHABETA_BOUND, currentDepth, board, info, table, true);
-        if (info.stopped) { // Because we may have stopped partway through alphaBeta, we break here so the previous results are returned
+        // Aspiration window: expect a score close to the last depth's, as a narrow window cuts off more.
+        // Not for the first few depths, where scores jump about, nor around a mate score
+        int alpha = -ALPHABETA_BOUND;
+        int beta = ALPHABETA_BOUND;
+        int step = ASPIRATION_WINDOW;
+        if (currentDepth >= ASPIRATION_MIN_DEPTH && abs(lastScore) < IS_MATE) {
+            alpha = lastScore - step;
+            beta = lastScore + step;
+        }
+        int bestScore;
+        int pvArray[MAX_DEPTH];
+        int pvMoves = 0;
+        // if the score lands outside the window, search again with that side moved out, twice as far each time
+        while (true) {
+            bestScore = alphaBeta(alpha, beta, currentDepth, board, info, table, true);
+            if (info.stopped) { // Because we may have stopped partway through alphaBeta, we break here so the previous results are returned
+                break;
+            }
+            if (bestScore <= alpha && alpha > -ALPHABETA_BOUND) { // worse than expected. All we know is 'at most alpha'
+                alpha = std::max(alpha - step, -ALPHABETA_BOUND);
+            } else {
+                // inside the window, or better than expected: either way the table's move is the one to play
+                pvMoves = getPVLine(currentDepth, board, table, pvArray);
+                if (pvMoves > 0) {
+                    bestMove = pvArray[0];
+                    ponderMove = pvArray[1]; // NO_MOVE if the pv is just the one move
+                }
+                if (bestScore < beta || beta == ALPHABETA_BOUND) { // inside the window, so this depth is done
+                    break;
+                }
+                beta = std::min(beta + step, ALPHABETA_BOUND);
+            }
+            step *= 2;
+        }
+        if (info.stopped) {
             break;
         }
-        int pvArray[MAX_DEPTH];
-        int pvMoves = getPVLine(currentDepth, board, table, pvArray);
-        if (pvMoves > 0) {
-            bestMove = pvArray[0];
-            ponderMove = pvArray[1]; // NO_MOVE if the pv is just the one move
-        }
+        lastScore = bestScore;
 
         std::string pv;
         for (int pvNum = 0; pvNum < pvMoves; ++pvNum) {
