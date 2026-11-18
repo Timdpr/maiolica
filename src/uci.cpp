@@ -18,7 +18,12 @@ static SearchInfo info{};
 static std::thread searchThread; // the running search, if any
 static int hashMB = 64;
 static int moveOverhead = 50; // ms kept back each move, for lag
-static TimeMS ponderBudget = 0; // time to use once a ponder search gets 'ponderhit'
+static TimeMS ponderSoft = 0, ponderHard = 0; // time to use once a ponder search gets 'ponderhit'
+
+// The budget for a move is split in two. No new depth is started once SOFT_LIMIT_PERCENT of it has gone,
+// & a depth that's under way is stopped dead at HARD_LIMIT_PERCENT
+constexpr int SOFT_LIMIT_PERCENT = 60;
+constexpr int HARD_LIMIT_PERCENT = 200;
 
 /// Print a whole line to the gui at once, so the search & input threads can't interleave
 void sendLine(const char *format, ...) {
@@ -47,17 +52,21 @@ static void stopSearch() {
     }
 }
 
-/// How long to think: a share of the clock plus the increment, less the overhead,
-/// but never more than 3/4 of what's left. -1 if there's no time limit
-static TimeMS timeBudget(long time, long inc, long movesToGo, long moveTime) {
-    if (moveTime >= 0) {
-        return std::max(1L, moveTime - moveOverhead);
+/// How long to think. The budget is a share of the clock plus the increment, less the overhead. 'soft' is when
+/// to stop starting new depths & 'hard' when to stop dead, never more than 3/4 of what's left. Both -1 if there's no time limit
+static void timeBudget(long time, long inc, long movesToGo, long moveTime, TimeMS& soft, TimeMS& hard) {
+    if (moveTime >= 0) { // told exactly how long to take, so take it
+        soft = hard = std::max(1L, moveTime - moveOverhead);
+        return;
     }
     if (time == LONG_MIN) { // no clock given. A negative one is real (we've overrun), & gets the 1 ms below
-        return -1;
+        soft = hard = -1;
+        return;
     }
     long cap = std::max(1L, (time - moveOverhead) * 3 / 4);
-    return std::clamp(time / (movesToGo > 0 ? movesToGo : 30) + inc - moveOverhead, 1L, cap); // 30 moves to go if not told
+    long budget = std::clamp(time / (movesToGo > 0 ? movesToGo : 30) + inc - moveOverhead, 1L, cap); // 30 moves to go if not told
+    soft = budget * SOFT_LIMIT_PERCENT / 100;
+    hard = std::min(budget * HARD_LIMIT_PERCENT / 100, cap);
 }
 
 /// e.g. go depth 6 wtime 180000 btime 100000 binc 1000 winc 1000 movetime 1000 movestogo 40
@@ -89,14 +98,19 @@ static void parseGo(std::istringstream& in) {
 
     info.depth = int(std::clamp(depth, 1L, long(MAX_DEPTH - 2))); // check extensions add one, & the pv tables are MAX_DEPTH long
     info.startTime = getTimeMS();
-    TimeMS budget = info.infinite ? -1 : timeBudget(time[board.side], inc[board.side], movesToGo, moveTime);
-    ponderBudget = ponder ? budget : 0;
-    info.stopTime = info.startTime + budget;
-    info.timeSet = budget > 0 && !ponder; // a ponder search starts the clock on 'ponderhit'
+    TimeMS soft = -1, hard = -1;
+    if (!info.infinite) {
+        timeBudget(time[board.side], inc[board.side], movesToGo, moveTime, soft, hard);
+    }
+    ponderSoft = ponder ? soft : 0;
+    ponderHard = ponder ? hard : 0;
+    info.softStopTime = info.startTime + soft;
+    info.stopTime = info.startTime + hard;
+    info.timeSet = hard > 0 && !ponder; // a ponder search starts the clock on 'ponderhit'
     info.ponder = ponder;
     info.stopped = false; // reset here, not in the search thread, so an early 'stop' can't get lost
     if (debugMode) {
-        sendLine("info string time budget %lld ms, depth %d", (long long)budget, info.depth);
+        sendLine("info string time budget %lld ms, at most %lld ms, depth %d", (long long)soft, (long long)hard, info.depth);
     }
 
     // search a copy of the board (on the heap, it's big), so the gui can carry on setting positions
@@ -105,8 +119,9 @@ static void parseGo(std::istringstream& in) {
 
 /// The opponent played the move we were pondering on, so start the clock for real
 static void ponderHit() {
-    if (ponderBudget > 0) {
-        info.stopTime = getTimeMS() + ponderBudget;
+    if (ponderHard > 0) {
+        info.softStopTime = getTimeMS() + ponderSoft;
+        info.stopTime = getTimeMS() + ponderHard;
         info.timeSet = true;
     }
     info.ponder = false;

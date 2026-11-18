@@ -96,9 +96,17 @@ check "pv stops at the fifty-move limit" $'position fen 8/8/4k3/8/8/4K3/8/7R w -
     '^info depth 8 .*score cp 0 .* pv [a-h][1-8][a-h][1-8]$' '^info depth 8 .* pv [a-h][1-8][a-h][1-8] '
 check "tiny clock still plays a legal move" $'position startpos\ngo wtime 30 btime 30\n~0.5\nquit' '^bestmove [a-h][1-8][a-h][1-8]'
 check "big increment is capped" $'debug on\nposition startpos\ngo wtime 500 btime 500 winc 5000 binc 5000\n~1\nquit' \
-    'time budget 337 ms'
+    'time budget 202 ms, at most 337 ms'
 check "negative clock still moves at once" $'debug on\nposition startpos\ngo wtime -30 btime 5000 winc 100 binc 100\n~0.5\nquit' \
-    'time budget 1 ms'
+    'time budget 0 ms, at most 1 ms'
+# the budget is 150 ms: no new depth after 90, & the one under way has until 300. From the start position each depth takes
+# about twice the one before, so the search ends between depths
+order "a clock search ends between depths" $'debug on\nposition startpos\ngo wtime 6000 btime 6000\n~1\nquit' \
+    '^info string stopped at the soft limit' '^bestmove'
+check "and not on the hard limit" $'debug on\nposition startpos\ngo wtime 6000 btime 6000\n~1\nquit' \
+    'time budget 90 ms, at most 300 ms' 'stopped at the hard limit'
+check "movetime uses all its time" $'debug on\nposition startpos\ngo movetime 250\n~1\nquit' \
+    'time budget 200 ms, at most 200 ms'
 order "ponder ignores the node limit" $'position startpos moves e2e4\ngo ponder nodes 3000\n~0.5\nisready\nponderhit\n~0.5\nquit' \
     '^readyok' '^bestmove'
 order "go nodes stops by itself" $'position startpos\ngo nodes 3000\n~0.5\nisready\nquit' '^bestmove' '^readyok'

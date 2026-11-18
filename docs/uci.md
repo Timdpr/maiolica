@@ -14,15 +14,16 @@ Maiolica speaks [UCI](https://www.shredderchess.com/download/div/uci.zip), so it
 | `stop` | stops the search, which then sends `bestmove`. Harmless when idle |
 | `ponderhit` | the move being pondered was played: the clock starts now |
 | `setoption name <name> [value <v>]` | names aren't case sensitive |
-| `debug on\|off` | `on` adds `info string`s (e.g. the time budget, unknown commands) |
+| `debug on\|off` | `on` adds `info string`s (e.g. the time budget, which limit stopped the search, unknown commands) |
 | `quit` | stops any search & exits. End of input does the same |
 
 ### `go`
 `wtime btime winc binc movestogo movetime depth nodes infinite ponder`. `searchmoves` and `mate` are ignored.
-- **Time budget:** `time / movestogo + inc - Move Overhead`, where movestogo is 30 if not given. It is capped at 3/4 of the clock left after overhead, and always at least 1 ms, which is also what a negative clock (an overrun) gets. `movetime` uses `movetime - Move Overhead`. The search stops on the budget, checked every 2048 nodes.
+- **Time budget:** `time / movestogo + inc - Move Overhead`, where movestogo is 30 if not given. It is capped at 3/4 of the clock left after overhead, and always at least 1 ms, which is also what a negative clock (an overrun) gets.
+- **Two limits** come from the budget. The soft limit is 60% of it: once it has passed, no new depth is started, since a depth takes about twice as long as the one before and one that is cut short is thrown away. The hard limit is twice the budget, and never more than 3/4 of the clock left after overhead: the search is stopped dead there, checked every 2048 nodes. Measured on game positions at 8+0.08, a move typically takes 0.9 of its budget, and about one in nine runs to the hard limit. `movetime` sets both limits to `movetime - Move Overhead`.
 - **`depth`** is clamped to 1–62. With no limits at all, it searches to depth 62.
 - **`nodes`** stops within 2048 nodes of the limit (after `ponderhit`, if pondering).
-- **`infinite`** and **`ponder`** never send `bestmove` until `stop` (or `ponderhit`, then the budget runs out), even if the search finishes first.
+- **`infinite`** and **`ponder`** never send `bestmove` until `stop` (or `ponderhit`, when both limits start running), even if the search finishes first.
 - **`bestmove`** is always a legal move. If the search stops before depth 1 completes, it's the first legal move; with no legal moves it's `0000`. It adds `ponder <move>` when the hash table has a legal reply to it.
 
 ## Options

@@ -431,6 +431,16 @@ void searchPosition(Board& board, SearchInfo& info, HashTable& table) {
         sendLine("info depth %d seldepth %d score %s nodes %lld nps %lld hashfull %d time %lld pv%s",
                  currentDepth, info.selDepth, scoreToUci(bestScore).c_str(), info.nodes,
                  (long long)(info.nodes * 1000 / (time + 1)), hashFull(table), (long long)time, pv.c_str());
+        // Most of the time gone? The next depth would take longer than all of this one, & a depth cut short is thrown away
+        if (info.timeSet && getTimeMS() > info.softStopTime) {
+            if (debugMode) {
+                sendLine("info string stopped at the soft limit, after depth %d", currentDepth);
+            }
+            break;
+        }
+    }
+    if (debugMode && info.stopped && info.timeSet && getTimeMS() > info.stopTime) {
+        sendLine("info string stopped at the hard limit");
     }
     // stopped before depth 1 was done? Play anything legal. Only now, as making & undoing a move
     // can reorder the piece lists, and doing that before the search would change it

@@ -92,7 +92,9 @@ add_test(NAME replay COMMAND bash -o pipefail -c "'$<TARGET_FILE:maiolica>' repl
 set_tests_properties(replay PROPERTIES LABELS quick FAIL_REGULAR_EXPRESSION "couldn't read")
 add_test(NAME console COMMAND bash -o pipefail -c "printf 'time 0.2\\ne4\\nquit\\n' | '$<TARGET_FILE:maiolica>' console | grep -E 'Black plays [a-h][1-8][a-h][1-8]'")
 add_test(NAME console_typo COMMAND bash -o pipefail -c "printf 'force\\nnf3\\nquit\\n' | '$<TARGET_FILE:maiolica>' console | grep 'not a legal move or command: nf3'")
-set_tests_properties(console console_typo PROPERTIES LABELS quick)
+# the console gives each move a set time, & should use it: depth 5 takes a few ms
+add_test(NAME console_time COMMAND bash -o pipefail -c "printf 'time 0.2\\ne4\\nquit\\n' | '$<TARGET_FILE:maiolica>' console | grep -E 'depth +5 '")
+set_tests_properties(console console_typo console_time PROPERTIES LABELS quick)
 
 file(STRINGS tests/bench_signature.txt MAIOLICA_BENCH LIMIT_COUNT 1)
 set_property(DIRECTORY APPEND PROPERTY CMAKE_CONFIGURE_DEPENDS tests/bench_signature.txt) # so an edit is picked up by the next build
