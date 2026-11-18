@@ -181,6 +181,7 @@ The routine:
 | 2026-11-14 | `969b6f5` (piece-list index, cheap legality test) | 4527030 | 2000 | +15.7 ± 10.3 (631 wins, 541 losses, 828 draws) |
 | 2026-11-16 | 1.1, `8051995` (two eval fixes, an en passant square only when a pawn can take, a pv walk that leaves the search's board alone) | 3938564 | 2000 | +126.4 ± 12.7 (1108 wins, 411 losses, 481 draws) |
 | 2026-11-17 | `c3307c9` (late move reductions) | 658098 | 2000 | +201.0 ± 14.2 (1289 wins, 246 losses, 465 draws) |
+| 2026-11-18 | `b2ced09` (quiet moves scored by the cutoffs they caused, a formula for late move reductions, reverse futility and futility pruning, aspiration windows) | 440084 | 2000 | +387.1 ± 19.4 (1663 wins, 52 losses, 285 draws) |
 
 The baseline played itself under these conditions, to check the setup favours neither side: 2000 games came out at -2.3 ± 9.1 Elo (591 wins, 604 losses, 805 draws), every game ending normally. So a gap under about 9 Elo at this length is noise.
 
