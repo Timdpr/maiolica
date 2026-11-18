@@ -101,8 +101,6 @@ int probeHashEntry(Board& board, HashTable& table, int *move, int *score, int al
     if (table.hTable[index].positionKey == board.positionKey) {
         *move = table.hTable[index].move; // get move
         if (table.hTable[index].depth >= depth) { // if depth >= search depth
-            table.hit++; // we have a hit!
-
             ASSERT(hashTable.hTable[index].depth >= 1 && hashTable.hTable[index].depth < MAX_DEPTH)
             ASSERT(hashTable.hTable[index].flags >= HF_ALPHA && hashTable.hTable[index].flags <= HF_EXACT)
 

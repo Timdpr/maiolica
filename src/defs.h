@@ -96,8 +96,6 @@ struct HashEntry {
 struct HashTable {
     HashEntry *hTable; // pointer to element
     int numEntries;
-    int hit;
-    int cut;
     int currentAge;
 };
 
@@ -160,8 +158,6 @@ struct SearchInfo {
     std::atomic<bool> stopped{false};
     std::atomic<bool> ponder{false}; // pondering: no time limit & no bestmove until 'ponderhit' or 'stop'
 
-    float failHigh; // divide fhf by fh to get an idea of how good move ordering is
-    float failHighFirst; // try to make it >90%
     int nullCut;
 };
 

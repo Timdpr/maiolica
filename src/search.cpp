@@ -54,16 +54,12 @@ static void clearForSearch(Board& board, SearchInfo& info, HashTable& table) {
             depth = 0;
         }
     }
-    table.hit = 0;
-    table.cut = 0;
     table.currentAge++;
 
     board.ply = 0;
 
     info.nodes = 0;
     info.selDepth = 0;
-    info.failHigh = 0;
-    info.failHighFirst = 0;
 }
 
 static int quiescence(int alpha, int beta, Board& board, SearchInfo& info) {
@@ -95,7 +91,6 @@ static int quiescence(int alpha, int beta, Board& board, SearchInfo& info) {
 
     MoveList moveList;
     generateAllCaptureMoves(board, moveList); // note - only capture moves!
-    int legal = 0;
 
     for (int moveNum = 0; moveNum < moveList.count; ++moveNum) {
         // order the moves
@@ -104,7 +99,6 @@ static int quiescence(int alpha, int beta, Board& board, SearchInfo& info) {
         if (!makeMove(board, moveList.moves[moveNum].move)) {
             continue;
         }
-        legal++;
         // negamax, so flip it all...
         score = -quiescence(-beta, -alpha, board, info);
         undoMove(board);
@@ -115,10 +109,6 @@ static int quiescence(int alpha, int beta, Board& board, SearchInfo& info) {
 
         if (score > alpha) {     // if score is greater than alpha...
             if (score >= beta) { // if we have beta cutoff, return beta...
-                if (legal == 1) {
-                    info.failHighFirst++; // increment 'we searched the best move first' counter
-                }
-                info.failHigh++;
                 return beta;
             }
             alpha = score;       // otherwise, update score and bestMove
@@ -202,7 +192,6 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
     int pvMove = NO_MOVE;
 
     if (probeHashEntry(board, table, &pvMove, &score, alpha, beta, depth) == true) {
-        table.cut++;
         return score;
     }
 
@@ -305,10 +294,6 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
             bestMove = moveList.moves[moveNum].move;
             if (score > alpha) {     // if score is greater than alpha...
                 if (score >= beta) { // if we have beta cutoff, return beta...
-                    if (legal == 1) {
-                        info.failHighFirst++; // increment 'we searched the best move first' counter
-                    }
-                    info.failHigh++;
                     // A killer move is a move that has caused a beta cutoff but isn't a capture move:
                     if (!(moveList.moves[moveNum].move & MFLAG_CAPTURING)) {
                         // if criteria for killer move is met, shuffle killer moves down by 1...
