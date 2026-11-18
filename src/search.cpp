@@ -5,8 +5,8 @@
 #include <thread>
 
 /// Check if time (or the node limit) is up. Neither applies while pondering: that only ends when the gui says so
-static void checkUp(SearchInfo& info) {
-    if ((info.timeSet && getTimeMS() > info.stopTime) || (info.nodeLimit && info.nodes >= info.nodeLimit && !info.ponder)) {
+static void checkUp(const Board& board, SearchInfo& info) {
+    if ((info.timeSet && getTimeMS() > info.stopTime) || (info.nodeLimit && board.nodes >= info.nodeLimit && !info.ponder)) {
         info.stopped = true;
     }
 }
@@ -57,6 +57,10 @@ static void clearForSearch(Board& board, SearchInfo& info, HashTable& table) {
     table.currentAge++;
 
     board.ply = 0;
+    board.nodes = 0;
+    board.selDepth = 0;
+    board.nullCut = 0;
+    board.rootMove = NO_MOVE;
 
     info.nodes = 0;
     info.selDepth = 0;
@@ -66,11 +70,11 @@ static int quiescence(int alpha, int beta, Board& board, SearchInfo& info) {
     ASSERT(checkBoard(board))
     ASSERT(beta > alpha)
     // Check time remaining:
-    if ((info.nodes & 2047) == 0) {
-        checkUp(info);
+    if ((board.nodes & 2047) == 0) {
+        checkUp(board, info);
     }
-    info.nodes++;
-    info.selDepth = std::max(info.selDepth, board.ply);
+    board.nodes++;
+    board.selDepth = std::max(board.selDepth, board.ply);
 
     if ((isRepetition(board) || board.fiftyMove >= 100) && board.ply) { // no repetition or 50 move AND we have at least one move
         return 0;
@@ -170,10 +174,10 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
         return quiescence(alpha, beta, board, info); // quiescence counts this node
     }
     // Check time remaining:
-    if ((info.nodes & 2047) == 0) {
-        checkUp(info);
+    if ((board.nodes & 2047) == 0) {
+        checkUp(board, info);
     }
-    info.nodes++;
+    board.nodes++;
 
     if ((isRepetition(board) || board.fiftyMove >= 100) && board.ply) { // not at the root, or we'd have no move to play
         return 0;
@@ -192,6 +196,11 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
     int pvMove = NO_MOVE;
 
     if (probeHashEntry(board, table, &pvMove, &score, alpha, beta, depth) == true) {
+        // the root, answered by the table: its move came in the same read as its score. But only a score that
+        // beats alpha comes with a best move: 'no better than alpha' just has whichever move did least badly
+        if (!board.ply && score > alpha) {
+            board.rootMove = pvMove;
+        }
         return score;
     }
 
@@ -219,7 +228,7 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
             return 0;
         }
         if (score >= beta && abs(score) < IS_MATE) {
-            info.nullCut++;
+            board.nullCut++;
             return beta;
         }
     }
@@ -294,6 +303,9 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
             bestMove = moveList.moves[moveNum].move;
             if (score > alpha) {     // if score is greater than alpha...
                 if (score >= beta) { // if we have beta cutoff, return beta...
+                    if (!board.ply) {
+                        board.rootMove = bestMove;
+                    }
                     // A killer move is a move that has caused a beta cutoff but isn't a capture move:
                     if (!(moveList.moves[moveNum].move & MFLAG_CAPTURING)) {
                         // if criteria for killer move is met, shuffle killer moves down by 1...
@@ -313,6 +325,9 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
                 foundPV = true;
                 alpha = score;       // otherwise, update score and bestMove
                 bestMove = moveList.moves[moveNum].move;
+                if (!board.ply) {
+                    board.rootMove = bestMove;
+                }
                 // Update search history
                 if (!(moveList.moves[moveNum].move & MFLAG_CAPTURING)) {
                     // by more when there's more depth left, to prioritise moves nearer the root of the tree
@@ -389,8 +404,9 @@ void searchPosition(Board& board, SearchInfo& info, HashTable& table) {
             if (bestScore <= alpha && alpha > -ALPHABETA_BOUND) { // worse than expected. All we know is 'at most alpha'
                 alpha = std::max(alpha - step, -ALPHABETA_BOUND);
             } else {
-                // inside the window, or better than expected: either way the table's move is the one to play
-                pvMoves = getPVLine(currentDepth, board, table, pvArray);
+                // inside the window, or better than expected: either way the search has a move to play.
+                // The rest of the line is the table's
+                pvMoves = getPVLine(currentDepth, board, table, board.rootMove, pvArray);
                 if (pvMoves > 0) {
                     bestMove = pvArray[0];
                     ponderMove = pvArray[1]; // NO_MOVE if the pv is just the one move
@@ -414,8 +430,8 @@ void searchPosition(Board& board, SearchInfo& info, HashTable& table) {
         }
         TimeMS time = getTimeMS() - info.startTime;
         sendLine("info depth %d seldepth %d score %s nodes %lld nps %lld hashfull %d time %lld pv%s",
-                 currentDepth, info.selDepth, scoreToUci(bestScore).c_str(), info.nodes,
-                 (long long)(info.nodes * 1000 / (time + 1)), hashFull(table), (long long)time, pv.c_str());
+                 currentDepth, board.selDepth, scoreToUci(bestScore).c_str(), board.nodes,
+                 (long long)(board.nodes * 1000 / (time + 1)), hashFull(table), (long long)time, pv.c_str());
         // Most of the time gone? The next depth would take longer than all of this one, & a depth cut short is thrown away
         if (info.timeSet && getTimeMS() > info.softStopTime) {
             if (debugMode) {
@@ -442,6 +458,8 @@ void searchPosition(Board& board, SearchInfo& info, HashTable& table) {
     while ((info.infinite || info.ponder) && !info.stopped) {
         std::this_thread::sleep_for(std::chrono::milliseconds(1));
     }
+    info.nodes = board.nodes;
+    info.selDepth = board.selDepth;
     std::string best = printMove(bestMove); // copy, as printMove reuses its buffer
     if (ponderMove != NO_MOVE) {
         sendLine("bestmove %s ponder %s", best.c_str(), printMove(ponderMove));

@@ -137,6 +137,12 @@ struct Board {
 
     int searchHistory[13][BRD_SQ_NUM]; // indexed by piece type and board square
     int searchKillers[2][MAX_DEPTH]; // indexed by 2 killer moves, by depth
+
+    // what the search on this board has done so far. They are here, not in SearchInfo, so that nothing is shared
+    long long nodes; // count of all positions visited in the search tree
+    int selDepth; // deepest ply reached
+    int nullCut; // null-move cutoffs
+    int rootMove; // the best move the search itself found at the root, NO_MOVE until it has one
 };
 static_assert(std::is_trivially_copyable_v<Board>); // boards get copied whole: for the search thread, & by the gui code
 
@@ -150,13 +156,11 @@ struct SearchInfo {
     long long nodeLimit; // 'go nodes', 0 if none
     bool infinite; // 'go infinite': don't send bestmove until told to stop
 
-    long long nodes; // count of all positions the engine visits in the search tree
-    int selDepth; // deepest ply reached
+    long long nodes; // count of all positions the engine visited in the search tree: filled in when the search ends
+    int selDepth; // deepest ply reached, likewise
 
     std::atomic<bool> stopped{false};
     std::atomic<bool> ponder{false}; // pondering: no time limit & no bestmove until 'ponderhit' or 'stop'
-
-    int nullCut;
 };
 
 
@@ -322,7 +326,7 @@ void searchPosition(Board& board, SearchInfo& info, HashTable& table);
 
 // pvtable.cpp
 void clearHashTable(HashTable& table);
-int getPVLine(int depth, const Board& board, const HashTable& table, int *pvArray);
+int getPVLine(int depth, const Board& board, const HashTable& table, int firstMove, int *pvArray);
 int probePonderMove(const Board& board, int move, const HashTable& table);
 void initHashTable(HashTable& table, int MB);
 void storeHashEntry(Board& board, HashTable& table, int move, int score, int flags, int depth);

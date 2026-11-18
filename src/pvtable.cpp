@@ -31,14 +31,16 @@ static U64 readEntry(const HashTable& table, int index, U64 positionKey) {
     return (entry.keyXorData.load(std::memory_order_relaxed) ^ data) == positionKey ? data : 0;
 }
 
-/// Fill pvArray with the table's line from this position, ending it with NO_MOVE. Returns its length.
+/// Fill pvArray with the line from this position: firstMove, then the table's moves. It ends with NO_MOVE.
+/// Returns its length. The first move is the search's own & not the table's, as the entry for the position
+/// searched isn't always the one this search stored.
 /// It walks a copy: making & undoing moves on the search's own board reorders its piece lists,
 /// and then how far the line went would change what gets searched next
-int getPVLine(const int depth, const Board& board, const HashTable& table, int *pvArray) {
+int getPVLine(const int depth, const Board& board, const HashTable& table, const int firstMove, int *pvArray) {
     ASSERT(depth < MAX_DEPTH && depth >= 1)
 
     Board walk = board;
-    int move = probePVTable(walk, table);
+    int move = firstMove;
     int count = 0;
 
     // 'loop through the table's moves until given depth, as long as legal moves are being found'

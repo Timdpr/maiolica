@@ -3,6 +3,7 @@
 #include "defs.h"
 #include <cstdio>
 #include <cstdlib>
+#include <cstring>
 
 static const struct { const char *name, *fen; int depth; } cases[] = {
     {"startpos", START_FEN, 6},
@@ -74,6 +75,29 @@ static bool entryReadsBack() {
     return ok;
 }
 
+// The move played must be the search's own. Its entry for the position it was asked about can be refused by the
+// table, when a deeper one from the same search is already there (with several threads, another thread's). So plant
+// one, saying only 'nothing here scores above 0' & carrying a move that throws the mate away, & see what gets played
+static char bestMoveLine[32];
+static bool rootMoveIsTheSearchsOwn() {
+    Board board{};
+    SearchInfo info{};
+    parseFen("6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1", board); // Ra8 mates
+    clearHashTable(hashTable);
+    hashTable.currentAge++; // the age the search is about to give its entries
+    storeHashEntry(board, hashTable, parseMove("a1a2", board), 0, HF_ALPHA, 40);
+    hashTable.currentAge--;
+    info.depth = 3;
+    info.startTime = getTimeMS();
+    lineHandler = [](const char *line) {
+        if (!std::strncmp(line, "bestmove ", 9)) std::snprintf(bestMoveLine, sizeof(bestMoveLine), "%s", line + 9);
+    };
+    searchPosition(board, info, hashTable);
+    lineHandler = [](const char *) {};
+    clearHashTable(hashTable);
+    return !std::strncmp(bestMoveLine, "a1a8", 4);
+}
+
 int main() {
     initAll();
     initHashTable(hashTable, 16);
@@ -90,12 +114,13 @@ int main() {
         info.startTime = getTimeMS();
         searchPosition(board, info, hashTable);
         totalNodes += info.nodes;
-        nullCuts += info.nullCut;
+        nullCuts += board.nullCut;
         std::printf("%-11s d%d %7lld nodes %4d null-move cutoffs %5lld ms\n",
-                    c.name, c.depth, info.nodes, info.nullCut, (long long)(getTimeMS() - info.startTime));
+                    c.name, c.depth, info.nodes, board.nullCut, (long long)(getTimeMS() - info.startTime));
     }
     const bool ponderOk = ponderReplyIsChecked();
     const bool entryOk = entryReadsBack();
+    const bool rootOk = rootMoveIsTheSearchsOwn();
     free(hashTable.hTable);
 
     // a failed ASSERT aborts, so getting here is most of the test. But make sure null moves were part of it
@@ -103,5 +128,6 @@ int main() {
     std::printf("%lld nodes, %d null-move cutoffs: %s\n", totalNodes, nullCuts, ok ? "ok" : "FAIL, no null moves were searched");
     if (!ponderOk) std::printf("FAIL, the ponder reply from the table isn't checked against the position\n");
     if (!entryOk) std::printf("FAIL, a table entry didn't read back as it was stored\n");
-    return ok && ponderOk && entryOk ? 0 : 1;
+    if (!rootOk) std::printf("FAIL, the move played came from a table entry that wasn't the search's own: bestmove %s\n", bestMoveLine);
+    return ok && ponderOk && entryOk && rootOk ? 0 : 1;
 }
