@@ -28,6 +28,52 @@ static bool ponderReplyIsChecked() {
     return refused && e5 != NO_MOVE && probePonderMove(board, e4, hashTable) == e5;
 }
 
+// An entry is packed into one 64-bit word, so store the widest value of every field & see that each comes back:
+// both mate scores, the deepest depth, every kind of score, a castling move & a capturing promotion
+static bool entryReadsBack() {
+    Board board{};
+    parseFen("r3k2r/1P6/8/8/8/8/8/R3K2R w KQkq - 0 1", board);
+    const int moves[] = {parseMove("e1g1", board), parseMove("b7a8q", board)};
+    const int scores[] = {ALPHABETA_BOUND - 1, -ALPHABETA_BOUND + 1, IS_MATE, -IS_MATE, 12345, 0, -1};
+    bool ok = moves[0] != NO_MOVE && moves[1] != NO_MOVE;
+    for (const int move : moves) {
+        for (const int score : scores) {
+            for (const int flags : {HF_ALPHA, HF_BETA, HF_EXACT}) {
+                int gotMove = NO_MOVE, gotScore = 0;
+                clearHashTable(hashTable);
+                storeHashEntry(board, hashTable, move, score, flags, MAX_DEPTH - 1);
+                // a window with the score on its edge: an upper bound answers at alpha, a lower bound at beta
+                const int alpha = flags == HF_BETA ? score - 1 : score;
+                const int beta = flags == HF_BETA ? score : score + 1;
+                ok = ok && probeHashEntry(board, hashTable, &gotMove, &gotScore, alpha, beta, MAX_DEPTH - 1)
+                     && gotMove == move && gotScore == score && probePVTable(board, hashTable) == move;
+                // & a window the bound says nothing about isn't answered (an exact score always is)
+                const bool answered = flags == HF_BETA ? probeHashEntry(board, hashTable, &gotMove, &gotScore, score, score + 1, 1)
+                                                       : probeHashEntry(board, hashTable, &gotMove, &gotScore, score - 1, score, 1);
+                ok = ok && answered == (flags == HF_EXACT);
+            }
+        }
+    }
+    // depth: an entry one ply short of what's asked for gives its move but no score
+    int gotMove = NO_MOVE, gotScore = 0;
+    clearHashTable(hashTable);
+    storeHashEntry(board, hashTable, moves[0], 0, HF_EXACT, MAX_DEPTH - 2);
+    ok = ok && !probeHashEntry(board, hashTable, &gotMove, &gotScore, -1, 1, MAX_DEPTH - 1) && gotMove == moves[0];
+    // age: a deeper entry from this search is kept, one from an earlier search is replaced. Also when the age wraps
+    for (const int age : {0, 0x3FFF}) {
+        clearHashTable(hashTable);
+        hashTable.currentAge = age;
+        storeHashEntry(board, hashTable, moves[0], 0, HF_EXACT, 10);
+        storeHashEntry(board, hashTable, moves[1], 0, HF_EXACT, 1);
+        ok = ok && probePVTable(board, hashTable) == moves[0];
+        hashTable.currentAge++;
+        storeHashEntry(board, hashTable, moves[1], 0, HF_EXACT, 1);
+        ok = ok && probePVTable(board, hashTable) == moves[1];
+    }
+    clearHashTable(hashTable);
+    return ok;
+}
+
 int main() {
     initAll();
     initHashTable(hashTable, 16);
@@ -49,11 +95,13 @@ int main() {
                     c.name, c.depth, info.nodes, info.nullCut, (long long)(getTimeMS() - info.startTime));
     }
     const bool ponderOk = ponderReplyIsChecked();
+    const bool entryOk = entryReadsBack();
     free(hashTable.hTable);
 
     // a failed ASSERT aborts, so getting here is most of the test. But make sure null moves were part of it
     const bool ok = nullCuts > 0;
     std::printf("%lld nodes, %d null-move cutoffs: %s\n", totalNodes, nullCuts, ok ? "ok" : "FAIL, no null moves were searched");
     if (!ponderOk) std::printf("FAIL, the ponder reply from the table isn't checked against the position\n");
-    return ok && ponderOk ? 0 : 1;
+    if (!entryOk) std::printf("FAIL, a table entry didn't read back as it was stored\n");
+    return ok && ponderOk && entryOk ? 0 : 1;
 }

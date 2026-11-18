@@ -82,15 +82,13 @@ struct MoveList {
     int count;
 };
 
-/// Transposition table entry
+/// Transposition table entry: two 64-bit words. The key is kept xored with the data, so an entry whose
+/// two words come from different writes fails the key test, & is treated as not there
 struct HashEntry {
-    U64 positionKey;
-    int move;
-    int score;
-    int depth;
-    int flags;
-    int age;
+    std::atomic<U64> keyXorData;
+    std::atomic<U64> data; // move 25 bits, score 16, depth 7, flags 2, age 14
 };
+static_assert(sizeof(HashEntry) == 16); // the number of entries, & so the search, depends on it
 
 /// Transposition table
 struct HashTable {
