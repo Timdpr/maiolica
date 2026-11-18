@@ -77,6 +77,13 @@ target_link_libraries(search_tests PRIVATE maiolica_core)
 add_test(NAME search COMMAND search_tests)
 set_tests_properties(search PROPERTIES LABELS "smoke;quick")
 
+# the search with helper threads: forced mates, legal moves & a search that stops, at 1 to 8 threads.
+# Not timed, so a hang is what fails it
+add_executable(thread_tests tests/thread_tests.cpp)
+target_link_libraries(thread_tests PRIVATE maiolica_core)
+add_test(NAME threads COMMAND thread_tests)
+set_tests_properties(threads PROPERTIES LABELS "smoke;quick" TIMEOUT 300)
+
 # eval: colour symmetry, the pawnless draw and the king's two tables
 add_executable(eval_tests tests/eval_tests.cpp)
 target_link_libraries(eval_tests PRIVATE maiolica_core)

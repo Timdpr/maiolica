@@ -124,6 +124,30 @@ check "debug on/off keeps the loop going" $'debug on\ndebug off\nisready\nquit' 
 check "eof without quit exits" $'uci' 'uciok'
 check "go perft" $'go perft 3\nquit' 'Nodes searched: 8902'
 check "bench" $'bench\nquit' 'nodes [0-9]+ nps'
+
+# Several search threads. Only the main one prints, & it has stopped the others before it sends bestmove
+T4=$'setoption name Threads value 4\n'
+check "threads: the option" $'uci\nquit' '^option name Threads type spin default 1 min 1 max 256$'
+depths "threads: each depth printed once, & the move is the last line's" "${T4}"$'position startpos\ngo depth 8\n~0.5\nquit' 8
+check "threads: mate scores" "${T4}"$'position fen 6k1/5ppp/8/8/8/8/8/R5K1 w - - 0 1\ngo depth 4\n~0.5\nquit' 'score mate 1 .*pv a1a8'
+order "threads: stop mid search" "${T4}"$'position startpos\ngo infinite\n~0.3\nstop\nisready\nquit' '^bestmove [a-h][1-8]' '^readyok'
+count "threads: go infinite then instant stop" "${T4}"$'position startpos\ngo infinite\nstop\nisready\nquit' '^bestmove [a-h][1-8]' 1
+order "threads: infinite waits for stop" "${T4}"$'position fen 8/8/4k3/8/8/4K3/8/8 w - - 0 1\ngo infinite\n~1\nisready\n~0.2\nstop\nquit' \
+    '^readyok' '^bestmove'
+count "threads: infinite then quit: just the one bestmove" "${T4}"$'position startpos\ngo infinite\n~0.3\nquit' '^bestmove' 1
+order "threads: ponder waits for ponderhit" "${T4}"$'position startpos moves e2e4\ngo ponder wtime 2000 btime 2000\n~0.5\nisready\nponderhit\n~1\nquit' \
+    '^readyok' '^bestmove'
+order "threads: go nodes stops by itself" "${T4}"$'position startpos\ngo nodes 30000\n~0.5\nisready\nquit' '^bestmove' '^readyok'
+count "threads: a new Hash after a search" "${T4}"$'position startpos\ngo depth 6\n~0.3\nsetoption name Hash value 8\ngo depth 6\n~0.3\nquit' \
+    '^bestmove [a-h][1-8][a-h][1-8]' 2
+# one thread searches the same way every time: so back at one thread, with the table cleared, the node count is the usual one
+one=$(run $'position startpos\ngo depth 8\n~0.5\nquit' | grep '^info depth 8 ' | sed 's/.* nodes \([0-9]*\) .*/\1/')
+check "threads: back to one thread" "${T4}"$'position startpos\ngo depth 6\n~0.3\nsetoption name Threads value 1\nucinewgame\nposition startpos\ngo depth 8\n~0.5\nquit' \
+    "^info depth 8 .* nodes ${one:-none} "
+# bench is the signature, so it takes no notice of Threads
+sig=$(run $'bench\nquit' | grep '^Nodes searched')
+check "threads: bench still uses one" "${T4}"$'bench\nquit' "^${sig:-none}\$"
+
 epd=$(mktemp) && echo "8/8/4k3/8/8/4K3/8/8 w - - 0 1" > "$epd"
 check "epd doesn't inherit go infinite" $'go infinite\nstop\nepd '"$epd"$'\nisready\nquit' 'readyok'
 rm -f "$epd"

@@ -138,7 +138,9 @@ struct Board {
     int searchHistory[13][BRD_SQ_NUM]; // indexed by piece type and board square
     int searchKillers[2][MAX_DEPTH]; // indexed by 2 killer moves, by depth
 
-    // what the search on this board has done so far. They are here, not in SearchInfo, so that nothing is shared
+    // what the search on this board has done so far. They are here, not in SearchInfo, as each search thread
+    // has a board of its own & nothing it writes at every node is shared
+    int threadId; // 0 for the main search thread, 1 & up for its helpers
     long long nodes; // count of all positions visited in the search tree
     int selDepth; // deepest ply reached
     int nullCut; // null-move cutoffs
@@ -146,8 +148,9 @@ struct Board {
 };
 static_assert(std::is_trivially_copyable_v<Board>); // boards get copied whole: for the search thread, & by the gui code
 
-/// Limits & stats for a search. The atomics are shared between the search & input threads
+/// Limits & stats for a search. The atomics are shared between the search threads & the input thread
 struct SearchInfo {
+    int threads = 1; // how many threads search: the main one & its helpers
     TimeMS startTime;
     std::atomic<TimeMS> softStopTime{0}; // no new depth is started after this
     std::atomic<TimeMS> stopTime{0}; // & the search is stopped dead at this
@@ -156,8 +159,9 @@ struct SearchInfo {
     long long nodeLimit; // 'go nodes', 0 if none
     bool infinite; // 'go infinite': don't send bestmove until told to stop
 
-    long long nodes; // count of all positions the engine visited in the search tree: filled in when the search ends
-    int selDepth; // deepest ply reached, likewise
+    long long nodes; // count of all positions visited in the search tree, by every thread: filled in when the search ends
+    int selDepth; // deepest ply the main thread reached, likewise
+    std::atomic<long long> helperNodes{0}; // what the helpers have visited so far, to the nearest 2048 each
 
     std::atomic<bool> stopped{false};
     std::atomic<bool> ponder{false}; // pondering: no time limit & no bestmove until 'ponderhit' or 'stop'

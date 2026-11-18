@@ -27,6 +27,8 @@ constexpr int SOFT_LIMIT_PERCENT = 60;
 constexpr int HARD_LIMIT_PERCENT = 200;
 constexpr int HARD_LIMIT_CLOCK_SHARE = 8;
 
+constexpr int MAX_THREADS = 256;
+
 /// Print a whole line to the gui at once, so the search & input threads can't interleave
 void sendLine(const char *format, ...) {
     static std::mutex mutex;
@@ -182,10 +184,12 @@ static void setOption(std::istringstream& in) {
         initHashTable(hashTable, hashMB);
     } else if (name == "clear hash") {
         clearHashTable(hashTable);
+    } else if (name == "threads") {
+        info.threads = std::clamp(std::atoi(value.c_str()), 1, MAX_THREADS);
     } else if (name == "move overhead") {
         moveOverhead = std::clamp(std::atoi(value.c_str()), 0, 5000);
     }
-    // 'threads' & 'ponder' are accepted, but there's nothing to do
+    // 'ponder' is accepted, but there's nothing to do
 }
 
 static void sendId() {
@@ -193,7 +197,7 @@ static void sendId() {
     sendLine("id author Tim Russell");
     sendLine("option name Hash type spin default 64 min 1 max 2048");
     sendLine("option name Clear Hash type button");
-    sendLine("option name Threads type spin default 1 min 1 max 1");
+    sendLine("option name Threads type spin default 1 min 1 max %d", MAX_THREADS);
     sendLine("option name Ponder type check default false");
     sendLine("option name Move Overhead type spin default 20 min 0 max 5000");
     sendLine("uciok");
