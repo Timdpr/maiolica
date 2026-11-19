@@ -119,7 +119,7 @@ int main() {
         expect(bestMoveIsLegal(START_FEN), "stop", 4, "stopped without a legal move");
     }
 
-    free(hashTable.hTable);
+    freeHashTable(hashTable);
     std::printf("%d failure(s)\n", failures);
     return failures > 0;
 }

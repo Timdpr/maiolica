@@ -72,7 +72,8 @@ static bool entryReadsBack() {
         ok = ok && probePVTable(board, hashTable) == moves[1];
     }
     clearHashTable(hashTable);
-    return ok;
+    // & the table's memory starts on a cache line
+    return ok && reinterpret_cast<std::uintptr_t>(hashTable.hTable) % 64 == 0;
 }
 
 // The move played must be the search's own. Its entry for the position it was asked about can be refused by the
@@ -121,7 +122,7 @@ int main() {
     const bool ponderOk = ponderReplyIsChecked();
     const bool entryOk = entryReadsBack();
     const bool rootOk = rootMoveIsTheSearchsOwn();
-    free(hashTable.hTable);
+    freeHashTable(hashTable);
 
     // a failed ASSERT aborts, so getting here is most of the test. But make sure null moves were part of it
     const bool ok = nullCuts > 0;

@@ -20,6 +20,6 @@ int main(int argc, char *argv[]) {
         uciLoop();
     }
 
-    free(hashTable.hTable);
+    freeHashTable(hashTable);
     return 0;
 }

@@ -1,6 +1,10 @@
 #include "defs.h"
+#include <new>
 
 HashTable hashTable;
+
+// The table's memory starts on a cache line (64 bytes on most processors, 128 on Apple's)
+constexpr std::align_val_t TT_ALIGNMENT{64};
 
 // Where each field sits in an entry's data word. The move is the low 25 bits, as it is everywhere else
 constexpr int TT_SCORE_SHIFT = 25, TT_DEPTH_SHIFT = 41, TT_FLAGS_SHIFT = 48, TT_AGE_SHIFT = 50;
@@ -23,10 +27,17 @@ static int tableAge(const HashTable& table) {
     return table.currentAge & TT_AGE_MASK;
 }
 
+/// The one entry this position can be in: its key modulo the number of entries
+static HashEntry& entryFor(const HashTable& table, U64 positionKey) {
+    int index = positionKey % table.numEntries;
+    ASSERT(index >= 0 && index <= table.numEntries - 1)
+    return table.hTable[index];
+}
+
 /// Read an entry's two words once each, & hand back the data if it is this key's. 0 if not: no entry's data is 0.
 /// Everything is then taken from that one copy: read the table again & another write may have landed in between
-static U64 readEntry(const HashTable& table, int index, U64 positionKey) {
-    const HashEntry& entry = table.hTable[index];
+static U64 readEntry(const HashTable& table, U64 positionKey) {
+    const HashEntry& entry = entryFor(table, positionKey);
     U64 data = entry.data.load(std::memory_order_relaxed);
     return (entry.keyXorData.load(std::memory_order_relaxed) ^ data) == positionKey ? data : 0;
 }
@@ -73,13 +84,19 @@ int probePonderMove(const Board& board, const int move, const HashTable& table) 
     return (reply != NO_MOVE && moveExists(next, reply)) ? reply : NO_MOVE;
 }
 
-/// Loop through every entry in the table, setting each to zero, which is what an empty one looks like
+/// Loop through every entry in the table, building a new one in its place: two zero words, which is what an empty
+/// one looks like. initHashTable's memory arrives raw, so this is also where its entries are first constructed
 void clearHashTable(HashTable& table) {
     for (HashEntry *hashEntry = table.hTable; hashEntry < table.hTable + table.numEntries; hashEntry++) {
-        hashEntry->keyXorData.store(0, std::memory_order_relaxed);
-        hashEntry->data.store(0, std::memory_order_relaxed);
+        new (hashEntry) HashEntry{};
     }
     table.currentAge = 0;
+}
+
+/// Give the table's memory back
+void freeHashTable(HashTable& table) {
+    ::operator delete(table.hTable, TT_ALIGNMENT); // nothing to destroy first: an entry is two numbers
+    table.hTable = nullptr;
 }
 
 /**
@@ -91,10 +108,9 @@ void initHashTable(HashTable& table, const int MB) {
     table.numEntries = int(hashSize / sizeof(HashEntry)); // how many entries can we fit inside?
     table.numEntries -= 2; // make sure we don't go over!
 
-    if (table.hTable != nullptr) {
-        free(table.hTable); // free table pointer's memory
-    }
-    table.hTable = (HashEntry *) malloc(size_t(table.numEntries) * sizeof(HashEntry)); // allocate memory with similar logic to how it was freed!
+    freeHashTable(table); // free table pointer's memory
+    // allocate memory with similar logic to how it was freed! It isn't a table yet: clearHashTable makes the entries
+    table.hTable = (HashEntry *) ::operator new(size_t(table.numEntries) * sizeof(HashEntry), TT_ALIGNMENT, std::nothrow);
     if (table.hTable == nullptr && MB > 1) {
         sendLine("info string hash allocation failed, trying %dMB", MB / 2);
         initHashTable(table, MB / 2);
@@ -115,10 +131,6 @@ int hashFull(const HashTable& table) {
 
 /// Get move indexed with this board's position key from principal variation table (if it exists)
 int probeHashEntry(Board& board, HashTable& table, int *move, int *score, int alpha, int beta, int depth) {
-    // get index out of pos key modulo the number of entries!
-    int index = board.positionKey % table.numEntries;
-
-    ASSERT(index >= 0 && index <= hashTable.numEntries - 1)
     ASSERT(depth >=1 && depth < MAX_DEPTH)
     ASSERT(alpha < beta)
     ASSERT(alpha >= -ALPHABETA_BOUND && alpha <= ALPHABETA_BOUND)
@@ -126,7 +138,7 @@ int probeHashEntry(Board& board, HashTable& table, int *move, int *score, int al
     ASSERT(board.ply >= 0 && board.ply < MAX_DEPTH)
 
     // if pos keys are equal...
-    U64 data = readEntry(table, index, board.positionKey);
+    U64 data = readEntry(table, board.positionKey);
     if (data != 0) {
         *move = entryMove(data); // get move
         if (entryDepth(data) >= depth) { // if depth >= search depth
@@ -167,17 +179,13 @@ int probeHashEntry(Board& board, HashTable& table, int *move, int *score, int al
 /// Store a move in the table
 /// TODO: Look up the more complex algorithms for how and when to store hash entries
 void storeHashEntry(Board& board, HashTable& table, const int move, int score, const int flags, const int depth) {
-    // make index out of pos key modulo the number of entries!
-    int index = board.positionKey % table.numEntries;
-
-    ASSERT(index >= 0 && index <= hashTable.numEntries - 1)
     ASSERT(depth >= 1 && depth < MAX_DEPTH)
     ASSERT(flags >= HF_ALPHA && flags <= HF_EXACT)
     ASSERT(score >= -INF_BOUND && score <= INF_BOUND)
     ASSERT(board.ply >= 0 && board.ply < MAX_DEPTH)
 
     // an empty slot is always taken. So is an entry from an earlier search, or one searched no deeper than this
-    HashEntry& entry = table.hTable[index];
+    HashEntry& entry = entryFor(table, board.positionKey);
     U64 old = entry.data.load(std::memory_order_relaxed);
     if (old != 0 && entryAge(old) == tableAge(table) && entryDepth(old) > depth) {
         return; // return early without storing the worse entry!
@@ -198,10 +206,6 @@ void storeHashEntry(Board& board, HashTable& table, const int move, int score, c
 }
 
 int probePVTable(const Board& board, const HashTable& table) {
-    // get index out of pos key modulo the number of entries!
-    int index = board.positionKey % table.numEntries;
-    ASSERT(index >= 0 && index <= hashTable.numEntries - 1)
-
-    // if pos keys are equal, we can return move at the index (& NO_MOVE is 0, as is the data when they aren't)
-    return entryMove(readEntry(table, index, board.positionKey));
+    // if pos keys are equal, we can return the entry's move (& NO_MOVE is 0, as is the data when they aren't)
+    return entryMove(readEntry(table, board.positionKey));
 }

@@ -333,6 +333,7 @@ void clearHashTable(HashTable& table);
 int getPVLine(int depth, const Board& board, const HashTable& table, int firstMove, int *pvArray);
 int probePonderMove(const Board& board, int move, const HashTable& table);
 void initHashTable(HashTable& table, int MB);
+void freeHashTable(HashTable& table);
 void storeHashEntry(Board& board, HashTable& table, int move, int score, int flags, int depth);
 [[nodiscard]] int probeHashEntry(Board& board, HashTable& table, int *move, int *score, int alpha, int beta, int depth);
 int probePVTable(const Board& board, const HashTable& table);
