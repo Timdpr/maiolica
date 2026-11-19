@@ -111,6 +111,10 @@ static int quiescence(int alpha, int beta, Board& board, SearchInfo& info) {
     for (int moveNum = 0; moveNum < moveList.count; ++moveNum) {
         // order the moves
         pickNextMove(moveNum, moveList);
+        // a capture that loses material once the other side has taken back (queen takes a defended pawn) isn't tried
+        if (!seeAtLeast(board, moveList.moves[moveNum].move, 0)) {
+            continue;
+        }
         // skip if it is not legal
         if (!makeMove(board, moveList.moves[moveNum].move)) {
             continue;
