@@ -34,6 +34,9 @@
     { "name": "debug", "configurePreset": "debug", "output": { "outputOnFailure": true },
       "filter": { "include": { "label": "smoke" } } },
     { "name": "asan", "configurePreset": "asan", "output": { "outputOnFailure": true },
-      "filter": { "include": { "label": "smoke" } } }
+      "filter": { "include": { "label": "smoke" } } },
+    { "name": "tsan", "configurePreset": "tsan", "output": { "outputOnFailure": true },
+      "filter": { "include": { "label": "smoke" } },
+      "environment": { "TSAN_OPTIONS": "halt_on_error=1 exitcode=66" } }
   ]
 }

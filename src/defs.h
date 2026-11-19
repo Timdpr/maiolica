@@ -82,22 +82,18 @@ struct MoveList {
     int count;
 };
 
-/// Transposition table entry
+/// Transposition table entry: two 64-bit words. The key is kept xored with the data, so an entry whose
+/// two words come from different writes fails the key test, & is treated as not there
 struct HashEntry {
-    U64 positionKey;
-    int move;
-    int score;
-    int depth;
-    int flags;
-    int age;
+    std::atomic<U64> keyXorData;
+    std::atomic<U64> data; // move 25 bits, score 16, depth 7, flags 2, age 14
 };
+static_assert(sizeof(HashEntry) == 16); // the number of entries, & so the search, depends on it
 
 /// Transposition table
 struct HashTable {
     HashEntry *hTable; // pointer to element
     int numEntries;
-    int hit;
-    int cut;
     int currentAge;
 };
 
@@ -141,11 +137,20 @@ struct Board {
 
     int searchHistory[13][BRD_SQ_NUM]; // indexed by piece type and board square
     int searchKillers[2][MAX_DEPTH]; // indexed by 2 killer moves, by depth
+
+    // what the search on this board has done so far. They are here, not in SearchInfo, as each search thread
+    // has a board of its own & nothing it writes at every node is shared
+    int threadId; // 0 for the main search thread, 1 & up for its helpers
+    long long nodes; // count of all positions visited in the search tree
+    int selDepth; // deepest ply reached
+    int nullCut; // null-move cutoffs
+    int rootMove; // the best move the search itself found at the root, NO_MOVE until it has one
 };
 static_assert(std::is_trivially_copyable_v<Board>); // boards get copied whole: for the search thread, & by the gui code
 
-/// Limits & stats for a search. The atomics are shared between the search & input threads
+/// Limits & stats for a search. The atomics are shared between the search threads & the input thread
 struct SearchInfo {
+    int threads = 1; // how many threads search: the main one & its helpers
     TimeMS startTime;
     std::atomic<TimeMS> softStopTime{0}; // no new depth is started after this
     std::atomic<TimeMS> stopTime{0}; // & the search is stopped dead at this
@@ -154,15 +159,12 @@ struct SearchInfo {
     long long nodeLimit; // 'go nodes', 0 if none
     bool infinite; // 'go infinite': don't send bestmove until told to stop
 
-    long long nodes; // count of all positions the engine visits in the search tree
-    int selDepth; // deepest ply reached
+    long long nodes; // count of all positions visited in the search tree, by every thread: filled in when the search ends
+    int selDepth; // deepest ply the main thread reached, likewise
+    std::atomic<long long> helperNodes{0}; // what the helpers have visited so far, to the nearest 2048 each
 
     std::atomic<bool> stopped{false};
     std::atomic<bool> ponder{false}; // pondering: no time limit & no bestmove until 'ponderhit' or 'stop'
-
-    float failHigh; // divide fhf by fh to get an idea of how good move ordering is
-    float failHighFirst; // try to make it >90%
-    int nullCut;
 };
 
 
@@ -328,7 +330,7 @@ void searchPosition(Board& board, SearchInfo& info, HashTable& table);
 
 // pvtable.cpp
 void clearHashTable(HashTable& table);
-int getPVLine(int depth, const Board& board, const HashTable& table, int *pvArray);
+int getPVLine(int depth, const Board& board, const HashTable& table, int firstMove, int *pvArray);
 int probePonderMove(const Board& board, int move, const HashTable& table);
 void initHashTable(HashTable& table, int MB);
 void storeHashEntry(Board& board, HashTable& table, int move, int score, int flags, int depth);
