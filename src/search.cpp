@@ -222,10 +222,13 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
         return score;
     }
 
+    // The static eval is kept for every position on the line being searched, so that those further down it can see
+    // which way things have been going. A position in check hasn't one: what counts there is getting out of it
+    int eval = board.staticEvals[board.ply] = inCheck ? NO_EVAL : evalPosition(board);
+
     // The two futility prunings trust the static eval near the leaves. Not in check, at the root or on the main line
-    // (where beta - alpha > 1), so that is the only place the eval is worked out
+    // (where beta - alpha > 1)
     int nearLeaf = !inCheck && board.ply && beta - alpha == 1 && depth <= FUTILITY_MAX_DEPTH;
-    int eval = nearLeaf ? evalPosition(board) : 0;
 
     // Reverse futility: a position already well above beta isn't going to fall below it. So don't look
     if (nearLeaf && depth <= RFP_MAX_DEPTH && abs(beta) < IS_MATE && eval - RFP_MARGIN * depth >= beta) {
