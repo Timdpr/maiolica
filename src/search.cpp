@@ -150,9 +150,12 @@ void initLmrReductions() {
     }
 }
 
-// Reverse futility pruning: how close to the leaves it applies, & how far above beta the eval must be per ply of depth left
+// Reverse futility pruning: how close to the leaves it applies, & how far above beta the eval must be per ply of depth left.
+// Where the eval is improving it reaches further from the leaves, on a smaller margin & a ply's worth less of it
 constexpr int RFP_MAX_DEPTH = 5;
 constexpr int RFP_MARGIN = 120;
+constexpr int RFP_IMPROVING_MAX_DEPTH = 7;
+constexpr int RFP_IMPROVING_MARGIN = 80;
 
 // Futility pruning: how close to the leaves, & how far below alpha the eval must be: 200 at depth 1, 325 at depth 2...
 constexpr int FUTILITY_MAX_DEPTH = 6;
@@ -225,13 +228,21 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
     // The static eval is kept for every position on the line being searched, so that those further down it can see
     // which way things have been going. A position in check hasn't one: what counts there is getting out of it
     int eval = board.staticEvals[board.ply] = inCheck ? NO_EVAL : evalPosition(board);
+    // Improving: is the eval better than the last time this side was to move, two plies up the line? If there was no
+    // eval then (it was in check, or the root is nearer than that) the answer is yes, as NO_EVAL is below any eval
+    int improving = board.ply < 2 || eval > board.staticEvals[board.ply - 2];
 
-    // The two futility prunings trust the static eval near the leaves. Not in check, at the root or on the main line
+    // The prunings below trust the static eval near the leaves. Not in check, at the root or on the main line
     // (where beta - alpha > 1)
-    int nearLeaf = !inCheck && board.ply && beta - alpha == 1 && depth <= FUTILITY_MAX_DEPTH;
+    int canPrune = !inCheck && board.ply && beta - alpha == 1;
+    int nearLeaf = canPrune && depth <= FUTILITY_MAX_DEPTH;
 
-    // Reverse futility: a position already well above beta isn't going to fall below it. So don't look
-    if (nearLeaf && depth <= RFP_MAX_DEPTH && abs(beta) < IS_MATE && eval - RFP_MARGIN * depth >= beta) {
+    // Reverse futility: a position already well above beta isn't going to fall below it. So don't look.
+    // An eval that is improving as well is a far safer bet than one that is above beta but falling: it gets a smaller
+    // margin, none at all at depth 1, & is trusted further from the leaves
+    int rfpMaxDepth = improving ? RFP_IMPROVING_MAX_DEPTH : RFP_MAX_DEPTH;
+    int rfpMargin = improving ? RFP_IMPROVING_MARGIN * (depth - 1) : RFP_MARGIN * depth;
+    if (canPrune && depth <= rfpMaxDepth && abs(beta) < IS_MATE && eval - rfpMargin >= beta) {
         return beta;
     }
     // Futility: so far below alpha that no quiet move will make up the difference in the depth that's left.
