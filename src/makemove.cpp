@@ -36,16 +36,6 @@ void initLineSteps() {
     // (d1 & g7 differ by 63, the same as h1 & a8). Following one just finds nothing
 }
 
-/// Is the side to move in check? Worked out the first time it's asked of a position, then remembered
-int isInCheck(Board& board) {
-    int& inCheck = board.history[board.historyPly].inCheck;
-    if (inCheck == CHECK_UNKNOWN) {
-        inCheck = isSquareAttacked(board.kingSq[board.side], board.side^1, board);
-    }
-    ASSERT(inCheck == isSquareAttacked(board.kingSq[board.side], board.side^1, board))
-    return inCheck;
-}
-
 /// Has a piece leaving the 'from' square opened a line to the given side's king?
 /// The whole legality test for a move, as long as the king wasn't in check before it,
 /// didn't move itself, and the move wasn't en passant (which empties two squares)
@@ -68,6 +58,56 @@ static int kingExposed(const int from, const int side, const Board& board) {
         return IS_ROOK_OR_QUEEN(piece);
     }
     return IS_BISHOP_OR_QUEEN(piece);
+}
+
+/// Does the piece on 'from' attack 'target'? Never true of a king, which can't give check
+static int attacksSquare(const int from, const int target, const Board& board) {
+    int piece = board.pieces[from];
+    int difference = target - from;
+    if (piece == wP) {
+        return difference == 9 || difference == 11;
+    }
+    if (piece == bP) {
+        return difference == -9 || difference == -11;
+    }
+    if (IS_KNIGHT(piece)) {
+        return abs(difference) == 8 || abs(difference) == 12 || abs(difference) == 19 || abs(difference) == 21;
+    }
+    int step = lineStep[from - target + 77]; // from the target towards the piece
+    if (step == 0) {
+        return false;
+    }
+    if (step == 1 || step == -1 || step == 10 || step == -10) {
+        if (!IS_ROOK_OR_QUEEN(piece)) {
+            return false;
+        }
+    } else if (!IS_BISHOP_OR_QUEEN(piece)) {
+        return false;
+    }
+    // the right kind of piece, on a line with the target. Is there anything in between?
+    int square = target + step;
+    while (board.pieces[square] == EMPTY) {
+        square += step;
+    }
+    return square == from;
+}
+
+/// Is the side to move in check? Worked out the first time it's asked of a position, then remembered
+int isInCheck(Board& board) {
+    int& inCheck = board.history[board.historyPly].inCheck;
+    if (inCheck == CHECK_UNKNOWN) {
+        int king = board.kingSq[board.side];
+        int move = board.historyPly > 0 ? board.history[board.historyPly - 1].move : NO_MOVE;
+        if (move != NO_MOVE && !(move & (MFLAG_EN_PASSANT | MFLAG_CASTLING))) {
+            // an ordinary move gives check in two ways only: with the piece that moved, or by uncovering a line to the king.
+            // (the king wasn't attacked before it, or the side that made it could have taken the king)
+            inCheck = attacksSquare(GET_TO(move), king, board) || kingExposed(GET_FROM(move), board.side, board);
+        } else { // no move before this one, a null move, or one of the two moves that shift a second piece
+            inCheck = isSquareAttacked(king, board.side^1, board);
+        }
+    }
+    ASSERT(inCheck == isSquareAttacked(board.kingSq[board.side], board.side^1, board))
+    return inCheck;
 }
 
 /// Clear the piece on the given square from the given board (& update other relevant fields)

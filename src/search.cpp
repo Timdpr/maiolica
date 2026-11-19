@@ -186,7 +186,9 @@ static void updateHistory(Board& board, int move, int bonus) {
 static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& info, HashTable& table, int nullMoveAllowed) {
     ASSERT(checkBoard(board))
 
-    if (depth == 0) {
+    // Out of depth? Then it's over to quiescence. But not while in check: quiescence would 'stand pat' on a position
+    // that can't stand still (or is mate!), so the check extension below gets in first & the replies are searched here
+    if (depth == 0 && !isInCheck(board)) {
         return quiescence(alpha, beta, board, info); // quiescence counts this node
     }
     // Check time remaining:
