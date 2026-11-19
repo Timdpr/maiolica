@@ -112,7 +112,9 @@ elif command -v pmset >/dev/null; then
 fi
 LOAD=$(uptime | sed 's/.*load averages*: *//; s/[, ].*//')
 [[ -n $NODES ]] || awk -v load="$LOAD" 'BEGIN {exit load > 2}' || NOTES+="warning: the machine was already busy (load $LOAD)"$'\n'
-AWAKE=$(command -v caffeinate || true)   # macOS: keeps the laptop from sleeping mid-match
+# macOS: keeps the laptop from sleeping mid-match. -i stops it dozing off when idle; -s holds it awake on mains
+# even after it has already dozed once (it then only half wakes, and -i alone no longer holds it)
+AWAKE=$(command -v caffeinate || true)
 
 if [[ -z $RESUME ]]; then
     DEV_SHA=$(git rev-parse --short HEAD)$(git diff --quiet HEAD || echo +dirty)   # +dirty: uncommitted changes
@@ -187,7 +189,7 @@ progress() {
 }
 trap ':' INT
 STATUS=0
-$AWAKE ${AWAKE:+-i} "$FASTCHESS" "${ARGS[@]}" 2>&1 | tee -a -i "$OUT/log.txt" \
+$AWAKE ${AWAKE:+-is} "$FASTCHESS" "${ARGS[@]}" 2>&1 | tee -a -i "$OUT/log.txt" \
     | progress "$([[ $MODE == elo ]] && echo "$GAMES" || echo "${CAP:-20000}")" || STATUS=$?
 trap - INT
 
