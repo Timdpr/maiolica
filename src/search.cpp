@@ -159,6 +159,10 @@ constexpr int FUTILITY_MAX_DEPTH = 6;
 constexpr int FUTILITY_MARGIN_BASE = 75;
 constexpr int FUTILITY_MARGIN_PER_DEPTH = 125;
 
+// Late move pruning: how many moves are tried near the leaves before the quiet ones left are skipped, on top of
+// depth squared: 4 at depth 1, 7 at depth 2, then 12, 19, 28, 39
+constexpr int LMP_BASE = 3;
+
 // Aspiration windows: from this depth on, the root is searched within this much of the last depth's score
 constexpr int ASPIRATION_MIN_DEPTH = 4;
 constexpr int ASPIRATION_WINDOW = 50;
@@ -230,6 +234,10 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
     int futile = nearLeaf && abs(alpha) < IS_MATE && board.bigPieces[board.side] > 1
                  && eval + FUTILITY_MARGIN_BASE + FUTILITY_MARGIN_PER_DEPTH * depth <= alpha;
 
+    // Late move pruning: moves are tried best first, so near the leaves, once this many have been, a quiet move still
+    // waiting is very unlikely to be the one. Wherever futility could apply, whatever the eval says
+    int lateMoveLimit = nearLeaf && board.bigPieces[board.side] > 1 ? LMP_BASE + depth * depth : MAX_POSITION_MOVES;
+
     // if regular ab search was called AND not in check AND at least one move in AND do we have at least **1 big piece no including king** AND our depth is >= 4
     if (nullMoveAllowed && !inCheck && board.ply && (board.bigPieces[board.side] > 1) && depth >= 4) {
         // if so, we can make a null move
@@ -264,17 +272,31 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
 
     // Using principal variation search
     int foundPV = false;
+    int skipQuiets = false; // set once late move pruning has given up on this node's quiet moves
 
     // for each move generated
     for (int moveNum = 0; moveNum < moveList.count; ++moveNum) {
-        // order the moves
-        pickNextMove(moveNum, moveList);
+        // order the moves. Once the quiet moves are being skipped there's no need: captures all come before them,
+        // so the only moves left that aren't skipped are promotions without a capture
+        if (!skipQuiets) {
+            pickNextMove(moveNum, moveList);
+        }
         int move = moveList.moves[moveNum].move;
+        if (skipQuiets && !(move & MFLAG_PROMOTION)) {
+            ASSERT(!(move & MFLAG_CAPTURING))
+            continue;
+        }
         // a late move reduction is for quiet moves (no capture, no promotion) that aren't killers at this ply
         int reducible = !(move & (MFLAG_CAPTURING | MFLAG_PROMOTION))
                         && move != board.searchKillers[0][board.ply] && move != board.searchKillers[1][board.ply];
         // at a futile node, once one move has been searched, the quiet ones aren't worth making, let alone searching
         if (futile && legal > 0 && !(move & (MFLAG_CAPTURING | MFLAG_PROMOTION))) {
+            continue;
+        }
+        // Late move pruning: enough moves have been tried here, so this quiet move & the ones after it are skipped.
+        // Killers are still tried (they come before the other quiet moves). Not while every move so far gets mated
+        if (reducible && legal >= lateMoveLimit && bestScore > -IS_MATE) {
+            skipQuiets = true;
             continue;
         }
         // skip if it is not legal
