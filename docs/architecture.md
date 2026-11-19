@@ -12,7 +12,7 @@ C++20 UCI engine. Alpha-beta search on one thread by default, or several that sh
 | `src/data.cpp` | Constant per-piece tables (`pieceValues`, `pieceColours`, `bigPieces`, `pieceKnight`…), `pieceChars`, `mirror64` |
 | `src/board.cpp` | `resetBoard`, `parseFen`, `updateMaterialLists`, `checkBoard` (debug cross-check), `printBoard`, `mirrorBoard` |
 | `src/hashkeys.cpp` | `generatePositionKey` (from scratch; make/undo update incrementally) |
-| `src/attack.cpp` | `isSquareAttacked(sq, attackingSide, board)` |
+| `src/attack.cpp` | `isSquareAttacked(sq, attackingSide, board)`; `seeAtLeast(board, move, threshold)`, the static exchange evaluation |
 | `src/movegen.cpp` | `generateAllMoves`, `generateAllCaptureMoves`, `MOVE()` macro, move scoring, `initMVVLVA`, `moveExists` |
 | `src/makemove.cpp` | `makeMove`/`undoMove`, `makeNullMove`/`undoNullMove`, `HASH_*` macros, `castlePermArray` |
 | `src/search.cpp` | `searchPosition` (iterative deepening), `alphaBeta`, `quiescence`, `pickNextMove`, `isRepetition`, `checkUp`, `firstLegalMove`, `scoreToUci` |
@@ -30,6 +30,7 @@ C++20 UCI engine. Alpha-beta search on one thread by default, or several that sh
 | `tests/search_tests.cpp` | A short search of five positions (~200k nodes) for debug and sanitiser builds, where the `ASSERT`s in `makeMove`, `isInCheck` and `checkBoard` run inside it, plus a check that `probePonderMove` refuses a table move that isn't legal, a table entry stored and read back at the widest value of every field, and a planted root entry that mustn't be played; ctest `search` |
 | `tests/thread_tests.cpp` | The search at 1, 2, 4 and 8 threads: forced mates, legal moves, the node count, a node limit and a stop from another thread; ctest `threads` |
 | `tests/eval_tests.cpp` | Eval checks: colour symmetry, the pawnless draw, the king's two tables; ctest `eval` |
+| `tests/see_tests.cpp` | Static exchange evaluation: 23 captures with known values, then every capture in 14 positions against the exchange played out the long way; ctest `see` |
 | `tests/bench_signature.txt` | Expected node total; ctest `bench_signature` greps `Nodes searched  : N` from `maiolica bench` |
 | `tests/microbench.cpp` | Optional Google Benchmark (`MAIOLICA_MICROBENCH=ON`, `microbench` preset): movegen, captures, make/undo, `isSquareAttacked`, eval. Indicative only; bench/perft decide |
 
@@ -103,6 +104,17 @@ Scores (set at generation; `alphaBeta` then sets the TT move to 2,000,000):
 `undoMove` reverses it incrementally (re-hashing, not restoring the key from `history`; the stored key is only read by `isRepetition`). `makeNullMove`/`undoNullMove` flip side, clear EP (hashed), bump `ply`/`historyPly`; fifty and castling are untouched.
 
 Zobrist: `pieceKeys[13][120]` (row `EMPTY` doubles as the EP-square key), `sideKey` (in when white to move), `castleKeys[16]` indexed by the perms nibble.
+
+## Static exchange evaluation (attack.cpp)
+`seeAtLeast(board, move, threshold)` answers one question without searching or making a move: if this move is played and the two sides then take turns capturing on its square, each with its least valuable piece and each free to stop, does the side that played it end up at least `threshold` ahead? Values are `pieceValues` (pawn 100, knight and bishop 325, rook 550, queen 1000). Nothing calls it yet.
+
+- **Two quick answers first.** If what the move takes (plus what a promotion adds) is below the threshold, no. If it is still at or above the threshold after giving up the piece that lands on the square, yes. Only a capture by a piece worth more than what it takes goes further.
+- **A pawn that can take back** is looked for next, on its two squares. A pawn is always the first to recapture, so when the piece is worth a pawn or more above what it took (which, with these values, is every capture that gets this far at a threshold of 0), a defending pawn makes the answer no at once.
+- **The attackers** of the square are found by walking the eight lines out from it (`nextOnLine`) and looking at the eight knight squares, for both sides at once. Each is kept with the line it stands on.
+- **Pieces lined up behind one another:** when an attacker is used, the walk carries on behind it along its line, and a rook, bishop or queen found there (of either side) joins in. The moving piece's own square is looked through from the start, and so is the square of a pawn taken en passant.
+- **The exchange** is a running `balance`, flipped at each capture, that stops as soon as the side that just took is ahead even if its piece is lost in turn. A king's value is far above everything else, so a king only "takes" when nothing can take it back.
+- **What it doesn't see:** pins (a pinned piece still takes), a pawn promoting part-way through the exchange, and anything off the square (a check, a piece left hanging elsewhere).
+- Between two attackers of the same value (knight and bishop, or two rooks) the choice can matter when different pieces stand behind them; it takes whichever it found first.
 
 ## Search (search.cpp)
 

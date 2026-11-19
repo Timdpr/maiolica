@@ -71,3 +71,115 @@ int isSquareAttacked(const int square, const int attackingSide, const Board& boa
 
     return false; // If no attacking piece can be found, return false!
 }
+
+/// The first piece met going out from a square along a line, or OFFBOARD. 'square' ends up where it stands.
+/// Up to two squares are looked through as if empty: their pieces have already left
+static inline int nextOnLine(const Board& board, int& square, const int step, const int gone, const int alsoGone) {
+    int piece;
+    do {
+        square += step;
+        piece = board.pieces[square];
+    } while (piece == EMPTY || (piece != OFFBOARD && (square == gone || square == alsoGone)));
+    return piece;
+}
+
+/// Static exchange evaluation, or 'SEE'. Say this move is made, and the two sides then take turns capturing on its
+/// square, each with its least valuable piece, either free to stop when taking again would cost it. Does the side that
+/// made the move end up at least 'threshold' ahead, in pieceValues? Nothing is searched & no move is made.
+/// A piece lined up behind another joins in once the one in front has gone. Pins aren't seen: a pinned piece still takes
+int seeAtLeast(const Board& board, const int move, const int threshold) {
+    const int from = GET_FROM(move);
+    const int to = GET_TO(move);
+    const int promoted = GET_PROMOTED(move);
+    const int side = board.side;
+
+    // the best case: what the move wins if nothing takes back
+    int balance = ((move & MFLAG_EN_PASSANT) ? pieceValues[wP] : pieceValues[GET_CAPTURED(move)]) - threshold;
+    if (promoted != EMPTY) {
+        balance += pieceValues[promoted] - pieceValues[wP];
+    }
+    if (balance < 0) {
+        return false;
+    }
+    // the worst case: the piece that lands on the square is lost for nothing
+    balance -= pieceValues[promoted != EMPTY ? promoted : board.pieces[from]];
+    if (balance >= 0) {
+        return true;
+    }
+
+    // A pawn takes back first if one can, & when the piece is worth this much more than what it took, that settles it
+    if (balance + pieceValues[wP] < 0) {
+        if (side == WHITE ? (board.pieces[to + 9] == bP || board.pieces[to + 11] == bP)
+                          : (board.pieces[to - 9] == wP || board.pieces[to - 11] == wP)) {
+            return false;
+        }
+    }
+
+    // Otherwise, find everything that attacks the square, for both sides: where each piece is & the line it is on
+    // (0 for a knight). The moving piece has left, as has a pawn taken en passant, so what's behind them counts
+    const int passed = (move & MFLAG_EN_PASSANT) ? (side == WHITE ? to - 10 : to + 10) : from;
+    int squares[2][16], steps[2][16];
+    int count[2] = { 0, 0 };
+
+    for (int i = 0; i < 8; ++i) { // kingDirection: the four rook lines, then the four bishop lines
+        int step = kingDirection[i];
+        int square = to;
+        int piece = nextOnLine(board, square, step, from, passed);
+        if (piece == OFFBOARD) {
+            continue;
+        }
+        int attacks = i < 4 ? IS_ROOK_OR_QUEEN(piece) : IS_BISHOP_OR_QUEEN(piece);
+        if (!attacks && square == to + step) { // right next to it: a king, or a pawn (which takes diagonally forwards)
+            attacks = IS_KING(piece) || (piece == wP && (step == -9 || step == -11)) || (piece == bP && (step == 9 || step == 11));
+        }
+        if (attacks) {
+            int colour = pieceColours[piece];
+            squares[colour][count[colour]] = square;
+            steps[colour][count[colour]++] = step;
+        }
+    }
+    for (int nDirection : knightDirection) {
+        int piece = board.pieces[to + nDirection];
+        if (piece != OFFBOARD && IS_KNIGHT(piece) && to + nDirection != from) {
+            int colour = pieceColours[piece];
+            squares[colour][count[colour]] = to + nDirection;
+            steps[colour][count[colour]++] = 0;
+        }
+    }
+
+    // Now the two sides take turns. Whoever is to take needs to: 'balance' says they are behind as things stand
+    int colour = side ^ 1;
+    while (count[colour] > 0) {
+        // take with the least valuable piece
+        int best = 0;
+        for (int i = 1; i < count[colour]; ++i) {
+            if (pieceValues[board.pieces[squares[colour][i]]] < pieceValues[board.pieces[squares[colour][best]]]) {
+                best = i;
+            }
+        }
+        int square = squares[colour][best];
+        int step = steps[colour][best];
+        int value = pieceValues[board.pieces[square]];
+        squares[colour][best] = squares[colour][--count[colour]];
+        steps[colour][best] = steps[colour][count[colour]];
+
+        // it has left its line, so a rook, bishop or queen behind it (either side's) now attacks the square too
+        if (step != 0) {
+            int piece = nextOnLine(board, square, step, NO_SQ, NO_SQ);
+            if (piece != OFFBOARD && ((step == 1 || step == -1 || step == 10 || step == -10) ? IS_ROOK_OR_QUEEN(piece) : IS_BISHOP_OR_QUEEN(piece))) {
+                int behind = pieceColours[piece];
+                squares[behind][count[behind]] = square;
+                steps[behind][count[behind]++] = step;
+            }
+        }
+
+        // the other side's turn. Is the side that just took ahead even if this piece is lost in its turn? Then it's over.
+        // (a king is worth so much that it never is: so a king only 'takes' when nothing can take it back)
+        colour ^= 1;
+        balance = -balance - 1 - value;
+        if (balance >= 0) {
+            break;
+        }
+    }
+    return colour != side; // whoever was left needing to take, & couldn't or didn't, comes out behind
+}

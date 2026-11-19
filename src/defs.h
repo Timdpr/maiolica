@@ -282,6 +282,7 @@ void mirrorBoard(Board& board);
 
 // attack.cpp
 int isSquareAttacked(int square, int attackingSide, const Board& board);
+int seeAtLeast(const Board& board, int move, int threshold);
 
 // io.cpp
 char *printSquare(int square);
