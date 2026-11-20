@@ -261,7 +261,9 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
     int lateMoveLimit = nearLeaf && board.bigPieces[board.side] > 1 ? LMP_BASE + depth * depth : MAX_POSITION_MOVES;
 
     // if regular ab search was called AND not in check AND at least one move in AND do we have at least **1 big piece no including king** AND our depth is >= 4
-    if (nullMoveAllowed && !inCheck && board.ply && (board.bigPieces[board.side] > 1) && depth >= 4) {
+    // AND the static eval is at or above beta already. A position that looks worse than beta before giving a move
+    // away is hardly ever at or above it afterwards (1 time in 40), so there the null move search is wasted
+    if (nullMoveAllowed && !inCheck && board.ply && (board.bigPieces[board.side] > 1) && depth >= 4 && eval >= beta) {
         // if so, we can make a null move
         makeNullMove(board);
         score = -alphaBeta(-beta, -beta+1, depth-4, board, info, table, false);
