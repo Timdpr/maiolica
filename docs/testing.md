@@ -28,6 +28,19 @@ For more than one thread, the tests check things that must be true however the t
 - **Speed with threads** is time to depth: how long the same positions take to reach the same depth. `scripts/ab.sh` can't measure it (it runs `bench`, which is one thread).
 - **Strength with threads** is a match: `THREADS=2 scripts/match.sh master gain`. See "Strength" below.
 
+What the threads measured when they went in (Nov 2026, M1 Pro, 8+0.08, Hash 16; the version with threads, `b8293f2`, against the one before it, `3e588e9`, which always has one):
+
+| Threads | Games | Wins-losses-draws | Elo | Kind of match | Time to depth 14 |
+|---|---|---|---|---|---|
+| 1 | 460 | 152-95-213 | +43.3 ± 24.5 | SPRT, passed "not weaker" | 1 (by definition) |
+| 2 | 270 | 104-50-116 | +70.4 ± 27.7 | SPRT, passed "stronger" | 1.52 times as fast |
+| 4 | 300 | 143-27-130 | +141.7 ± 27.6 | fixed length | 2.18 times as fast |
+| 8 | not played | | | | 2.89 times as fast |
+
+- The one-thread row is not the threads: the same change made the table entry 16 bytes, so the table holds twice as many. That gain is inside the other rows too.
+- The first two rows are SPRT figures, which read high (see "Strength").
+- Time to depth is over 150 positions from self-play games, against one thread of the same build.
+
 `eval` (`tests/eval_tests.cpp`) checks that a position scores the same as its colour-flipped twin (22 positions: pawns for both sides, one side and neither), that the pawnless-draw shortcut fires only with no pawns on the board, and that the king prefers the middle in an ending and home in a middlegame. The bench signature can't do this job: a change that breaks one of these just gives a new number.
 
 `see` (`tests/see_tests.cpp`) is for the static exchange evaluation, `seeAtLeast`: the routine that says, without searching, whether a capture comes out ahead once both sides have finished taking on its square. It has two parts. First, 23 captures whose value is known: plain exchanges, pieces lined up behind one another (a rook behind a rook or a queen, a bishop behind the pawn that takes, the other side's rook behind our queen), en passant, capturing promotions, and kings, which take only when nothing can take back. Each must be worth exactly its value: yes at that threshold, no one higher. Second, every capture in 14 busy positions, with the colours swapped too, is compared with a second opinion written inside the test: the same exchange played out one capture at a time on a copy of the board, the slow and obvious way.
@@ -205,6 +218,9 @@ Against `baseline-2026-11-18`:
 | Date | Version | Bench | Games | Elo vs baseline |
 |---|---|---|---|---|
 | 2026-11-18 | `baseline-2026-11-18` | 440084 | | 0 (by definition) |
+| 2026-11-19 | `a842578` (a soft time limit, a 16-byte table entry and so twice the entries, late move pruning, quiescence never starting from a position in check; one thread) | 265768 | 2000 | +127.2 ± 12.2 (978 wins, 277 losses, 745 draws) |
+
+The SPRTs that let those four changes in showed about +109, +43, +69 and +8, which add up to far more than +127. That is what "don't read the gap off an SPRT" above means in practice: a test that stops when the score looks convincing reports a figure on the high side, and the fixed-length match is the one to believe.
 
 Against `baseline-2026-11` (closed: the last row is the version the second tag marks):
 
