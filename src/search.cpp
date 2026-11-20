@@ -290,8 +290,6 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
         }
     }
 
-    // Using principal variation search
-    int foundPV = false;
     int skipQuiets = false; // set once late move pruning has given up on this node's quiet moves
 
     // for each move generated
@@ -335,9 +333,10 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
         }
         // if it does (or it wasn't reduced), search it at full depth
         if (score > alpha) {
-            // negamax, so flip it all. Also using principal variation search!
-            // TODO: PVS may be detrimental...
-            if (foundPV == true) {
+            // negamax, so flip it all. Principal variation search: only the first move gets the full window.
+            // Each later one is first asked just 'do you beat alpha?', which is far cheaper, & is searched
+            // again in full only if it does & there's room between alpha & beta for an exact score
+            if (legal > 1) {
                 score = -alphaBeta(-alpha - 1, -alpha, depth-1, board, info, table, true);
                 if (score > alpha && score < beta) {
                     score = -alphaBeta(-beta, -alpha, depth-1, board, info, table, true);
@@ -376,8 +375,7 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
                     storeHashEntry(board, table,  bestMove, beta, HF_BETA, depth);
                     return beta;
                 }
-                foundPV = true;
-                alpha = score;       // otherwise, update score and bestMove
+                alpha = score;      // otherwise, update score and bestMove
                 bestMove = moveList.moves[moveNum].move;
                 if (!board.ply) {
                     board.rootMove = bestMove;
