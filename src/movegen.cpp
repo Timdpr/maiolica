@@ -13,6 +13,7 @@ static int mVVLVAScores[13][13];
  * - Captures -> MvvLVA (most valuable victim, least valuable attacker) (so P takes Q descending to Q takes P)
  * - Killers (non-capturing)
  * - HistoryScore (non-capturing)
+ * - Captures that lose material (the main search marks them down as they come up: see pickNextMoveLosersLast)
  */
 
 /// Use this array to loop through slide pieces for a side. Start at index given by slideLoopStartIndex[SIDE], and stop at '0'.
@@ -64,7 +65,7 @@ static void addCaptureMove(const Board& board, int move, MoveList& moveList) {
     ASSERT(squareOnBoard(GET_TO(move)))
     ASSERT(pieceValid(GET_CAPTURED(move)))
     moveList.moves[moveList.count].move = move;
-    moveList.moves[moveList.count].score = mVVLVAScores[GET_CAPTURED(move)][board.pieces[GET_FROM(move)]] + 1000000; // +1m makes sure these are searched first
+    moveList.moves[moveList.count].score = mVVLVAScores[GET_CAPTURED(move)][board.pieces[GET_FROM(move)]] + SCORE_CAPTURE; // +1m makes sure these are searched first
     moveList.count++;
 }
 
@@ -73,7 +74,7 @@ static void addEnPassantMove(const Board& board, int move, MoveList& moveList) {
     ASSERT(squareOnBoard(GET_FROM(move)))
     ASSERT(squareOnBoard(GET_TO(move)))
     moveList.moves[moveList.count].move = move;
-    moveList.moves[moveList.count].score = 105 + 1000000; // effectively pawn takes pawn. +1m makes sure these are searched first
+    moveList.moves[moveList.count].score = 105 + SCORE_CAPTURE; // effectively pawn takes pawn. +1m makes sure these are searched first
     moveList.count++;
 }
 

@@ -83,6 +83,11 @@ struct MoveList {
     int count;
 };
 
+// Move scores: the table's move gets the first, a capture the second plus its MVV-LVA score. So a score from
+// SCORE_CAPTURE up to SCORE_TABLE_MOVE is a capture. Killers & history scores are all below (see movegen.cpp)
+constexpr int SCORE_TABLE_MOVE = 2000000;
+constexpr int SCORE_CAPTURE = 1000000;
+
 /// Transposition table entry: two 64-bit words. The key is kept xored with the data, so an entry whose
 /// two words come from different writes fails the key test, & is treated as not there
 struct HashEntry {

@@ -40,6 +40,22 @@ static void pickNextMove(int moveNum, MoveList& moveList) {
     moveList.moves[bestMoveNum] = tempMove;
 }
 
+/// As pickNextMove, for the main search, where captures that lose material are to be tried last. A capture that comes
+/// up as the best move left is put to the static exchange evaluation first. If it loses (queen takes a defended pawn)
+/// it is marked down to below every quiet move & the pick is made again. The table's move isn't asked.
+/// Returns how many captures were put back like that
+static int pickNextMoveLosersLast(const Board& board, int moveNum, MoveList& moveList) {
+    int putBack = 0;
+    pickNextMove(moveNum, moveList);
+    Move& picked = moveList.moves[moveNum];
+    while (picked.score >= SCORE_CAPTURE && picked.score < SCORE_TABLE_MOVE && !seeAtLeast(board, picked.move, 0)) {
+        picked.score -= SCORE_TABLE_MOVE; // history scores stop at -HISTORY_MAX. This is far below
+        putBack++;
+        pickNextMove(moveNum, moveList);
+    }
+    return putBack;
+}
+
 int isRepetition(const Board& board) {
     // start at current ply minus how long since the fifty move rule was reset, and look at hash keys
     for (int i = std::max(0, board.historyPly - board.fiftyMove); i < board.historyPly-1; ++i) { // the fen's clock can predate our history // todo: quicker way to do this in yt comments?
@@ -285,7 +301,7 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
     if (pvMove != NO_MOVE) { // if we have a principal variation move
         for (int moveNum = 0; moveNum < moveList.count; ++moveNum) {
             if (moveList.moves[moveNum].move == pvMove) { // if pv move is in our move list
-                moveList.moves[moveNum].score = 2000000; // give it a big score in our list so it is searched first!
+                moveList.moves[moveNum].score = SCORE_TABLE_MOVE; // give it a big score in our list so it is searched first!
             }
         }
     }
@@ -293,19 +309,21 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
     // Using principal variation search
     int foundPV = false;
     int skipQuiets = false; // set once late move pruning has given up on this node's quiet moves
+    int putBack = 0; // how many losing captures have been sent to the back of the queue so far
 
     // for each move generated
     for (int moveNum = 0; moveNum < moveList.count; ++moveNum) {
-        // order the moves. Once the quiet moves are being skipped there's no need: captures all come before them,
-        // so the only moves left that aren't skipped are promotions without a capture
+        // order the moves, captures that lose material last. Once the quiet moves are being skipped there's no need:
+        // the only moves left that aren't skipped are those losing captures & promotions without a capture
         if (!skipQuiets) {
-            pickNextMove(moveNum, moveList);
+            putBack += pickNextMoveLosersLast(board, moveNum, moveList);
         }
         int move = moveList.moves[moveNum].move;
-        if (skipQuiets && !(move & MFLAG_PROMOTION)) {
-            ASSERT(!(move & MFLAG_CAPTURING))
+        if (skipQuiets && !(move & (MFLAG_CAPTURING | MFLAG_PROMOTION))) {
             continue;
         }
+        // (every capture still in the list by then has been marked down: the others all came before the quiet moves)
+        ASSERT(!skipQuiets || !(move & MFLAG_CAPTURING) || moveList.moves[moveNum].score < 0)
         // a late move reduction is for quiet moves (no capture, no promotion) that aren't killers at this ply
         int reducible = !(move & (MFLAG_CAPTURING | MFLAG_PROMOTION))
                         && move != board.searchKillers[0][board.ply] && move != board.searchKillers[1][board.ply];
@@ -327,9 +345,12 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
         // Late move reduction: moves are ordered best first, so a late quiet move is rarely any good.
         // Look at it a ply or more shallower, just to ask 'does it beat alpha?'. Not when in check, or giving check
         score = alpha + 1; // anything not reduced goes straight to the full search below
-        if (reducible && legal > LMR_FULL_MOVES && depth >= LMR_MIN_DEPTH && !inCheck && !isInCheck(board)) {
+        // How late a move is counts the losing captures that were put back as well as the moves searched. Else every
+        // quiet move would count as that much earlier, & fewer would be reduced, & by less
+        int lateness = legal + putBack;
+        if (reducible && lateness > LMR_FULL_MOVES && depth >= LMR_MIN_DEPTH && !inCheck && !isInCheck(board)) {
             // by more for the later moves & at higher depths, but always leaving a ply to search
-            int reduction = lmrReductions[std::min(depth, MAX_DEPTH - 1)][std::min(legal, LMR_MAX_MOVES - 1)];
+            int reduction = lmrReductions[std::min(depth, MAX_DEPTH - 1)][std::min(lateness, LMR_MAX_MOVES - 1)];
             reduction = std::min(reduction, depth - 2);
             score = -alphaBeta(-alpha - 1, -alpha, depth-1-reduction, board, info, table, true);
         }
