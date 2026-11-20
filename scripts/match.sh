@@ -12,10 +12,14 @@
 # however busy the machine is, but is blind to speed & time management. It doesn't replace the timed test.
 # THREADS=<n> gives dev that many search threads (base keeps one), to test the threads themselves. Fewer games
 # are then played at once, so that no more than 6 threads are ever busy: 3 for two threads, 1 for four.
+# BASE_THREADS=<n> gives base threads too: THREADS=4 BASE_THREADS=4 tests a change with four threads a side.
+# HASH=<MB> is both engines' table size, 16 unless given. A bigger search wants a bigger table (64 for four threads
+# a side), & a small one puts the table under pressure on purpose. Leave it alone for a baseline match.
 # Ctrl-C pauses a match: the games that have finished are kept, & RESUME=<its folder> scripts/match.sh
 # carries on from there, with the same engines, openings & settings (no other arguments needed).
 # env overrides: FASTCHESS, BOOK, MATCHES, CONCURRENCY, SEED (same seed, same openings), GAMES (elo only),
-#                CAP (gain & nonreg only), NODES (in place of a time control), THREADS (dev's search threads)
+#                CAP (gain & nonreg only), NODES (in place of a time control), THREADS (dev's search threads),
+#                BASE_THREADS (base's), HASH (MB, both engines)
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -29,9 +33,14 @@ BOOK=${BOOK:-$MAIN/books/8moves_v3.pgn}
 MATCHES=${MATCHES:-$MAIN/matches}
 THREADS=${THREADS:-}   # dev's Threads option. Unset, neither engine is given one
 [[ -z $THREADS || $THREADS =~ ^[1-9][0-9]*$ ]] || { echo "THREADS must be a number of threads, got '$THREADS'" >&2; exit 1; }
-# M1 Pro has 8 P-cores; leave a bit of headroom. Only one side thinks at a time, so a game keeps dev's threads busy at most
+BASE_THREADS=${BASE_THREADS:-}   # base's Threads option. Unset, base isn't given one
+[[ -z $BASE_THREADS || $BASE_THREADS =~ ^[1-9][0-9]*$ ]] || { echo "BASE_THREADS must be a number of threads, got '$BASE_THREADS'" >&2; exit 1; }
+HASH=${HASH:-16}   # both engines' Hash option, in MB
+[[ $HASH =~ ^[1-9][0-9]*$ ]] || { echo "HASH must be a number of megabytes, got '$HASH'" >&2; exit 1; }
+# M1 Pro has 8 P-cores; leave a bit of headroom. Only one side thinks at a time, so a game keeps the bigger side's threads busy at most
 BUSY=6
-CONCURRENCY=${CONCURRENCY:-$(( THREADS > BUSY ? 1 : BUSY / ${THREADS:-1} ))}
+MOST=$(( ${THREADS:-1} > ${BASE_THREADS:-1} ? ${THREADS:-1} : ${BASE_THREADS:-1} ))
+CONCURRENCY=${CONCURRENCY:-$(( MOST > BUSY ? 1 : BUSY / MOST ))}
 SEED=${SEED:-$(( (RANDOM << 15) | RANDOM ))}   # picks the openings; recorded so a match can be repeated
 GAMES=${GAMES:-2000}
 CAP=${CAP:-}   # gain & nonreg: give up waiting for a verdict after this many games
@@ -40,7 +49,7 @@ NODES=${NODES:-}   # every move searches this many nodes, & there is no clock
 [[ -z $NODES || $NODES =~ ^[1-9][0-9]*$ ]] || { echo "NODES must be a number of nodes a move, got '$NODES'" >&2; exit 1; }
 [[ -z $NODES || $# -lt 3 ]] || { echo "NODES takes the place of the time control: give one or the other" >&2; exit 1; }
 # with threads the same number of nodes isn't the same search twice, nor shared out the same way
-[[ -z $NODES || -z $THREADS ]] || { echo "NODES can't be used with THREADS: threads need the timed test" >&2; exit 1; }
+[[ -z $NODES || -z $THREADS$BASE_THREADS ]] || { echo "NODES can't be used with THREADS or BASE_THREADS: threads need the timed test" >&2; exit 1; }
 if [[ -n $NODES ]]; then
     LIMIT="nodes=$NODES" LIMIT_NAME=limit LIMIT_DESC="$NODES nodes a move"
 else
@@ -63,6 +72,9 @@ if [[ -n $RESUME ]]; then
     GAMES=$(sed -n 's/^mode: elo (\([0-9]*\) games.*/\1/p' "$INFO")
     WHAT=$(sed -n 's/^what: //p' "$INFO")
     THREADS=$(sed -n 's/^threads: dev \([0-9]*\),.*/\1/p' "$INFO")
+    BASE_THREADS=$(sed -n 's/^threads: dev [0-9]*, base \([0-9]*\),.*/\1/p' "$INFO")
+    HASH=$(sed -n 's/^hash: \([0-9]*\) MB$/\1/p' "$INFO")
+    HASH=${HASH:-16}   # only written down when it isn't 16
     NODES=$([[ $LIMIT_DESC != *"nodes a move" ]] || echo "${LIMIT_DESC%% *}")
 fi
 
@@ -141,7 +153,8 @@ if [[ -z $RESUME ]]; then
       echo "base: $BASE_REF ($BASE_SHA)"
       echo "mode: $MODE ($DESC), $LIMIT_NAME: $LIMIT_DESC, book: $BOOK"
       echo "seed: $SEED"
-      [[ -z $THREADS ]] || echo "threads: dev $THREADS, base 1, $CONCURRENCY games at once"
+      [[ -z $THREADS$BASE_THREADS ]] || echo "threads: dev ${THREADS:-1}, base ${BASE_THREADS:-1}, $CONCURRENCY games at once"
+      [[ $HASH == 16 ]] || echo "hash: $HASH MB"
       [[ -z ${WHAT:-} ]] || echo "what: $WHAT"
       [[ -z ${CAPNOTE:-} ]] || echo "$CAPNOTE"
       echo "fastchess: $("$FASTCHESS" --version | sed 's/^fastchess //')"
@@ -158,8 +171,8 @@ fi
 # still gets written up, as 'paused' (it's asked for the score after every pair, so there's always a recent one)
 if [[ -z $RESUME ]]; then
     ARGS=(-engine cmd="$OUT/dev" name=dev ${THREADS:+option.Threads=$THREADS}
-          -engine cmd="$OUT/base" name=base
-          -each "$LIMIT" option.Hash=16
+          -engine cmd="$OUT/base" name=base ${BASE_THREADS:+option.Threads=$BASE_THREADS}
+          -each "$LIMIT" option.Hash="$HASH"
           -openings file="$BOOK" format="${BOOK##*.}" order=random -srand "$SEED"
           -games 2 -repeat $LENGTH -concurrency "$CONCURRENCY"
           -pgnout file="$OUT/games.pgn"
@@ -255,9 +268,16 @@ elif [[ $VERDICT == unfinished* ]]; then
     VERDICT="capped at ${CAP:-20000} games (LLR $LLR)"
 fi
 [[ -z $ODD ]] || VERDICT="$VERDICT, but not every game ended normally"
+# the threads, as the row says them: nothing when neither was set, "dev 4 threads" against one, "4 threads a side" when level
+SIDES=${THREADS:+, dev $THREADS threads}
+if [[ -n $BASE_THREADS && ${THREADS:-1} == "$BASE_THREADS" ]]; then
+    SIDES=", $BASE_THREADS threads a side"
+elif [[ -n $BASE_THREADS ]]; then
+    SIDES=", dev ${THREADS:-1} threads, base $BASE_THREADS"
+fi
 [[ -z $(tail -c 1 "$README") ]] || echo >> "$README"   # the last row might lack its newline
 grep -vF "\`$NAME\`" "$README" > "$README.tmp" && mv "$README.tmp" "$README"   # a resumed match keeps its one row
-echo "| ${NAME:0:4}-${NAME:4:2}-${NAME:6:2} | ${WHAT:-} | \`$DEV_SHA\` | \`$BASE_SHA\` | $MODE$BOUNDS | $LIMIT_DESC, Hash 16${THREADS:+, dev $THREADS threads} | $SCORE | $ELO | $VERDICT | \`$NAME\` |" >> "$README"
+echo "| ${NAME:0:4}-${NAME:4:2}-${NAME:6:2} | ${WHAT:-} | \`$DEV_SHA\` | \`$BASE_SHA\` | $MODE$BOUNDS | $LIMIT_DESC, Hash $HASH$SIDES | $SCORE | $ELO | $VERDICT | \`$NAME\` |" >> "$README"
 echo "results are in $OUT"
 
 if [[ -n $ODD ]]; then
