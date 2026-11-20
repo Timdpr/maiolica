@@ -171,8 +171,11 @@ constexpr int FUTILITY_MARGIN_PER_DEPTH = 125;
 constexpr int LMP_BASE = 3;
 
 // Exchange pruning: a capture is skipped when the static exchange evaluation says it loses more than this for each ply
-// of depth left: anything at all at depth 1, a piece for a pawn at depth 2, a rook for a pawn at depth 4, & so on
+// of depth left: anything at all at depth 1, a piece for a pawn at depth 2, a rook for a pawn at depth 4, & so on.
+// A quiet move, which can only lose what it puts where it can be taken, gets half the margin, this close to the leaves
 constexpr int SEE_CAPTURE_MARGIN = 100;
+constexpr int SEE_QUIET_MARGIN = 50;
+constexpr int SEE_QUIET_MAX_DEPTH = 10;
 
 // Aspiration windows: from this depth on, the root is searched within this much of the last depth's score
 constexpr int ASPIRATION_MIN_DEPTH = 4;
@@ -323,10 +326,12 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
             skipQuiets = true;
             continue;
         }
-        // Exchange pruning: a capture that gives up more material than there is depth left to show why (queen takes a
-        // defended pawn, two plies from the end) isn't made. Like late move pruning, not while every move so far gets mated
-        if (canPrune && bestScore > -IS_MATE && (move & (MFLAG_CAPTURING | MFLAG_PROMOTION))
-            && !seeAtLeast(board, move, -SEE_CAPTURE_MARGIN * depth)) {
+        // Exchange pruning: a move that gives up more material than there is depth left to show why (queen takes a
+        // defended pawn, or a knight steps where a pawn takes it, two plies from the end) isn't made. Like late move
+        // pruning, not while every move so far gets mated
+        int quiet = !(move & (MFLAG_CAPTURING | MFLAG_PROMOTION));
+        if (canPrune && bestScore > -IS_MATE && (!quiet || depth <= SEE_QUIET_MAX_DEPTH)
+            && !seeAtLeast(board, move, -(quiet ? SEE_QUIET_MARGIN : SEE_CAPTURE_MARGIN) * depth)) {
             continue;
         }
         // skip if it is not legal
