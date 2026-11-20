@@ -13,6 +13,7 @@ Each kind of claim has its own tool. Use the one that matches what a change clai
 | "The protocol still works" | scripted sessions behave | `ctest` (`uci`, `fen`) |
 | "Several threads still work" | forced results at 1 to 8 threads, and no report from the thread sanitiser | `ctest` (`threads`), `ctest --preset tsan` |
 | "N threads are stronger than one" | a match with dev on N threads | `THREADS=N scripts/match.sh` |
+| "Stronger with four threads a side" | a match with both sides on four threads and a 64MB table | `THREADS=4 BASE_THREADS=4 HASH=64 scripts/match.sh` |
 
 `ctest --preset release` runs perft smoke and quick, `fen`, `search`, `threads`, `eval`, `see`, `uci`, `replay`, `console`, `console_typo` (a mistyped move is refused, not guessed at), `console_time` (a move given a set time uses it) and the bench signature (~15s). `replay` plays `tests/replay_test.pgn` (both castles, promotions, underpromotion, disambiguation, en passant, annotation codes like `$1`, a FEN start) through the san reader. The debug, asan and tsan presets run perft smoke, `fen`, `search`, `threads`, `eval` and `see`.
 
@@ -27,6 +28,7 @@ For more than one thread, the tests check things that must be true however the t
 - **`ctest --preset tsan`** runs the smoke tests in a build with the thread sanitiser, which watches every memory access and reports any place where two threads touch the same memory without it being atomic. One report fails the test (`halt_on_error`). CI runs it on Linux. The whole uci test can be run against that build too: see "Protocol" below.
 - **Speed with threads** is time to depth: how long the same positions take to reach the same depth. `scripts/ab.sh` can't measure it (it runs `bench`, which is one thread).
 - **Strength with threads** is a match: `THREADS=2 scripts/match.sh master gain`. See "Strength" below.
+- **A change judged at four threads** is a match with four a side: `THREADS=4 BASE_THREADS=4 HASH=64 scripts/match.sh master gain`. See "Four threads a side" under "Strength".
 
 What the threads measured when they went in (Nov 2026, M1 Pro, 8+0.08, Hash 16; the version with threads, `b8293f2`, against the one before it, `3e588e9`, which always has one):
 
@@ -119,6 +121,7 @@ scripts/match.sh <ref> elo       # 2000 games, no SPRT: how big is the gap?
 CAP=2000 scripts/match.sh master nonreg   # the same SPRT, but stop at 2000 games if it still hasn't decided
 NODES=30000 scripts/match.sh master nonreg   # a quick first look, with no clock: every move searches 30,000 nodes
 THREADS=2 CAP=2000 scripts/match.sh master gain   # dev on two search threads against base on one
+THREADS=4 BASE_THREADS=4 HASH=64 CAP=2000 scripts/match.sh master gain   # four threads a side, with a 64MB table
 ```
 The script builds the working tree ("dev") and the given ref ("base"). It plays 8+0.08 games (8 seconds each, plus 0.08 a move) with Hash 16, from `books/8moves_v3.pgn`, in pairs with colours swapped, 6 at a time.
 
@@ -127,6 +130,8 @@ The script builds the working tree ("dev") and the given ref ("base"). It plays 
 - **`CAP=<games>`** puts an upper limit on a `gain` or `nonreg` run. Decide on one before starting: see "How long an SPRT takes" below. Without one the script says so in `info.txt`.
 - **`NODES=<n>`** takes the clock away and gives every move the same number of nodes instead. It is a quick first look, not a verdict: see "A quick look at fixed nodes" below.
 - **`THREADS=<n>`** sets dev's `Threads` option; base keeps its one thread. It is for testing the threads themselves, so the base should be a version with the same search. Only one side thinks at a time, so a game keeps at most n threads busy, and the script plays fewer games at once to keep that under six in all: 3 games for two threads (about 8 games a minute at 8+0.08, so 2,000 take about 4 hours), 1 for four (under 3 a minute). `CONCURRENCY` overrides it. More busy threads than fast cores hurts the side with more threads most, so a crowded machine makes the gain read low. The thread count goes into `info.txt` and the results table. It can't be combined with `NODES`. Without it neither engine is given the option, and both search with one thread.
+- **`BASE_THREADS=<n>`** sets base's `Threads` option too, so a change can be tested with several threads on both sides. The games played at once follow the side with more threads. The row in the results table reads "4 threads a side" when the two are level. Base must be a version that has the option.
+- **`HASH=<MB>`** is the table size given to both engines; 16 unless set. It goes into `info.txt` and the results table. See "Four threads a side" below for when to change it.
 - **Seed:** the openings are drawn from the book at random. The seed is printed and saved in `info.txt`, and `SEED=<n> scripts/match.sh ...` replays a match with the same openings in the same order.
 - **Terminations:** when the match finishes, the script counts how the games ended. Anything other than `normal` (a time forfeit, an illegal move, a crash, a disconnect) makes it exit non-zero, because that result wasn't decided on the board.
 - **A stale base:** `master` here is your local copy of the branch, which only moves when you pull. The script fetches first, and if the base branch is behind its remote copy it says so on screen and in `info.txt`. Using `origin/master` as the base avoids the question.
@@ -135,6 +140,24 @@ The script builds the working tree ("dev") and the given ref ("base"). It plays 
 - **Pausing:** Ctrl-C pauses a match. Every finished game is kept; the few in progress are dropped. The row in the table says `paused at N games`, and the script prints the command that carries on: `RESUME=<folder> scripts/match.sh`. That takes no other arguments, since the engines, openings, settings and score so far are read back from the folder. The dropped games are played again from their openings, and the match runs to the length it was started with, so a paused match is not a shortened one. Checked with a 200-game fixed-node match paused twice: it ended with the same games as the one played straight through. `games.pgn` can hold one game twice, if it finished at the moment of the pause; the score counts it once.
 - **A cap:** a run that reaches its `CAP` says `capped at N games`, with the LLR it had got to.
 - **No adjudication:** games are played out to mate or a draw by the rules. Ending them early on the engines' own scores (resigning at -6.00, calling a draw when both sides sit near 0.00) was simulated on 790 real games: it would have got 17 to 20 results wrong, for 5 to 12% fewer moves played.
+
+### Four threads a side
+A change to the search is tested with one thread a side, as above: it is several times quicker, and what makes one thread search better makes four search better. A change to what the threads share (the table, or how the threads work together) is tested with four a side:
+```sh
+THREADS=4 BASE_THREADS=4 HASH=64 CAP=2000 scripts/match.sh master gain
+```
+- **Why 64MB.** A table should grow with the search that fills it. Four threads search about four times the positions of one, so 64MB puts the table under the pressure 16MB has with one thread: a move at 8+0.08 rewrites about 5% of it either way. It is also the engine's default, and what Stockfish's and OpenBench's short tests with several threads use.
+- **How long.** One game at a time, about 2.5 games a minute: 300 games take two hours and 2,000 take thirteen.
+- **A change to the table's shape gets a second match at `HASH=8`.** At 64MB and 8+0.08 the table is nowhere near full, so a better way of filling it has nothing to show. With four threads and a second or more a move, 64MB is rewritten by a third or more every move; 8MB at 8+0.08 is under about that pressure (43% a move, measured the same way as the table below), at the price of a fast game.
+
+How much of the table one move rewrites (Nov 2026, M1 Pro, eight middlegame positions, an empty table, read from `hashfull`):
+
+| | 16MB | 64MB | 256MB |
+|---|---|---|---|
+| 1 thread, 0.18 s (a move at 8+0.08) | 5.6% | 1.6% | 0.4% |
+| 4 threads, 0.18 s | 18.8% | 4.9% | 1.4% |
+| 1 thread, 1.4 s (a move at about 60+0.6) | 46.8% | 14.5% | 3.6% |
+| 4 threads, 1.4 s | 85.8% | 36.5% | 12.5% |
 
 ### How long an SPRT takes, and when to cap it
 An SPRT has no fixed length. It is quick when the change is clearly on one side of its two bounds, and slow when the truth lies between them. Expected lengths at our usual 16 games a minute, worked out from the spread of scores in our own games (estimates, not promises: a single run can take half or twice as long):
@@ -207,7 +230,7 @@ The second tag was made when the engine was taking 90% of the points against the
 
 To place a later version on the first baseline's scale, add its figure to +387. That sum is rough: Elo gaps measured against different opponents don't add up exactly, and both margins come along.
 
-The conditions never change, so that results stay comparable: 8+0.08, Hash 16, `books/8moves_v3.pgn`, 6 games at once, no adjudication. These are the script's defaults, so don't override them for a baseline run.
+The conditions never change, so that results stay comparable: 8+0.08, Hash 16, `books/8moves_v3.pgn`, 6 games at once, no adjudication. These are the script's defaults, so don't override them for a baseline run (`HASH`, `THREADS` and `BASE_THREADS` included).
 
 The routine:
 1. Every change to the engine gets an SPRT against the previous master: `scripts/match.sh master gain` (or `nonreg`).
