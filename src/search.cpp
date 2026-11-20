@@ -213,6 +213,17 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
         return evalPosition(board);
     }
 
+    // Mate distance pruning: the best this position can do is give mate with its next move, & the worst is to be
+    // mated already. If a quicker mate than that is in hand elsewhere (alpha is above the one, or beta below the
+    // other), nothing found here can change the result. Without it a forced mate makes every depth cost ten times the last
+    if (board.ply) {
+        alpha = std::max(alpha, -ALPHABETA_BOUND + board.ply);
+        beta = std::min(beta, ALPHABETA_BOUND - board.ply - 1);
+        if (alpha >= beta) {
+            return alpha;
+        }
+    }
+
     // increase depth if we are in check!
     int inCheck = isInCheck(board); // are we in check? (makeMove wants to know too, so it's remembered)
     if (inCheck == true) {
