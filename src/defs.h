@@ -30,6 +30,7 @@ constexpr const char *START_FEN = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w
 constexpr int INF_BOUND = 32000;
 constexpr int ALPHABETA_BOUND = 30000;
 constexpr int IS_MATE = ALPHABETA_BOUND - MAX_DEPTH;
+constexpr int NO_EVAL = -INF_BOUND; // stands in for the static eval of a position in check, which hasn't one
 
 using U64 = std::uint64_t;
 using TimeMS = std::chrono::milliseconds::rep;
@@ -137,6 +138,7 @@ struct Board {
 
     int searchHistory[13][BRD_SQ_NUM]; // indexed by piece type and board square
     int searchKillers[2][MAX_DEPTH]; // indexed by 2 killer moves, by depth
+    int staticEvals[MAX_DEPTH]; // the static eval of each position on the line being searched, by ply. NO_EVAL in check
 
     // what the search on this board has done so far. They are here, not in SearchInfo, as each search thread
     // has a board of its own & nothing it writes at every node is shared
