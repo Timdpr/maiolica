@@ -304,6 +304,15 @@ void generateAllMoves(const Board& board, MoveList& moveList) {
     }
 }
 
+/// Adds a pawn's step on to the last rank to become a queen, taking nothing, to the list of captures: it wins about
+/// what taking a queen wins, so that is how it is sorted
+static void addQueeningMove(int move, MoveList& moveList) {
+    moveList.moves[moveList.count].move = move;
+    moveList.moves[moveList.count].score = mVVLVAScores[wQ][wP] + 1000000;
+    moveList.count++;
+}
+
+/// Every capture, & a pawn queening without one: the moves quiescence tries
 void generateAllCaptureMoves(const Board& board, MoveList& moveList) {
     ASSERT(checkBoard(board))
 
@@ -317,6 +326,10 @@ void generateAllCaptureMoves(const Board& board, MoveList& moveList) {
         for (int pieceNum = 0; pieceNum < board.pieceCounts[wP]; ++pieceNum) {
             int square = board.pieceList[wP][pieceNum];
             ASSERT(squareOnBoard(square))
+            // a pawn that can queen by stepping forward (the other three promotions wait for the main search)
+            if (ranksBoard[square] == RANK_7 && board.pieces[square + 10] == EMPTY) {
+                addQueeningMove(MOVE(square, square + 10, EMPTY, wQ, 0), moveList);
+            }
             // generate CAPTURE moves for it
             // (if square ahead and to the right/left is not offboard and has a black piece, add capture move):
             if (!SQUARE_OFFBOARD(square+9) && pieceColours[board.pieces[square + 9]] == BLACK) {
@@ -339,6 +352,9 @@ void generateAllCaptureMoves(const Board& board, MoveList& moveList) {
         for (int pieceNum = 0; pieceNum < board.pieceCounts[bP]; ++pieceNum) { // loop through black pawns
             int square = board.pieceList[bP][pieceNum];
             ASSERT(squareOnBoard(square))
+            if (ranksBoard[square] == RANK_2 && board.pieces[square - 10] == EMPTY) { // queening
+                addQueeningMove(MOVE(square, square - 10, EMPTY, bQ, 0), moveList);
+            }
             // CAPTURE moves:
             if (!SQUARE_OFFBOARD(square-9) && pieceColours[board.pieces[square - 9]] == WHITE) {
                 addBlackPawnCaptureMove(board, square, square-9, board.pieces[square-9], moveList);

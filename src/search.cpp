@@ -106,12 +106,13 @@ static int quiescence(int alpha, int beta, Board& board, SearchInfo& info) {
     }
 
     MoveList moveList;
-    generateAllCaptureMoves(board, moveList); // note - only capture moves!
+    generateAllCaptureMoves(board, moveList); // captures, & a pawn queening without one. Nothing else!
 
     for (int moveNum = 0; moveNum < moveList.count; ++moveNum) {
         // order the moves
         pickNextMove(moveNum, moveList);
-        // a capture that loses material once the other side has taken back (queen takes a defended pawn) isn't tried
+        // a capture that loses material once the other side has taken back (queen takes a defended pawn) isn't tried,
+        // nor a pawn queening on a square where the new queen is simply taken
         if (!seeAtLeast(board, moveList.moves[moveNum].move, 0)) {
             continue;
         }
