@@ -90,6 +90,12 @@ target_link_libraries(eval_tests PRIVATE maiolica_core)
 add_test(NAME eval COMMAND eval_tests)
 set_tests_properties(eval PROPERTIES LABELS "smoke;quick")
 
+# static exchange evaluation: exchanges with known values, & every capture in some busy positions the long way
+add_executable(see_tests tests/see_tests.cpp)
+target_link_libraries(see_tests PRIVATE maiolica_core)
+add_test(NAME see COMMAND see_tests)
+set_tests_properties(see PROPERTIES LABELS "smoke;quick")
+
 add_test(NAME uci COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/uci_test.sh $<TARGET_FILE:maiolica>)
 set_tests_properties(uci PROPERTIES LABELS quick)
 
