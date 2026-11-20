@@ -173,6 +173,8 @@ constexpr int LMP_BASE = 3;
 // Aspiration windows: from this depth on, the root is searched within this much of the last depth's score
 constexpr int ASPIRATION_MIN_DEPTH = 4;
 constexpr int ASPIRATION_WINDOW = 50;
+// ...and after a score above that window (a fail high) the root is searched again this many plies shallower
+constexpr int ASPIRATION_FAIL_HIGH_REDUCTION = 1;
 
 // History scores stay within +-HISTORY_MAX, well below the killers
 constexpr int HISTORY_MAX = 16384;
@@ -445,17 +447,19 @@ static void deepen(Board& board, SearchInfo& info, HashTable& table, int& bestMo
             alpha = lastScore - step;
             beta = lastScore + step;
         }
+        int searchDepth = currentDepth;
         int bestScore;
         int pvArray[MAX_DEPTH];
         int pvMoves = 0;
         // if the score lands outside the window, search again with that side moved out, twice as far each time
         while (true) {
-            bestScore = alphaBeta(alpha, beta, currentDepth, board, info, table, true);
+            bestScore = alphaBeta(alpha, beta, searchDepth, board, info, table, true);
             if (info.stopped) { // Because we may have stopped partway through alphaBeta, we break here so the previous results are returned
                 break;
             }
             if (bestScore <= alpha && alpha > -ALPHABETA_BOUND) { // worse than expected. All we know is 'at most alpha'
                 alpha = std::max(alpha - step, -ALPHABETA_BOUND);
+                searchDepth = currentDepth; // & whatever went before, finding out how much worse wants the full depth
             } else {
                 // inside the window, or better than expected: either way the search has a move to play.
                 // The rest of the line is the table's
@@ -470,6 +474,10 @@ static void deepen(Board& board, SearchInfo& info, HashTable& table, int& bestMo
                     break;
                 }
                 beta = std::min(beta + step, ALPHABETA_BOUND);
+                // The move is known to be good now, & all that's wanted is its score, to aim the next depth with.
+                // A shallower search gives that for about half the work. One ply only, however often it fails high:
+                // beta just doubles its way out, so a big jump takes several tries & a mate takes ten
+                searchDepth = currentDepth - ASPIRATION_FAIL_HIGH_REDUCTION;
             }
             step *= 2;
         }
