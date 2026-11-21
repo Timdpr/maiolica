@@ -197,6 +197,23 @@ static void updateHistory(Board& board, int move, int bonus) {
     entry += bonus - entry * abs(bonus) / HISTORY_MAX; // the nearer the limit, the less it moves. So new results outweigh old ones
 }
 
+/// The table's move was searched by itself & didn't cut off, so now the others are wanted. Generate the whole
+/// list & put that move back at the front, where the move loop has just been
+static int generateTheRest(const Board& board, MoveList& moveList, int& tableMoveOnly) {
+    const int tableMove = moveList.moves[0].move;
+    generateAllMoves(board, moveList);
+    int found = 0;
+    while (found < moveList.count && moveList.moves[found].move != tableMove) {
+        ++found;
+    }
+    ASSERT(found < moveList.count) // movePlayable said it would be there
+    if (found < moveList.count) {
+        std::swap(moveList.moves[0], moveList.moves[found]);
+    }
+    tableMoveOnly = false;
+    return moveList.count > 1;
+}
+
 /// Negamax alpha-beta search...
 static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& info, HashTable& table, int nullMoveAllowed) {
     ASSERT(checkBoard(board))
@@ -281,8 +298,17 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
         }
     }
 
+    // The table's move goes first, & more often than not it cuts off. So it is searched before the others are even
+    // generated: the list starts as that one move (if it could be played here at all), & the rest join it only if needed
     MoveList moveList;
-    generateAllMoves(board, moveList);
+    int tableMoveOnly = pvMove != NO_MOVE && movePlayable(board, pvMove);
+    if (tableMoveOnly) {
+        moveList.moves[0].move = pvMove;
+        moveList.moves[0].score = 0;
+        moveList.count = 1;
+    } else {
+        generateAllMoves(board, moveList);
+    }
     int legal = 0;
     int oldAlpha = alpha;
     int bestMove = NO_MOVE;
@@ -290,20 +316,12 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
     int quietsTried[MAX_POSITION_MOVES]; // the non-captures searched so far that didn't cut off
     int quietCount = 0;
 
-    if (pvMove != NO_MOVE) { // if we have a principal variation move
-        for (int moveNum = 0; moveNum < moveList.count; ++moveNum) {
-            if (moveList.moves[moveNum].move == pvMove) { // if pv move is in our move list
-                moveList.moves[moveNum].score = 2000000; // give it a big score in our list so it is searched first!
-            }
-        }
-    }
-
     // Using principal variation search
     int foundPV = false;
     int skipQuiets = false; // set once late move pruning has given up on this node's quiet moves
 
     // for each move generated
-    for (int moveNum = 0; moveNum < moveList.count; ++moveNum) {
+    for (int moveNum = 0; moveNum < moveList.count || (tableMoveOnly && generateTheRest(board, moveList, tableMoveOnly)); ++moveNum) {
         // order the moves. Once the quiet moves are being skipped there's no need: captures all come before them,
         // so the only moves left that aren't skipped are promotions without a capture
         if (!skipQuiets) {
