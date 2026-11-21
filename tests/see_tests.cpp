@@ -33,6 +33,11 @@ static const struct { const char *name, *fen, *move; int value; } cases[] = {
     {"takes & queens", "3r4/4P3/8/8/8/8/8/k3K3 w - - 0 1", "e7d8q", 1450},
     {"takes & queens, king takes back", "2kr4/4P3/8/8/8/8/8/4K3 w - - 0 1", "e7d8q", 450},
     {"takes & knights, king takes back", "2kr4/4P3/8/8/8/8/8/4K3 w - - 0 1", "e7d8n", 450},
+    // ...& without taking anything: the search asks about these too, to sort a queening move
+    {"queens on a safe square", "8/4P3/8/8/8/8/8/k3K3 w - - 0 1", "e7e8q", 900},
+    {"queens where a rook takes it", "3r4/4P3/8/8/8/8/8/k3K3 w - - 0 1", "e7e8q", -100},
+    {"queens, rook takes, the rook behind the pawn takes back", "3r4/4P3/8/8/8/8/8/k3RK2 w - - 0 1", "e7e8q", 450},
+    {"queens where a rook takes it (black)", "K3k3/8/8/8/8/8/4p3/3R4 b - - 0 1", "e2e1q", -100},
     // kings: one takes only when nothing can take it back
     {"king takes a loose pawn", "4k3/8/8/8/8/8/4p3/4K3 w - - 0 1", "e1e2", 100},
     {"only the king defends", "8/8/8/8/3k4/3p4/8/3R2K1 w - - 0 1", "d1d3", -450},
