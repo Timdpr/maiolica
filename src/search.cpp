@@ -173,6 +173,8 @@ constexpr int LMP_BASE = 3;
 // Aspiration windows: from this depth on, the root is searched within this much of the last depth's score
 constexpr int ASPIRATION_MIN_DEPTH = 4;
 constexpr int ASPIRATION_WINDOW = 50;
+// ...and after a score above that window (a fail high) the root is searched again this many plies shallower
+constexpr int ASPIRATION_FAIL_HIGH_REDUCTION = 1;
 
 // History scores stay within +-HISTORY_MAX, well below the killers
 constexpr int HISTORY_MAX = 16384;
@@ -209,6 +211,17 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
     }
     if (board.ply > MAX_DEPTH - 1) { // at max depth allowed!
         return evalPosition(board);
+    }
+
+    // Mate distance pruning: the best this position can do is give mate with its next move, & the worst is to be
+    // mated already. If a quicker mate than that is in hand elsewhere (alpha is above the one, or beta below the
+    // other), nothing found here can change the result. Without it a forced mate makes every depth cost ten times the last
+    if (board.ply) {
+        alpha = std::max(alpha, -ALPHABETA_BOUND + board.ply);
+        beta = std::min(beta, ALPHABETA_BOUND - board.ply - 1);
+        if (alpha >= beta) {
+            return alpha;
+        }
     }
 
     // increase depth if we are in check!
@@ -259,7 +272,11 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
     int lateMoveLimit = nearLeaf && board.bigPieces[board.side] > 1 ? LMP_BASE + depth * depth : MAX_POSITION_MOVES;
 
     // if regular ab search was called AND not in check AND at least one move in AND do we have at least **1 big piece no including king** AND our depth is >= 4
-    if (nullMoveAllowed && !inCheck && board.ply && (board.bigPieces[board.side] > 1) && depth >= 4) {
+    // AND the static eval is at or above beta already. A position that looks worse than beta before giving a move
+    // away is hardly ever at or above it afterwards (1 time in 40), so there the null move search is wasted.
+    // AND not on the main line (beta - alpha > 1), where an exact score & a line are wanted, not a shortcut
+    if (nullMoveAllowed && !inCheck && board.ply && (board.bigPieces[board.side] > 1) && depth >= 4 && eval >= beta
+        && beta - alpha == 1) {
         // if so, we can make a null move
         makeNullMove(board);
         score = -alphaBeta(-beta, -beta+1, depth-4, board, info, table, false);
@@ -290,8 +307,6 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
         }
     }
 
-    // Using principal variation search
-    int foundPV = false;
     int skipQuiets = false; // set once late move pruning has given up on this node's quiet moves
 
     // for each move generated
@@ -335,9 +350,10 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
         }
         // if it does (or it wasn't reduced), search it at full depth
         if (score > alpha) {
-            // negamax, so flip it all. Also using principal variation search!
-            // TODO: PVS may be detrimental...
-            if (foundPV == true) {
+            // negamax, so flip it all. Principal variation search: only the first move gets the full window.
+            // Each later one is first asked just 'do you beat alpha?', which is far cheaper, & is searched
+            // again in full only if it does & there's room between alpha & beta for an exact score
+            if (legal > 1) {
                 score = -alphaBeta(-alpha - 1, -alpha, depth-1, board, info, table, true);
                 if (score > alpha && score < beta) {
                     score = -alphaBeta(-beta, -alpha, depth-1, board, info, table, true);
@@ -376,8 +392,7 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
                     storeHashEntry(board, table,  bestMove, beta, HF_BETA, depth);
                     return beta;
                 }
-                foundPV = true;
-                alpha = score;       // otherwise, update score and bestMove
+                alpha = score;      // otherwise, update score and bestMove
                 bestMove = moveList.moves[moveNum].move;
                 if (!board.ply) {
                     board.rootMove = bestMove;
@@ -447,17 +462,19 @@ static void deepen(Board& board, SearchInfo& info, HashTable& table, int& bestMo
             alpha = lastScore - step;
             beta = lastScore + step;
         }
+        int searchDepth = currentDepth;
         int bestScore;
         int pvArray[MAX_DEPTH];
         int pvMoves = 0;
         // if the score lands outside the window, search again with that side moved out, twice as far each time
         while (true) {
-            bestScore = alphaBeta(alpha, beta, currentDepth, board, info, table, true);
+            bestScore = alphaBeta(alpha, beta, searchDepth, board, info, table, true);
             if (info.stopped) { // Because we may have stopped partway through alphaBeta, we break here so the previous results are returned
                 break;
             }
             if (bestScore <= alpha && alpha > -ALPHABETA_BOUND) { // worse than expected. All we know is 'at most alpha'
                 alpha = std::max(alpha - step, -ALPHABETA_BOUND);
+                searchDepth = currentDepth; // & whatever went before, finding out how much worse wants the full depth
             } else {
                 // inside the window, or better than expected: either way the search has a move to play.
                 // The rest of the line is the table's
@@ -472,6 +489,10 @@ static void deepen(Board& board, SearchInfo& info, HashTable& table, int& bestMo
                     break;
                 }
                 beta = std::min(beta + step, ALPHABETA_BOUND);
+                // The move is known to be good now, & all that's wanted is its score, to aim the next depth with.
+                // A shallower search gives that for about half the work. One ply only, however often it fails high:
+                // beta just doubles its way out, so a big jump takes several tries & a mate takes ten
+                searchDepth = currentDepth - ASPIRATION_FAIL_HIGH_REDUCTION;
             }
             step *= 2;
         }
