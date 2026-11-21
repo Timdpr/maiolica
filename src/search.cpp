@@ -332,6 +332,8 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
         // a late move reduction is for quiet moves (no capture, no promotion) that aren't killers at this ply
         int reducible = !(move & (MFLAG_CAPTURING | MFLAG_PROMOTION))
                         && move != board.searchKillers[0][board.ply] && move != board.searchKillers[1][board.ply];
+        // ...& for a capture that loses material: one that was put back to the end of the queue, as its score shows
+        int losingCapture = (move & MFLAG_CAPTURING) && moveList.moves[moveNum].score < 0;
         // at a futile node, once one move has been searched, the quiet ones aren't worth making, let alone searching
         if (futile && legal > 0 && !(move & (MFLAG_CAPTURING | MFLAG_PROMOTION))) {
             continue;
@@ -347,13 +349,13 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
             continue;
         }
         legal++;
-        // Late move reduction: moves are ordered best first, so a late quiet move is rarely any good.
+        // Late move reduction: moves are ordered best first, so a late quiet move or a losing capture is rarely any good.
         // Look at it a ply or more shallower, just to ask 'does it beat alpha?'. Not when in check, or giving check
         score = alpha + 1; // anything not reduced goes straight to the full search below
         // How late a move is counts the losing captures that were put back as well as the moves searched. Else every
         // quiet move would count as that much earlier, & fewer would be reduced, & by less
         int lateness = legal + putBack;
-        if (reducible && lateness > LMR_FULL_MOVES && depth >= LMR_MIN_DEPTH && !inCheck && !isInCheck(board)) {
+        if ((reducible || losingCapture) && lateness > LMR_FULL_MOVES && depth >= LMR_MIN_DEPTH && !inCheck && !isInCheck(board)) {
             // by more for the later moves & at higher depths, but always leaving a ply to search
             int reduction = lmrReductions[std::min(depth, MAX_DEPTH - 1)][std::min(lateness, LMR_MAX_MOVES - 1)];
             reduction = std::min(reduction, depth - 2);
