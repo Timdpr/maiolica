@@ -44,7 +44,8 @@ static void pickNextMove(int moveNum, MoveList& moveList) {
 /// As pickNextMove, for the main search, where captures that lose material are to be tried last. A capture that comes
 /// up as the best move left is put to the static exchange evaluation first. If it loses (queen takes a defended pawn)
 /// it is marked down to below every quiet move & the pick is made again. The table's move isn't asked.
-/// Returns how many captures were put back like that
+/// A pawn queening without a capture is scored with the captures, so it is asked about too: is the new queen just lost?
+/// Returns how many moves were put back like that
 static int pickNextMoveLosersLast(const Board& board, int moveNum, MoveList& moveList) {
     int putBack = 0;
     pickNextMove(moveNum, moveList);

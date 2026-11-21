@@ -84,9 +84,11 @@ struct MoveList {
 };
 
 // Move scores: the table's move gets the first, a capture the second plus its MVV-LVA score. So a score from
-// SCORE_CAPTURE up to SCORE_TABLE_MOVE is a capture. Killers & history scores are all below (see movegen.cpp)
+// SCORE_CAPTURE up to SCORE_TABLE_MOVE is a capture or a pawn queening. Killers & history scores are all below
+// (see movegen.cpp)
 constexpr int SCORE_TABLE_MOVE = 2000000;
 constexpr int SCORE_CAPTURE = 1000000;
+constexpr int SCORE_QUEEN_PROMOTION = SCORE_CAPTURE + 600; // a pawn that queens without capturing: above pawn takes queen (505)
 
 /// Transposition table entry: two 64-bit words. The key is kept xored with the data, so an entry whose
 /// two words come from different writes fails the key test, & is treated as not there

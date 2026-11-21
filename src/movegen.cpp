@@ -10,10 +10,12 @@ static int mVVLVAScores[13][13];
  * Move ordering:
  * Search for...
  * - PV Move
+ * - A pawn queening without a capture
  * - Captures -> MvvLVA (most valuable victim, least valuable attacker) (so P takes Q descending to Q takes P)
  * - Killers (non-capturing)
  * - HistoryScore (non-capturing)
- * - Captures that lose material (the main search marks them down as they come up: see pickNextMoveLosersLast)
+ * - Captures that lose material, & queening where the queen is lost for nothing (the main search marks them down as
+ *   they come up: see pickNextMoveLosersLast)
  */
 
 /// Use this array to loop through slide pieces for a side. Start at index given by slideLoopStartIndex[SIDE], and stop at '0'.
@@ -101,6 +103,7 @@ static void addWhitePawnMove(const Board& board, const int from, const int to, M
     // if pawn starts on rank 7, then it will finish on rank 8, where it has to promote
     if (ranksBoard[from] == RANK_7) {
         addQuietMove(board, MOVE(from, to, EMPTY, wQ, 0), list);
+        list.moves[list.count - 1].score = SCORE_QUEEN_PROMOTION; // queening gains as much as any capture, so it goes ahead of them
         addQuietMove(board, MOVE(from, to, EMPTY, wR, 0), list);
         addQuietMove(board, MOVE(from, to, EMPTY, wB, 0), list);
         addQuietMove(board, MOVE(from, to, EMPTY, wN, 0), list);
@@ -132,6 +135,7 @@ static void addBlackPawnMove(const Board& board, const int from, const int to, M
     // if pawn starts on rank 2, then it will finish on rank 1, where it has to promote
     if (ranksBoard[from] == RANK_2) {
         addQuietMove(board, MOVE(from, to, EMPTY, bQ, 0), list);
+        list.moves[list.count - 1].score = SCORE_QUEEN_PROMOTION; // queening gains as much as any capture, so it goes ahead of them
         addQuietMove(board, MOVE(from, to, EMPTY, bR, 0), list);
         addQuietMove(board, MOVE(from, to, EMPTY, bB, 0), list);
         addQuietMove(board, MOVE(from, to, EMPTY, bN, 0), list);

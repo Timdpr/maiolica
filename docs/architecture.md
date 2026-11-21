@@ -30,7 +30,7 @@ C++20 UCI engine. Alpha-beta search on one thread by default, or several that sh
 | `tests/search_tests.cpp` | A short search of five positions (~200k nodes) for debug and sanitiser builds, where the `ASSERT`s in `makeMove`, `isInCheck` and `checkBoard` run inside it, plus a check that `probePonderMove` refuses a table move that isn't legal, a table entry stored and read back at the widest value of every field, and a planted root entry that mustn't be played; ctest `search` |
 | `tests/thread_tests.cpp` | The search at 1, 2, 4 and 8 threads: forced mates, legal moves, the node count, a node limit and a stop from another thread; ctest `threads` |
 | `tests/eval_tests.cpp` | Eval checks: colour symmetry, the pawnless draw, the king's two tables; ctest `eval` |
-| `tests/see_tests.cpp` | Static exchange evaluation: 23 captures with known values, then every capture in 14 positions against the exchange played out the long way; ctest `see` |
+| `tests/see_tests.cpp` | Static exchange evaluation: 27 moves with known values (23 captures, and four queen promotions without one), then every capture in 14 positions against the exchange played out the long way; ctest `see` |
 | `tests/bench_signature.txt` | Expected node total; ctest `bench_signature` greps `Nodes searched  : N` from `maiolica bench` |
 | `tests/microbench.cpp` | Optional Google Benchmark (`MAIOLICA_MICROBENCH=ON`, `microbench` preset): movegen, captures, make/undo, `isSquareAttacked`, eval. Indicative only; bench/perft decide |
 
@@ -78,15 +78,16 @@ Scores (set at generation; `alphaBeta` then sets the TT move to 2,000,000, `SCOR
 
 | Move | Score |
 |---|---|
+| Queen promotion without a capture | 1,000,600 (`SCORE_QUEEN_PROMOTION`): ahead of every capture (pawn takes queen is 1,000,505) |
 | Capture (incl. capture-promotion) | 1,000,000 (`SCORE_CAPTURE`) + `mVVLVAScores[victim][attacker]` = victimScore + 6 − attackerScore/100 (P..K = 100..600; PxQ 505, QxP 101) |
 | En passant | 1,000,105 (= PxP) |
 | Killer 0 / killer 1 at this ply | 900,000 / 800,000 |
-| Other quiet (incl. quiet promotion) | `searchHistory[piece][to]`, between −16,384 and 16,384 (`HISTORY_MAX`) |
-| Capture that loses material (main search only, once it has come up) | its capture score − 2,000,000, so about −1,000,000 |
+| Other quiet (incl. promotion to rook, bishop or knight without a capture) | `searchHistory[piece][to]`, between −16,384 and 16,384 (`HISTORY_MAX`) |
+| Capture that loses material, or queening where the queen is lost for nothing (main search only, once it has come up) | its score − 2,000,000, so about −1,000,000 |
 
 `pickNextMove` (search.cpp) is a selection step: scan from `moveNum` for strictly greater score (starting from the score at `moveNum`, since history scores can be negative), swap it into place. Ties go to the earliest index in the **current, already-swapped** list, so generation order, piece-list order and the swap pattern all decide tie-breaks (e.g. the four capture-promotions on one square score equal). **Any change to generation order, piece-list order, scores or the tie-break changes search node counts, so it changes the bench signature.**
 
-`alphaBeta` picks through `pickNextMoveLosersLast`, so that captures which lose material are tried after the quiet moves and not before them. When the best move left is a capture (a score from `SCORE_CAPTURE` up to `SCORE_TABLE_MOVE`), it is put to `seeAtLeast(board, move, 0)`. A capture that fails (queen takes a defended pawn) has 2,000,000 taken off its score, which puts it below every history score, and the pick is made again. So the exchange evaluation is only paid for captures that come up to be tried: a node that cuts off on its first move pays for one at most. The TT move is never asked. It returns how many captures it put back, which the late move reduction counts (step 8 of `alphaBeta`). Losing captures keep their MVV-LVA order among themselves. `quiescence` uses plain `pickNextMove` and skips losing captures outright.
+`alphaBeta` picks through `pickNextMoveLosersLast`, so that captures which lose material are tried after the quiet moves and not before them. When the best move left is a capture or a queen promotion without one (a score from `SCORE_CAPTURE` up to `SCORE_TABLE_MOVE`), it is put to `seeAtLeast(board, move, 0)`. One that fails (queen takes a defended pawn; a pawn queening where the queen is taken for nothing) has 2,000,000 taken off its score, which puts it below every history score, and the pick is made again. So the exchange evaluation is only paid for captures that come up to be tried: a node that cuts off on its first move pays for one at most. The TT move is never asked. It returns how many moves it put back, which the late move reduction counts (step 8 of `alphaBeta`). Losing captures keep their MVV-LVA order among themselves. `quiescence` uses plain `pickNextMove` and skips losing captures outright.
 
 `moveExists` (generate + try each) validates TT moves in `getPVLine`; `parseMove` matches UCI strings against generated moves.
 
@@ -109,7 +110,7 @@ Scores (set at generation; `alphaBeta` then sets the TT move to 2,000,000, `SCOR
 Zobrist: `pieceKeys[13][120]` (row `EMPTY` doubles as the EP-square key), `sideKey` (in when white to move), `castleKeys[16]` indexed by the perms nibble.
 
 ## Static exchange evaluation (attack.cpp)
-`seeAtLeast(board, move, threshold)` answers one question without searching or making a move: if this move is played and the two sides then take turns capturing on its square, each with its least valuable piece and each free to stop, does the side that played it end up at least `threshold` ahead? Values are `pieceValues` (pawn 100, knight and bishop 325, rook 550, queen 1000). Quiescence asks it, at a threshold of 0, before making a capture.
+`seeAtLeast(board, move, threshold)` answers one question without searching or making a move: if this move is played and the two sides then take turns capturing on its square, each with its least valuable piece and each free to stop, does the side that played it end up at least `threshold` ahead? Values are `pieceValues` (pawn 100, knight and bishop 325, rook 550, queen 1000). Quiescence asks it, at a threshold of 0, before making a capture, and the main search asks it the same question to sort losing captures last (see "Move generation and ordering").
 
 - **Two quick answers first.** If what the move takes (plus what a promotion adds) is below the threshold, no. If it is still at or above the threshold after giving up the piece that lands on the square, yes. Only a capture by a piece worth more than what it takes goes further.
 - **A pawn that can take back** is looked for next, on its two squares. A pawn is always the first to recapture, so when the piece is worth a pawn or more above what it took (which, with these values, is every capture that gets this far at a threshold of 0), a defending pawn makes the answer no at once.
