@@ -1,9 +1,11 @@
-// Static exchange evaluation: captures whose exchange value is known, then every capture in a set of busy
-// positions against a slow second opinion that works the exchange out the long way. Usage: see_tests
+// Static exchange evaluation: captures whose exchange value is known, then every move in a set of busy
+// positions against a slow second opinion that works the exchange out the long way. Both with pins seen &
+// without. Usage: see_tests
 #include "defs.h"
 #include <algorithm>
 #include <climits>
 #include <cstdio>
+#include <cstdlib>
 
 static int failures = 0;
 
@@ -37,6 +39,23 @@ static const struct { const char *name, *fen, *move; int value; } cases[] = {
     {"king takes a loose pawn", "4k3/8/8/8/8/8/4p3/4K3 w - - 0 1", "e1e2", 100},
     {"only the king defends", "8/8/8/8/3k4/3p4/8/3R2K1 w - - 0 1", "d1d3", -450},
     {"the king defends, but can't take back", "8/8/8/8/3k4/3p4/8/3R1BK1 w - - 0 1", "d1d3", 100},
+};
+
+// Pins. Asked to see them, the routine knows that a piece of the other side's that is pinned to its king can't take
+// back; not asked, it lets the piece take. 'blind' is the value then
+static const struct { const char *name, *fen, *move; int value, blind; } pinCases[] = {
+    {"the knight that defends is pinned", "7k/8/5n2/3p4/8/8/1B6/3R2K1 w - - 0 1", "d1d5", 100, -450},
+    {"...and the same pawn when a pawn stands in the pin's way", "7k/6p1/5n2/3p4/8/8/1B6/3R2K1 w - - 0 1", "d1d5", -450, -450},
+    {"a pinned pawn can't take back", "4k3/8/4p3/3p4/8/2N5/8/4RK2 w - - 0 1", "c3d5", 100, -225},
+    {"a knight pinned on a file, the queen takes what it guards", "1k6/8/1n6/3p4/8/8/8/1R1Q2K1 w - - 0 1", "d1d5", 100, -900},
+    {"a pinned defender (black to move)", "5rk1/1b6/8/8/5P2/8/6N1/7K b - - 0 1", "f8f4", 100, -450},
+    {"two defenders, one of them pinned", "4k3/4n3/1n6/3p4/8/8/8/3RR1K1 w - - 0 1", "d1d5", -450, -450},
+    {"pinned, but taking along the line of the pin", "7k/6b1/8/8/3p4/8/1B6/3R2K1 w - - 0 1", "d1d4", -125, -125},
+    {"the piece that pinned it is the one that took", "4k3/3r4/8/8/Q2p4/8/8/4K3 w - - 0 1", "a4d4", -900, -900},
+    {"the pin ends once the pinning piece has itself taken", "4k3/8/2n5/4p3/Q2p4/5N2/8/6K1 w - - 0 1", "f3d4", -225, -225},
+    // the side that made the move may use its own pinned pieces: when the routine said no on their account, the move
+    // turned out well many times as often as its other noes
+    {"our own pinned piece still takes back", "6k1/8/6n1/b7/5p2/8/3B2N1/4K3 w - - 0 1", "g2f4", 100, 100},
 };
 
 // -- The second opinion: the exchange played out on a copy of the squares, one capture at a time.
@@ -75,13 +94,41 @@ static bool attacks(const int *pieces, int from, int to) {
 
 struct Range { int low, high; };
 
-/// What 'side' can win on the square by taking there, or 0 if it does better not to
-static Range exchange(int *pieces, int to, int side) {
+/// Is the piece on 'square' pinned to its own king, as things stand on this copy of the board? Lined up with the king,
+/// nothing between, & the next piece beyond it an enemy that moves along that line. The square of the exchange stops
+/// the line (taking along the line of a pin is no pin), & a king that has itself taken is no longer anywhere to pin to
+static bool pinned(const int *pieces, int square, int side, int to) {
+    int king = NO_SQ;
+    for (int sq = A1; sq <= H8; ++sq) {
+        if (pieces[sq] == (side == WHITE ? wK : bK)) king = sq;
+    }
+    if (king == NO_SQ || king == to || king == square) return false;
+    int files = filesBoard[square] - filesBoard[king], ranks = ranksBoard[square] - ranksBoard[king];
+    if (files != 0 && ranks != 0 && std::abs(files) != std::abs(ranks)) return false;
+    int step = (ranks > 0 ? 10 : ranks < 0 ? -10 : 0) + (files > 0 ? 1 : files < 0 ? -1 : 0);
+    for (int sq = king + step; sq != square; sq += step) {
+        if (sq == to || pieces[sq] != EMPTY) return false;
+    }
+    for (int sq = square + step; ; sq += step) {
+        if (pieces[sq] == OFFBOARD || sq == to) return false;
+        if (pieces[sq] == EMPTY) continue;
+        bool straight = files == 0 || ranks == 0;
+        return pieceColours[pieces[sq]] != side && (straight ? IS_ROOK_OR_QUEEN(pieces[sq]) : IS_BISHOP_OR_QUEEN(pieces[sq]));
+    }
+}
+
+/// What 'side' can win on the square by taking there, or 0 if it does better not to. 'defender' is the side that
+/// didn't make the move being judged: its pinned pieces stay where they are
+static Range exchange(int *pieces, int to, int side, int defender) {
+    auto canTake = [&](int square) {
+        int piece = pieces[square];
+        return piece >= wP && piece <= bK && pieceColours[piece] == side && attacks(pieces, square, to)
+               && !(side == defender && pinned(pieces, square, side, to));
+    };
     int least = INT_MAX;
     for (int square = A1; square <= H8; ++square) {
-        int piece = pieces[square];
-        if (piece >= wP && piece <= bK && pieceColours[piece] == side && attacks(pieces, square, to)) {
-            least = std::min(least, pieceValues[piece]);
+        if (canTake(square)) {
+            least = std::min(least, pieceValues[pieces[square]]);
         }
     }
     if (least == INT_MAX) {
@@ -90,11 +137,11 @@ static Range exchange(int *pieces, int to, int side) {
     Range best = {INT_MAX, INT_MIN};
     for (int square = A1; square <= H8; ++square) {
         int piece = pieces[square];
-        if (piece >= wP && piece <= bK && pieceColours[piece] == side && pieceValues[piece] == least && attacks(pieces, square, to)) {
+        if (canTake(square) && pieceValues[piece] == least) {
             int taken = pieces[to];
             pieces[to] = piece;
             pieces[square] = EMPTY;
-            Range reply = exchange(pieces, to, side ^ 1);
+            Range reply = exchange(pieces, to, side ^ 1, defender);
             pieces[square] = piece;
             pieces[to] = taken;
             best.low = std::min(best.low, std::max(0, pieceValues[taken] - reply.high));
@@ -104,7 +151,7 @@ static Range exchange(int *pieces, int to, int side) {
     return best;
 }
 
-static Range exchangeAfter(const Board& board, int move) {
+static Range exchangeAfter(const Board& board, int move, bool seePins) {
     int pieces[BRD_SQ_NUM];
     std::copy(board.pieces, board.pieces + BRD_SQ_NUM, pieces);
     int from = GET_FROM(move), to = GET_TO(move), promoted = GET_PROMOTED(move);
@@ -113,23 +160,23 @@ static Range exchangeAfter(const Board& board, int move) {
     if (move & MFLAG_EN_PASSANT) pieces[board.side == WHITE ? to - 10 : to + 10] = EMPTY;
     pieces[to] = promoted != EMPTY ? promoted : pieces[from];
     pieces[from] = EMPTY;
-    Range reply = exchange(pieces, to, board.side ^ 1);
+    Range reply = exchange(pieces, to, board.side ^ 1, seePins ? board.side ^ 1 : BOTH); // no defender, no pins
     return {wins - reply.high, wins - reply.low};
 }
 
 // seeAtLeast only says yes or no. Its value is the highest threshold it says yes to (or 'below FLOOR')
 constexpr int FLOOR = -3000, CEILING = 3000;
-static int seeValue(const Board& board, int move) {
-    if (!seeAtLeast(board, move, FLOOR)) return FLOOR - 1;
+static int seeValue(const Board& board, int move, bool seePins) {
+    if (!seeAtLeast(board, move, FLOOR, seePins)) return FLOOR - 1;
     int yes = FLOOR, no = CEILING + 1;
     while (no - yes > 1) {
         int middle = (yes + no) / 2;
-        if (seeAtLeast(board, move, middle)) yes = middle; else no = middle;
+        if (seeAtLeast(board, move, middle, seePins)) yes = middle; else no = middle;
     }
     return yes;
 }
 
-// every capture here is compared with the second opinion, for the side to move & then with the colours swapped
+// every move here, capture or not, is compared with the second opinion, for the side to move & then with the colours swapped
 static const char *busyFens[] = {
     "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1",
     "2kr4/b7/1B1R1b2/4P3/rP1K1Q1q/8/1R1N1B2/b2r2q1 w - - 0 1",
@@ -145,46 +192,66 @@ static const char *busyFens[] = {
     "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1",
     "q3k2q/1P4P1/8/3n4/8/2B2R2/8/Q3K2Q w - - 0 1",
     "4k3/8/2n1b3/3p4/2P1P3/3B1N2/3R4/3QK3 w - - 0 1",
+    // pins all over: defenders pinned on files, ranks & diagonals, some of them by the piece that takes
+    "4k3/4n3/2n2b2/3p4/B2NP2Q/8/4R3/3RK3 w - - 0 1",
+    "r3k2r/1b2bppp/p1nppn2/qp4B1/3NP3/1BN2Q2/PPP2PPP/2KRR3 w kq - 0 1",
+    "2r1k2r/pp1bbppp/2n1pn2/q2p2B1/3P4/2NBPN2/PPQ2PPP/R3K2R b KQk - 0 1",
+    "3rk3/3q4/2n1b3/1B1p2B1/4P3/2N5/3R4/3QK3 w - - 0 1",
+    "6k1/5ppp/8/2b5/8/5N2/r3RPPP/4R1K1 b - - 0 1",
 };
 
 static int compareAll(const Board& board, const char *fen) {
     MoveList list;
-    generateAllCaptureMoves(board, list);
+    generateAllMoves(board, list); // quiet moves too: the search asks whether a piece can be taken where it lands
     for (int i = 0; i < list.count; ++i) {
         int move = list.moves[i].move;
-        Range slow = exchangeAfter(board, move);
-        int quick = seeValue(board, move);
-        if (quick < std::max(slow.low, FLOOR - 1) || quick > std::max(slow.high, FLOOR - 1)) {
-            failures++;
-            std::printf("FAIL %s gives %d, the long way gives %d to %d: %s\n", printMove(move), quick, slow.low, slow.high, fen);
+        for (bool seePins : { false, true }) {
+            Range slow = exchangeAfter(board, move, seePins);
+            int quick = seeValue(board, move, seePins);
+            if (quick < std::max(slow.low, FLOOR - 1) || quick > std::max(slow.high, FLOOR - 1)) {
+                failures++;
+                std::printf("FAIL %s gives %d, the long way gives %d to %d (pins %s): %s\n", printMove(move), quick, slow.low,
+                            slow.high, seePins ? "seen" : "not seen", fen);
+            }
         }
     }
     return list.count;
 }
 
+/// One capture whose value is known: yes at that threshold, no one higher, & the second opinion had better agree
+static void checkValue(const char *name, const char *fen, const char *moveString, int value, bool seePins) {
+    Board board{};
+    if (parseFen(fen, board) != 0) { failures++; std::printf("FAIL bad fen %s\n", fen); return; }
+    int move = parseMove(moveString, board);
+    if (move == NO_MOVE) { failures++; std::printf("FAIL bad move %s in %s\n", moveString, fen); return; }
+    const char *how = seePins ? "seeing pins" : "not seeing pins";
+    if (!seeAtLeast(board, move, value, seePins) || seeAtLeast(board, move, value + 1, seePins)) {
+        failures++;
+        std::printf("FAIL %s, %s: %s should be worth %d, but is worth %d\n", name, how, moveString, value, seeValue(board, move, seePins));
+    }
+    Range slow = exchangeAfter(board, move, seePins);
+    if (slow.low != value || slow.high != value) {
+        failures++;
+        std::printf("FAIL %s, %s: the long way gives %d to %d, not %d\n", name, how, slow.low, slow.high, value);
+    }
+}
+
 int main() {
     initAll();
 
-    for (const auto& c : cases) {
-        Board board{};
-        if (parseFen(c.fen, board) != 0) { failures++; std::printf("FAIL bad fen %s\n", c.fen); continue; }
-        int move = parseMove(c.move, board);
-        if (move == NO_MOVE) { failures++; std::printf("FAIL bad move %s in %s\n", c.move, c.fen); continue; }
-        if (!seeAtLeast(board, move, c.value) || seeAtLeast(board, move, c.value + 1)) {
-            failures++;
-            std::printf("FAIL %s: %s should be worth %d, but is worth %d\n", c.name, c.move, c.value, seeValue(board, move));
-        }
-        Range slow = exchangeAfter(board, move); // the second opinion had better agree with the table too
-        if (slow.low != c.value || slow.high != c.value) {
-            failures++;
-            std::printf("FAIL %s: the long way gives %d to %d, not %d\n", c.name, slow.low, slow.high, c.value);
-        }
+    for (const auto& c : cases) { // no pins in these, so seeing them changes nothing
+        checkValue(c.name, c.fen, c.move, c.value, false);
+        checkValue(c.name, c.fen, c.move, c.value, true);
+    }
+    for (const auto& c : pinCases) {
+        checkValue(c.name, c.fen, c.move, c.value, true);
+        checkValue(c.name, c.fen, c.move, c.blind, false);
     }
 
     // a king can't take a defended piece at all, so no threshold is low enough
     Board board{};
     parseFen("4k3/8/8/8/8/3p4/4p3/4K3 w - - 0 1", board);
-    if (seeAtLeast(board, parseMove("e1e2", board), FLOOR)) {
+    if (seeAtLeast(board, parseMove("e1e2", board), FLOOR, false) || seeAtLeast(board, parseMove("e1e2", board), FLOOR, true)) {
         failures++;
         std::printf("FAIL the king took a defended pawn\n");
     }
@@ -197,6 +264,6 @@ int main() {
         compared += compareAll(board, fen);
     }
 
-    std::printf("%d captures compared, %d failure(s)\n", compared, failures);
+    std::printf("%d moves compared, with & without pins seen, %d failure(s)\n", compared, failures);
     return failures ? 1 : 0;
 }

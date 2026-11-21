@@ -112,8 +112,9 @@ static int quiescence(int alpha, int beta, Board& board, SearchInfo& info) {
         // order the moves
         pickNextMove(moveNum, moveList);
         // a capture that loses material once the other side has taken back (queen takes a defended pawn) isn't tried,
-        // nor a pawn queening on a square where the new queen is simply taken
-        if (!seeAtLeast(board, moveList.moves[moveNum].move, 0)) {
+        // nor a pawn queening on a square where the new queen is simply taken.
+        // Pins are seen: a pawn whose only defender is pinned to its king is there for the taking
+        if (!seeAtLeast(board, moveList.moves[moveNum].move, 0, true)) {
             continue;
         }
         // skip if it is not legal
@@ -350,7 +351,7 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
         // pruning, not while every move so far gets mated
         int quiet = !(move & (MFLAG_CAPTURING | MFLAG_PROMOTION));
         if (canPrune && bestScore > -IS_MATE && (!quiet || depth <= SEE_QUIET_MAX_DEPTH)
-            && !seeAtLeast(board, move, -(quiet ? SEE_QUIET_MARGIN : SEE_CAPTURE_MARGIN) * depth)) {
+            && !seeAtLeast(board, move, -(quiet ? SEE_QUIET_MARGIN : SEE_CAPTURE_MARGIN) * depth, !quiet)) { // pins seen for captures
             continue;
         }
         // skip if it is not legal
