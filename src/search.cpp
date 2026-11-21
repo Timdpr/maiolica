@@ -106,12 +106,13 @@ static int quiescence(int alpha, int beta, Board& board, SearchInfo& info) {
     }
 
     MoveList moveList;
-    generateAllCaptureMoves(board, moveList); // note - only capture moves!
+    generateAllCaptureMoves(board, moveList); // captures, & a pawn queening without one. Nothing else!
 
     for (int moveNum = 0; moveNum < moveList.count; ++moveNum) {
         // order the moves
         pickNextMove(moveNum, moveList);
-        // a capture that loses material once the other side has taken back (queen takes a defended pawn) isn't tried
+        // a capture that loses material once the other side has taken back (queen takes a defended pawn) isn't tried,
+        // nor a pawn queening on a square where the new queen is simply taken
         if (!seeAtLeast(board, moveList.moves[moveNum].move, 0)) {
             continue;
         }
@@ -170,6 +171,13 @@ constexpr int FUTILITY_MARGIN_PER_DEPTH = 125;
 // depth squared: 4 at depth 1, 7 at depth 2, then 12, 19, 28, 39
 constexpr int LMP_BASE = 3;
 
+// Exchange pruning: a capture is skipped when the static exchange evaluation says it loses more than this for each ply
+// of depth left: anything at all at depth 1, a piece for a pawn at depth 2, a rook for a pawn at depth 4, & so on.
+// A quiet move, which can only lose what it puts where it can be taken, gets half the margin, this close to the leaves
+constexpr int SEE_CAPTURE_MARGIN = 100;
+constexpr int SEE_QUIET_MARGIN = 50;
+constexpr int SEE_QUIET_MAX_DEPTH = 10;
+
 // Aspiration windows: from this depth on, the root is searched within this much of the last depth's score
 constexpr int ASPIRATION_MIN_DEPTH = 4;
 constexpr int ASPIRATION_WINDOW = 50;
@@ -187,6 +195,23 @@ static int historyBonus(int depth) {
 static void updateHistory(Board& board, int move, int bonus) {
     int& entry = board.searchHistory[board.pieces[GET_FROM(move)]][GET_TO(move)];
     entry += bonus - entry * abs(bonus) / HISTORY_MAX; // the nearer the limit, the less it moves. So new results outweigh old ones
+}
+
+/// The table's move was searched by itself & didn't cut off, so now the others are wanted. Generate the whole
+/// list & put that move back at the front, where the move loop has just been
+static int generateTheRest(const Board& board, MoveList& moveList, int& tableMoveOnly) {
+    const int tableMove = moveList.moves[0].move;
+    generateAllMoves(board, moveList);
+    int found = 0;
+    while (found < moveList.count && moveList.moves[found].move != tableMove) {
+        ++found;
+    }
+    ASSERT(found < moveList.count) // movePlayable said it would be there
+    if (found < moveList.count) {
+        std::swap(moveList.moves[0], moveList.moves[found]);
+    }
+    tableMoveOnly = false;
+    return moveList.count > 1;
 }
 
 /// Negamax alpha-beta search...
@@ -273,8 +298,17 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
         }
     }
 
+    // The table's move goes first, & more often than not it cuts off. So it is searched before the others are even
+    // generated: the list starts as that one move (if it could be played here at all), & the rest join it only if needed
     MoveList moveList;
-    generateAllMoves(board, moveList);
+    int tableMoveOnly = pvMove != NO_MOVE && movePlayable(board, pvMove);
+    if (tableMoveOnly) {
+        moveList.moves[0].move = pvMove;
+        moveList.moves[0].score = 0;
+        moveList.count = 1;
+    } else {
+        generateAllMoves(board, moveList);
+    }
     int legal = 0;
     int oldAlpha = alpha;
     int bestMove = NO_MOVE;
@@ -282,20 +316,12 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
     int quietsTried[MAX_POSITION_MOVES]; // the non-captures searched so far that didn't cut off
     int quietCount = 0;
 
-    if (pvMove != NO_MOVE) { // if we have a principal variation move
-        for (int moveNum = 0; moveNum < moveList.count; ++moveNum) {
-            if (moveList.moves[moveNum].move == pvMove) { // if pv move is in our move list
-                moveList.moves[moveNum].score = 2000000; // give it a big score in our list so it is searched first!
-            }
-        }
-    }
-
     // Using principal variation search
     int foundPV = false;
     int skipQuiets = false; // set once late move pruning has given up on this node's quiet moves
 
     // for each move generated
-    for (int moveNum = 0; moveNum < moveList.count; ++moveNum) {
+    for (int moveNum = 0; moveNum < moveList.count || (tableMoveOnly && generateTheRest(board, moveList, tableMoveOnly)); ++moveNum) {
         // order the moves. Once the quiet moves are being skipped there's no need: captures all come before them,
         // so the only moves left that aren't skipped are promotions without a capture
         if (!skipQuiets) {
@@ -317,6 +343,14 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
         // Killers are still tried (they come before the other quiet moves). Not while every move so far gets mated
         if (reducible && legal >= lateMoveLimit && bestScore > -IS_MATE) {
             skipQuiets = true;
+            continue;
+        }
+        // Exchange pruning: a move that gives up more material than there is depth left to show why (queen takes a
+        // defended pawn, or a knight steps where a pawn takes it, two plies from the end) isn't made. Like late move
+        // pruning, not while every move so far gets mated
+        int quiet = !(move & (MFLAG_CAPTURING | MFLAG_PROMOTION));
+        if (canPrune && bestScore > -IS_MATE && (!quiet || depth <= SEE_QUIET_MAX_DEPTH)
+            && !seeAtLeast(board, move, -(quiet ? SEE_QUIET_MARGIN : SEE_CAPTURE_MARGIN) * depth)) {
             continue;
         }
         // skip if it is not legal

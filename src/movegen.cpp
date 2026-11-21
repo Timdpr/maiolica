@@ -304,6 +304,15 @@ void generateAllMoves(const Board& board, MoveList& moveList) {
     }
 }
 
+/// Adds a pawn's step on to the last rank to become a queen, taking nothing, to the list of captures: it wins about
+/// what taking a queen wins, so that is how it is sorted
+static void addQueeningMove(int move, MoveList& moveList) {
+    moveList.moves[moveList.count].move = move;
+    moveList.moves[moveList.count].score = mVVLVAScores[wQ][wP] + 1000000;
+    moveList.count++;
+}
+
+/// Every capture, & a pawn queening without one: the moves quiescence tries
 void generateAllCaptureMoves(const Board& board, MoveList& moveList) {
     ASSERT(checkBoard(board))
 
@@ -317,6 +326,10 @@ void generateAllCaptureMoves(const Board& board, MoveList& moveList) {
         for (int pieceNum = 0; pieceNum < board.pieceCounts[wP]; ++pieceNum) {
             int square = board.pieceList[wP][pieceNum];
             ASSERT(squareOnBoard(square))
+            // a pawn that can queen by stepping forward (the other three promotions wait for the main search)
+            if (ranksBoard[square] == RANK_7 && board.pieces[square + 10] == EMPTY) {
+                addQueeningMove(MOVE(square, square + 10, EMPTY, wQ, 0), moveList);
+            }
             // generate CAPTURE moves for it
             // (if square ahead and to the right/left is not offboard and has a black piece, add capture move):
             if (!SQUARE_OFFBOARD(square+9) && pieceColours[board.pieces[square + 9]] == BLACK) {
@@ -339,6 +352,9 @@ void generateAllCaptureMoves(const Board& board, MoveList& moveList) {
         for (int pieceNum = 0; pieceNum < board.pieceCounts[bP]; ++pieceNum) { // loop through black pawns
             int square = board.pieceList[bP][pieceNum];
             ASSERT(squareOnBoard(square))
+            if (ranksBoard[square] == RANK_2 && board.pieces[square - 10] == EMPTY) { // queening
+                addQueeningMove(MOVE(square, square - 10, EMPTY, bQ, 0), moveList);
+            }
             // CAPTURE moves:
             if (!SQUARE_OFFBOARD(square-9) && pieceColours[board.pieces[square - 9]] == WHITE) {
                 addBlackPawnCaptureMove(board, square, square-9, board.pieces[square-9], moveList);
@@ -426,16 +442,92 @@ void initMVVLVA() {
     }
 }
 
-/// Check that a move is legal given the board state
-int moveExists(Board& board, const int move) {
-    MoveList moveList;
-    generateAllMoves(board, moveList);
-    for (int moveNum = 0; moveNum < moveList.count; ++moveNum) {
-        if (!makeMove(board, moveList.moves[moveNum].move)) {
-            continue;
+/// Could this move be played here? True exactly when generateAllMoves would have it in its list: the same squares, the
+/// same piece taken, the same flags. So it may still leave its own king in check, which makeMove finds out.
+/// For a move from the table, which a clash of keys (or another thread's write) can leave belonging to another position
+int movePlayable(const Board& board, const int move) {
+    const int from = GET_FROM(move);
+    const int to = GET_TO(move);
+    if (from >= BRD_SQ_NUM || to >= BRD_SQ_NUM) { // seven bits can name a square the board hasn't got
+        return false;
+    }
+    const int side = board.side;
+    const int piece = board.pieces[from];
+    const int target = board.pieces[to];
+    if (piece == EMPTY || piece == OFFBOARD || pieceColours[piece] != side || target == OFFBOARD) {
+        return false;
+    }
+    const int step = to - from;
+
+    if (piecePawn[piece]) {
+        const int forward = (side == WHITE) ? 10 : -10;
+        if (move & MFLAG_EN_PASSANT) {
+            return to == board.enPasSq && (step == forward - 1 || step == forward + 1)
+                   && move == MOVE(from, to, EMPTY, EMPTY, MFLAG_EN_PASSANT);
         }
-        undoMove(board);
-        if (moveList.moves[moveNum].move == move) {
+        if (move & MFLAG_PAWN_START) {
+            return ranksBoard[from] == (side == WHITE ? RANK_2 : RANK_7) && board.pieces[from + forward] == EMPTY
+                   && target == EMPTY && move == MOVE(from, from + 2 * forward, EMPTY, EMPTY, MFLAG_PAWN_START);
+        }
+        // straight on to an empty square, or diagonally on to one of theirs
+        if (step == forward) {
+            if (target != EMPTY) {
+                return false;
+            }
+        } else if ((step != forward - 1 && step != forward + 1) || pieceColours[target] != (side ^ 1)) {
+            return false;
+        }
+        // from its seventh rank it has to turn into something, of its own colour, & from nowhere else can it
+        const int promoted = GET_PROMOTED(move);
+        if (ranksBoard[from] == (side == WHITE ? RANK_7 : RANK_2)) {
+            if (promoted < (side == WHITE ? wN : bN) || promoted > (side == WHITE ? wQ : bQ)) {
+                return false;
+            }
+        } else if (promoted != EMPTY) {
+            return false;
+        }
+        return move == MOVE(from, to, target, promoted, 0);
+    }
+
+    if (move & MFLAG_CASTLING) { // just what the generator asks before it adds one
+        if (side == WHITE) {
+            if (move == MOVE(E1, G1, EMPTY, EMPTY, MFLAG_CASTLING)) {
+                return (board.castlingPerms & wK_CA) && board.pieces[F1] == EMPTY && board.pieces[G1] == EMPTY
+                       && !isSquareAttacked(E1, BLACK, board) && !isSquareAttacked(F1, BLACK, board);
+            }
+            if (move == MOVE(E1, C1, EMPTY, EMPTY, MFLAG_CASTLING)) {
+                return (board.castlingPerms & wQ_CA) && board.pieces[D1] == EMPTY && board.pieces[C1] == EMPTY
+                       && board.pieces[B1] == EMPTY && !isSquareAttacked(E1, BLACK, board) && !isSquareAttacked(D1, BLACK, board);
+            }
+        } else {
+            if (move == MOVE(E8, G8, EMPTY, EMPTY, MFLAG_CASTLING)) {
+                return (board.castlingPerms & bK_CA) && board.pieces[F8] == EMPTY && board.pieces[G8] == EMPTY
+                       && !isSquareAttacked(E8, WHITE, board) && !isSquareAttacked(F8, WHITE, board);
+            }
+            if (move == MOVE(E8, C8, EMPTY, EMPTY, MFLAG_CASTLING)) {
+                return (board.castlingPerms & bQ_CA) && board.pieces[D8] == EMPTY && board.pieces[C8] == EMPTY
+                       && board.pieces[B8] == EMPTY && !isSquareAttacked(E8, WHITE, board) && !isSquareAttacked(D8, WHITE, board);
+            }
+        }
+        return false;
+    }
+
+    // Any other piece: on to an empty square or one of theirs, with nothing else said in the move...
+    if (pieceColours[target] == side || move != MOVE(from, to, target, EMPTY, 0)) {
+        return false;
+    }
+    // ...and along one of its own directions: a single step, or for a slider as far as the way is clear
+    for (int i = 0; i < pieceDirectionNumbers[piece]; ++i) {
+        const int direction = pieceDirection[piece][i];
+        if (pieceSlides[piece]) {
+            int square = from + direction;
+            while (square != to && board.pieces[square] == EMPTY) {
+                square += direction;
+            }
+            if (square == to) {
+                return true;
+            }
+        } else if (step == direction) {
             return true;
         }
     }

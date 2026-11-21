@@ -307,7 +307,7 @@ void mirrorEvalTest(Board& board);
 // movegen.cpp
 void generateAllMoves(const Board& board, MoveList& list);
 void generateAllCaptureMoves(const Board& board, MoveList& moveList);
-[[nodiscard]] int moveExists(Board& board, int move);
+[[nodiscard]] int movePlayable(const Board& board, int move);
 void initMVVLVA();
 
 // makemove.cpp
