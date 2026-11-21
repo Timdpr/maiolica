@@ -8,7 +8,7 @@ Maiolica speaks [UCI](https://www.shredderchess.com/download/div/uci.zip), so it
 |---|---|
 | `uci` | `id`, the options below, `uciok` |
 | `isready` | `readyok`, immediately, even mid search |
-| `ucinewgame` | stops any search, clears the hash, resets to the start position |
+| `ucinewgame` | stops any search, clears the hash and the history scores kept from the last search, resets to the start position |
 | `position startpos \| fen <fen> [moves …]` | Any whitespace. A bad FEN falls back to the start position. A bad or illegal move stops the move list there. Both report an `info string` |
 | `go …` | see below. A running search is stopped first |
 | `stop` | stops the search, which then sends `bestmove`. Harmless when idle |

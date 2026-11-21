@@ -1,6 +1,7 @@
 #include "defs.h"
 #include <algorithm>
 #include <cmath>
+#include <cstring>
 #include <memory>
 #include <string>
 #include <thread>
@@ -68,13 +69,16 @@ int isRepetition(const Board& board) {
     return false;
 }
 
-/// Clear relevant arrays before starting to search and set up search info
+/// Forget the history scores kept from the last search: for a new game, or a position that has nothing to do with the last one
+void forgetHistory(SearchInfo& info) {
+    std::memset(info.keptHistory, 0, sizeof(info.keptHistory));
+}
+
+/// Clear relevant arrays before starting to search and set up search info.
+/// The history scores aren't cleared: they start as the last search left them (all 0 if there hasn't been one)
 static void clearForSearch(Board& board, SearchInfo& info, HashTable& table) {
-    for (auto& piece : board.searchHistory) {
-        for (int& square : piece) {
-            square = 0;
-        }
-    }
+    static_assert(sizeof(board.searchHistory) == sizeof(info.keptHistory));
+    std::memcpy(board.searchHistory, info.keptHistory, sizeof(board.searchHistory));
     for (auto& killerMove : board.searchKillers) {
         for (int& depth : killerMove) {
             depth = 0;
@@ -544,6 +548,9 @@ void searchPosition(Board& board, SearchInfo& info, HashTable& table) {
     }
 
     deepen(board, info, table, bestMove, ponderMove);
+    // what this search learnt about which quiet moves work is where the next one starts: its position will be a move
+    // or two further on in the same game. (Each helper started from the same scores, & what it learnt goes with it)
+    std::memcpy(info.keptHistory, board.searchHistory, sizeof(info.keptHistory));
 
     if (debugMode && info.stopped && info.timeSet && getTimeMS() > info.stopTime) {
         sendLine("info string stopped at the hard limit");

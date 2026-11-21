@@ -172,6 +172,10 @@ struct SearchInfo {
 
     std::atomic<bool> stopped{false};
     std::atomic<bool> ponder{false}; // pondering: no time limit & no bestmove until 'ponderhit' or 'stop'
+
+    // the main thread's history scores as the last search left them. The next search starts from these, as its position
+    // is the same game a move or two on. Indexed as Board's searchHistory. All 0 until a search has run, & after forgetHistory
+    int keptHistory[13][BRD_SQ_NUM] = {};
 };
 
 
@@ -335,6 +339,7 @@ TimeMS getTimeMS();
 void initLmrReductions();
 [[nodiscard]] int isRepetition(const Board& board);
 void searchPosition(Board& board, SearchInfo& info, HashTable& table);
+void forgetHistory(SearchInfo& info);
 
 // pvtable.cpp
 void clearHashTable(HashTable& table);
