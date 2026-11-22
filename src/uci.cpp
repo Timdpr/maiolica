@@ -222,6 +222,7 @@ void uciLoop() {
         else if (command == "ucinewgame") {
             stopSearch();
             clearHashTable(hashTable);
+            forgetHistory(info);
             parseFen(START_FEN, board);
         } else if (command == "setoption") {
             stopSearch(); // the hash table may get swapped out from under it

@@ -98,6 +98,33 @@ static bool rootMoveIsTheSearchsOwn() {
     return !std::strncmp(bestMoveLine, "a1a8", 4);
 }
 
+// The history scores are kept from one search to the next, as the next position is the same game a move on. So a
+// second search with the same SearchInfo must start from them (it then searches a different tree), & after
+// forgetHistory it must search exactly as the first did
+static long long nodesTo(const char *fen, int depth, SearchInfo& info) {
+    Board board{};
+    parseFen(fen, board);
+    clearHashTable(hashTable); // so that the history scores are all that is carried over
+    info.depth = depth;
+    info.startTime = getTimeMS();
+    searchPosition(board, info, hashTable);
+    return info.nodes;
+}
+static bool historyIsKeptThenForgotten() {
+    const char *fen = "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10";
+    SearchInfo info{};
+    const long long fresh = nodesTo(fen, 6, info);
+    bool kept = false;
+    for (const auto& piece : info.keptHistory) {
+        for (const int score : piece) kept |= score != 0;
+    }
+    const long long second = nodesTo(fen, 6, info);
+    forgetHistory(info);
+    const long long again = nodesTo(fen, 6, info);
+    clearHashTable(hashTable);
+    return kept && second != fresh && again == fresh;
+}
+
 int main() {
     initAll();
     initHashTable(hashTable, 16);
@@ -121,6 +148,7 @@ int main() {
     const bool ponderOk = ponderReplyIsChecked();
     const bool entryOk = entryReadsBack();
     const bool rootOk = rootMoveIsTheSearchsOwn();
+    const bool historyOk = historyIsKeptThenForgotten();
     free(hashTable.hTable);
 
     // a failed ASSERT aborts, so getting here is most of the test. But make sure null moves were part of it
@@ -129,5 +157,6 @@ int main() {
     if (!ponderOk) std::printf("FAIL, the ponder reply from the table isn't checked against the position\n");
     if (!entryOk) std::printf("FAIL, a table entry didn't read back as it was stored\n");
     if (!rootOk) std::printf("FAIL, the move played came from a table entry that wasn't the search's own: bestmove %s\n", bestMoveLine);
-    return ok && ponderOk && entryOk && rootOk ? 0 : 1;
+    if (!historyOk) std::printf("FAIL, the history scores weren't kept for the next search, or weren't forgotten when told to\n");
+    return ok && ponderOk && entryOk && rootOk && historyOk ? 0 : 1;
 }
