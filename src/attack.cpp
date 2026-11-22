@@ -1,4 +1,5 @@
 #include "defs.h"
+#include <algorithm>
 
 const int knightDirection[8] = { -8, -19, -21, -12, 8, 19, 21, 12 };
 const int bishopDirection[4] = { -9, -11, 11, 9 };
@@ -83,11 +84,43 @@ static inline int nextOnLine(const Board& board, int& square, const int step, co
     return piece;
 }
 
+/// Is the piece on 'square' pinned to its own king, in an exchange on 'to'? That is: it stands on a line with its king,
+/// nothing between them, & the next piece along that line beyond it is an enemy bishop, rook or queen that moves that
+/// way. The squares in 'gone' are looked through: their pieces have left. 'to' itself stops the line whichever side of
+/// the piece it lies, so a piece that takes along the very line it is pinned on isn't called pinned
+static inline int pinnedToKing(const Board& board, const int square, const int colour, const int to, const int *gone, const int goneCount) {
+    const int king = board.kingSq[colour];
+    const int step = lineStep[square - king + 77]; // from the king towards the piece
+    if (step == 0) {
+        return false; // not on a line with the king at all (or it is the king)
+    }
+    auto left = [&](int sq) { return std::find(gone, gone + goneCount, sq) != gone + goneCount; };
+    // from the king to the piece: is the way clear? (a few far-apart pairs get a step without sharing a line: for those
+    // this walk runs off the board, which isn't EMPTY, before it arrives)
+    for (int sq = king + step; sq != square; sq += step) {
+        if (sq == to || (board.pieces[sq] != EMPTY && !left(sq))) {
+            return false;
+        }
+    }
+    for (int sq = square + step; ; sq += step) { // & beyond the piece: what comes first?
+        const int piece = board.pieces[sq];
+        if (piece == OFFBOARD || sq == to) {
+            return false;
+        }
+        if (piece != EMPTY && !left(sq)) {
+            const int straight = step == 1 || step == -1 || step == 10 || step == -10;
+            return pieceColours[piece] != colour && (straight ? IS_ROOK_OR_QUEEN(piece) : IS_BISHOP_OR_QUEEN(piece));
+        }
+    }
+}
+
 /// Static exchange evaluation, or 'SEE'. Say this move is made, and the two sides then take turns capturing on its
 /// square, each with its least valuable piece, either free to stop when taking again would cost it. Does the side that
 /// made the move end up at least 'threshold' ahead, in pieceValues? Nothing is searched & no move is made.
-/// A piece lined up behind another joins in once the one in front has gone. Pins aren't seen: a pinned piece still takes
-int seeAtLeast(const Board& board, const int move, const int threshold) {
+/// A piece lined up behind another joins in once the one in front has gone. With 'seePins', a piece of the other side's
+/// that is pinned to its king can't take back (the mover's own pinned pieces still can: docs/architecture.md says why).
+/// That costs about a sixth more, so it is asked for where a wrong 'no' is dearest
+int seeAtLeast(const Board& board, const int move, const int threshold, const int seePins) {
     const int from = GET_FROM(move);
     const int to = GET_TO(move);
     const int promoted = GET_PROMOTED(move);
@@ -107,17 +140,26 @@ int seeAtLeast(const Board& board, const int move, const int threshold) {
         return true;
     }
 
-    // A pawn takes back first if one can, & when the piece is worth this much more than what it took, that settles it
+    // Squares whose pieces have left: the mover's, a pawn taken en passant, & later each piece used in the exchange
+    const int passed = (move & MFLAG_EN_PASSANT) ? (side == WHITE ? to - 10 : to + 10) : from;
+    int gone[32];
+    int goneCount = 0;
+    gone[goneCount++] = from;
+    gone[goneCount++] = passed;
+
+    // A pawn takes back first if one can (& isn't pinned), & when the piece is worth this much more than what it
+    // took, that settles it
     if (balance + pieceValues[wP] < 0) {
-        if (side == WHITE ? (board.pieces[to + 9] == bP || board.pieces[to + 11] == bP)
-                          : (board.pieces[to - 9] == wP || board.pieces[to - 11] == wP)) {
-            return false;
+        const int pawn = (side == WHITE) ? bP : wP;
+        for (int square : { side == WHITE ? to + 9 : to - 9, side == WHITE ? to + 11 : to - 11 }) {
+            if (board.pieces[square] == pawn && !(seePins && pinnedToKing(board, square, side ^ 1, to, gone, goneCount))) {
+                return false;
+            }
         }
     }
 
     // Otherwise, find everything that attacks the square, for both sides: where each piece is & the line it is on
     // (0 for a knight). The moving piece has left, as has a pawn taken en passant, so what's behind them counts
-    const int passed = (move & MFLAG_EN_PASSANT) ? (side == WHITE ? to - 10 : to + 10) : from;
     int squares[2][16], steps[2][16];
     int count[2] = { 0, 0 };
 
@@ -149,6 +191,7 @@ int seeAtLeast(const Board& board, const int move, const int threshold) {
 
     // Now the two sides take turns. Whoever is to take needs to: 'balance' says they are behind as things stand
     int colour = side ^ 1;
+    int kingUsed = false; // once the other side's king has taken, its pins mean nothing
     while (count[colour] > 0) {
         // take with the least valuable piece
         int best = 0;
@@ -157,9 +200,28 @@ int seeAtLeast(const Board& board, const int move, const int threshold) {
                 best = i;
             }
         }
+        // ...though the side that didn't make the move must pass over a piece that is pinned to its king
+        if (seePins && colour != side && !kingUsed) {
+            unsigned pinned = 0; // a bit for each piece found pinned, this turn
+            while (best >= 0 && pinnedToKing(board, squares[colour][best], colour, to, gone, goneCount)) {
+                pinned |= 1u << best;
+                best = -1;
+                for (int i = 0; i < count[colour]; ++i) {
+                    if (!(pinned >> i & 1)
+                        && (best < 0 || pieceValues[board.pieces[squares[colour][i]]] < pieceValues[board.pieces[squares[colour][best]]])) {
+                        best = i;
+                    }
+                }
+            }
+            if (best < 0) {
+                break; // every piece of theirs that could take is pinned
+            }
+        }
         int square = squares[colour][best];
         int step = steps[colour][best];
         int value = pieceValues[board.pieces[square]];
+        gone[goneCount++] = square;
+        kingUsed |= colour != side && IS_KING(board.pieces[square]);
         squares[colour][best] = squares[colour][--count[colour]];
         steps[colour][best] = steps[colour][count[colour]];
 

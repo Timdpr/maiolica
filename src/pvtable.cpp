@@ -46,7 +46,7 @@ int getPVLine(const int depth, const Board& board, const HashTable& table, const
     // 'loop through the table's moves until given depth, as long as legal moves are being found'
     while (move != NO_MOVE && count < depth) {
         ASSERT(count < MAX_DEPTH)
-        if (moveExists(walk, move) && makeMove(walk, move)) { // it's legal, so it gets made
+        if (movePlayable(walk, move) && makeMove(walk, move)) { // it's legal, so it gets made
             pvArray[count++] = move; // populate pvArray with move
         } else {
             break;
@@ -70,7 +70,7 @@ int probePonderMove(const Board& board, const int move, const HashTable& table) 
         return NO_MOVE;
     }
     int reply = probePVTable(next, table);
-    return (reply != NO_MOVE && moveExists(next, reply)) ? reply : NO_MOVE;
+    return (reply != NO_MOVE && movePlayable(next, reply) && makeMove(next, reply)) ? reply : NO_MOVE;
 }
 
 /// Loop through every entry in the table, setting each to zero, which is what an empty one looks like

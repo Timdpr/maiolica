@@ -96,6 +96,14 @@ target_link_libraries(see_tests PRIVATE maiolica_core)
 add_test(NAME see COMMAND see_tests)
 set_tests_properties(see PROPERTIES LABELS "smoke;quick")
 
+# movePlayable: its answer against the move list, for every move there could be (smoke: a spread of them)
+add_executable(playable_tests tests/playable_tests.cpp)
+target_link_libraries(playable_tests PRIVATE maiolica_core)
+add_test(NAME playable COMMAND playable_tests quick)
+set_tests_properties(playable PROPERTIES LABELS quick)
+add_test(NAME playable_smoke COMMAND playable_tests smoke)
+set_tests_properties(playable_smoke PROPERTIES LABELS smoke)
+
 add_test(NAME uci COMMAND bash ${CMAKE_CURRENT_SOURCE_DIR}/tests/uci_test.sh $<TARGET_FILE:maiolica>)
 set_tests_properties(uci PROPERTIES LABELS quick)
 

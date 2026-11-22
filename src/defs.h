@@ -295,7 +295,7 @@ void mirrorBoard(Board& board);
 
 // attack.cpp
 int isSquareAttacked(int square, int attackingSide, const Board& board);
-int seeAtLeast(const Board& board, int move, int threshold);
+int seeAtLeast(const Board& board, int move, int threshold, int seePins = false);
 
 // io.cpp
 char *printSquare(int square);
@@ -318,11 +318,12 @@ void mirrorEvalTest(Board& board);
 // movegen.cpp
 void generateAllMoves(const Board& board, MoveList& list);
 void generateAllCaptureMoves(const Board& board, MoveList& moveList);
-[[nodiscard]] int moveExists(Board& board, int move);
+[[nodiscard]] int movePlayable(const Board& board, int move);
 void initMVVLVA();
 
 // makemove.cpp
 void initLineSteps();
+extern int lineStep[155]; // the step from one square towards another on the same line, by their difference + 77. 0 if none
 int isInCheck(Board& board);
 [[nodiscard]] int makeMove(Board& board, int move);
 void undoMove(Board& board);

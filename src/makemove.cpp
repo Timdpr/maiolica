@@ -23,7 +23,7 @@ const int castlePermArray[120] = {
 
 /// The step that takes you from one square towards another on the same rank, file or diagonal,
 /// indexed by the difference between the squares + 77. 0 if they don't share a line
-static int lineStep[155];
+int lineStep[155];
 
 void initLineSteps() {
     for (int step : { 1, 9, 10, 11 }) {
