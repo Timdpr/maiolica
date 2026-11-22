@@ -167,6 +167,7 @@ constexpr int LMR_FULL_MOVES = 4;
 constexpr int LMR_MIN_DEPTH = 3;
 constexpr int LMR_MAX_MOVES = 64;
 static int lmrReductions[MAX_DEPTH][LMR_MAX_MOVES]; // plies to reduce by, indexed by depth left & how many legal moves in we are
+constexpr int LMR_HISTORY = 2048; // a history score this good takes a ply off the reduction, & one this bad adds a ply
 
 /// Fill the reduction table: the deeper there is still to go and the later the move, the more it is reduced
 void initLmrReductions() {
@@ -409,8 +410,15 @@ static int alphaBeta(int alpha, int beta, int depth, Board& board, SearchInfo& i
         if ((reducible || losingCapture) && lateness > LMR_FULL_MOVES && depth >= LMR_MIN_DEPTH && !inCheck && !isInCheck(board)) {
             // by more for the later moves & at higher depths, but always leaving a ply to search
             int reduction = lmrReductions[std::min(depth, MAX_DEPTH - 1)][std::min(lateness, LMR_MAX_MOVES - 1)];
+            // a quiet move that has done well before gets a ply less (so no reduction at all, if it was only due one),
+            // & one that keeps failing a ply more. The move has been made, so its piece now stands on 'to'. History is
+            // only kept for quiet moves, so a losing capture is left as it was
+            int history = reducible ? board.searchHistory[board.pieces[GET_TO(move)]][GET_TO(move)] : 0;
+            reduction += (history <= -LMR_HISTORY) - (history >= LMR_HISTORY);
             reduction = std::min(reduction, depth - 2);
-            score = -alphaBeta(-alpha - 1, -alpha, depth-1-reduction, board, info, table, true);
+            if (reduction > 0) {
+                score = -alphaBeta(-alpha - 1, -alpha, depth-1-reduction, board, info, table, true);
+            }
         }
         // if it does (or it wasn't reduced), search it at full depth
         if (score > alpha) {
