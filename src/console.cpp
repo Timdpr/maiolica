@@ -179,9 +179,10 @@ static int lastMove(const Board& board) {
     return board.historyPly > 0 ? board.history[board.historyPly - 1].move : NO_MOVE;
 }
 
+static SearchInfo info{}; // kept between the engine's moves, as its history scores are
+
 /// Search the position with the console's limits & return the move it picks
 static int think(Board& board, const int moveTime, const int depth) {
-    static SearchInfo info{};
     info.depth = depth;
     info.nodeLimit = 0;
     info.infinite = false;
@@ -257,6 +258,7 @@ void consoleLoop() {
         else if (command == "new") {
             parseFen(START_FEN, board);
             clearHashTable(hashTable);
+            forgetHistory(info);
             engineSide = BLACK;
             drawBoard(board, NO_MOVE);
         } else if (command == "go") engineSide = board.side;
