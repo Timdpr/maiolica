@@ -72,6 +72,7 @@ void debugAnalysisTest(const char *epdFile, Board& board, SearchInfo& info, Hash
             info.softStopTime = info.stopTime.load(); // a set time for each position, so use all of it
             info.stopped = false;
             clearHashTable(table);
+            forgetHistory(info); // each position is a fresh start
             parseFen(lineIn, board);
             printf("\n%s\n", lineIn);
             printf("time:%d start:%lld stop:%lld depth:%d timeset:%d\n",

@@ -89,6 +89,8 @@ It first makes its games: a few random opening moves, then the first build plays
 | 1MB table kept for the whole game, 30000 nodes a move | a table that is always full, so entries get replaced all the time; node limits |
 | 64MB table kept for the whole game, depth 7 (first 20 games) | the default table carried from move to move, a bit deeper |
 
+The first mode sends `ucinewgame` before every search, so each starts from an empty table and with no history scores kept from the search before; the other two carry both from move to move, as a game does.
+
 It prints the first few mismatches per mode and exits non-zero if there were any. An engine that crashes, or gives no answer for 2 minutes, fails it too. It only makes sense for a change that claims to leave search alone: once the bench signature moves, this fails too, as it should.
 
 CI runs it on every pull request, on Linux only: 10 games (~1,600 searches) through the pull request and through the commit it would merge into, in under 2 minutes alongside the other tests. A pull request that changes `tests/bench_signature.txt` has changed search on purpose, so there the job compares nothing and passes.

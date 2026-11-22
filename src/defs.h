@@ -83,6 +83,13 @@ struct MoveList {
     int count;
 };
 
+// Move scores: the table's move gets the first, a capture the second plus its MVV-LVA score. So a score from
+// SCORE_CAPTURE up to SCORE_TABLE_MOVE is a capture or a pawn queening. Killers & history scores are all below
+// (see movegen.cpp)
+constexpr int SCORE_TABLE_MOVE = 2000000;
+constexpr int SCORE_CAPTURE = 1000000;
+constexpr int SCORE_QUEEN_PROMOTION = SCORE_CAPTURE + 600; // a pawn that queens without capturing: above pawn takes queen (505)
+
 /// Transposition table entry: two 64-bit words. The key is kept xored with the data, so an entry whose
 /// two words come from different writes fails the key test, & is treated as not there
 struct HashEntry {
@@ -167,6 +174,10 @@ struct SearchInfo {
 
     std::atomic<bool> stopped{false};
     std::atomic<bool> ponder{false}; // pondering: no time limit & no bestmove until 'ponderhit' or 'stop'
+
+    // the main thread's history scores as the last search left them. The next search starts from these, as its position
+    // is the same game a move or two on. Indexed as Board's searchHistory. All 0 until a search has run, & after forgetHistory
+    int keptHistory[13][BRD_SQ_NUM] = {};
 };
 
 
@@ -331,6 +342,7 @@ TimeMS getTimeMS();
 void initLmrReductions();
 [[nodiscard]] int isRepetition(const Board& board);
 void searchPosition(Board& board, SearchInfo& info, HashTable& table);
+void forgetHistory(SearchInfo& info);
 
 // pvtable.cpp
 void clearHashTable(HashTable& table);

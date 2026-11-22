@@ -151,6 +151,11 @@ check "threads: back to one thread" "${T4}"$'position startpos\ngo depth 6\n~0.3
 sig=$(run $'bench\nquit' | grep '^Nodes searched')
 check "threads: bench still uses one" "${T4}"$'bench\nquit' "^${sig:-none}\$"
 
+# the table & the history scores are both kept from move to move. A new game must start from neither
+fresh=$(run $'position startpos\ngo depth 7\n~0.5\nquit' | sed -n 's/^info depth 7 .* nodes \([0-9]*\) .*/\1/p')
+check "ucinewgame starts afresh" $'position startpos moves e2e4 e7e5\ngo depth 7\n~0.5\nucinewgame\nposition startpos\ngo depth 7\n~0.5\nquit' \
+    "^info depth 7 .* nodes ${fresh:-none} "
+
 epd=$(mktemp) && echo "8/8/4k3/8/8/4K3/8/8 w - - 0 1" > "$epd"
 check "epd doesn't inherit go infinite" $'go infinite\nstop\nepd '"$epd"$'\nisready\nquit' 'readyok'
 rm -f "$epd"
